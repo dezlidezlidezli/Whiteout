@@ -1,0 +1,64 @@
+# Builds Frostkettle and publishes it to GitHub Pages:
+#   https://dezlidezlidezli.github.io/Whiteout/
+#
+# One-time setup (repository Settings):
+#   1. Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
+#   2. Optional, to play the development branch before merging:
+#      Settings -> Environments -> github-pages -> Deployment branches and tags ->
+#      "Add deployment branch or tag rule" -> claude/whiteout-survival-game-kxixxo
+#      (or simply merge into main).
+#
+# Behaviour:
+#   - main always builds, tests and deploys.
+#   - The development branch always builds and tests. Its deploy step is allowed to be
+#     refused by the github-pages environment rules (default: only the default branch may
+#     deploy) without turning the whole run red; once the branch is allowed (step 2) it
+#     deploys too. There is only one Pages site, so the most recent deploy wins.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - claude/whiteout-survival-game-kxixxo
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; never cancel a deployment that is already running.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    # Non-default branches may be blocked by the github-pages environment protection rules;
+    # that is expected until the branch is allowed, so it must not fail the run.
+    continue-on-error: ${{ github.ref != format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
