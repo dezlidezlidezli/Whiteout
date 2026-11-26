@@ -90,3 +90,18 @@
 
 .fk-ui.fk-titling .fk-top, .fk-ui.fk-titling .fk-quest, .fk-ui.fk-titling .fk-toasts, .fk-ui.fk-titling .fk-hint, .fk-ui.fk-titling .fk-floaters { opacity: 0; pointer-events: none; }
 .fk-ui .fk-top, .fk-ui .fk-quest { transition: opacity 0.5s; }
+
+.fk-version {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--safe-bottom, 0px) + 10px);
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: rgba(246, 231, 207, 0.6);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}

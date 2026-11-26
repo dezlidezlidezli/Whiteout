@@ -1,6 +1,7 @@
 // Title overlay: wordmark + one big button ("Begin" / "Continue") and a small "New game".
 
 import './title.css';
+import { VERSION_LABEL } from '../platform/version';
 
 const KETTLE_SVG = `<svg class="fk-kettle" viewBox="0 0 96 96" aria-hidden="true">
   <path class="fk-steam" d="M40 26c-6-6 6-10 0-18" fill="none" stroke="#f4f8ff" stroke-width="4" stroke-linecap="round" opacity=".8"/>
@@ -38,7 +39,8 @@ export class TitleScreen {
       <div class="fk-actions">
         <button class="fk-begin" type="button">${opts.hasSave ? 'Continue' : 'Begin'}</button>
         ${opts.hasSave ? '<button class="fk-newgame" type="button">New game</button>' : ''}
-      </div>`;
+      </div>
+      <div class="fk-version">${VERSION_LABEL}</div>`;
     root.appendChild(this.el);
     root.classList.add('fk-titling');
     this.el.addEventListener('pointerdown', () => opts.onFirstTouch());

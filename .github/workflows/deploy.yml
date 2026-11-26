@@ -42,7 +42,10 @@ jobs:
     outputs:
       pages_enabled: ${{ steps.pages.outcome == 'success' }}
     steps:
+      # Full history so the in-app version number (commit count) is correct.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
