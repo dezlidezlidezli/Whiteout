@@ -279,6 +279,7 @@ function loop(now: number): void {
     if (!touchedOnce && Math.hypot(v.x, v.z) > 0.2) markMoved();
   }
 
+  const t0 = performance.now();
   acc += dt * timeScale;
   let steps = 0;
   while (acc >= STEP && steps < MAX_STEPS) {
@@ -296,6 +297,7 @@ function loop(now: number): void {
   }
   view.frame(acc / STEP, dt);
   hud.update(sim, dt, (w) => view.project(new THREE.Vector3(w.x, w.y, w.z)));
+  view.cpuMs += (performance.now() - t0 - view.cpuMs) * 0.1;
   if (firstFrame) {
     firstFrame = false;
     window.dispatchEvent(new Event('fk-ready'));

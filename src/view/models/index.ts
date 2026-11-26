@@ -89,7 +89,7 @@ export function getCrowdMesh(variant: 'frozen' | 'thawed'): CrowdMeshDef {
 }
 
 /** Shared palette so view/UI effects match the models. */
-export { PALETTE } from './palette';
+export { PALETTE, FROZEN_TINTS } from './palette';
 export type { PaletteKey } from './palette';
 /** Shared materials (std, glow, ember, ice, crowd) for effects that should match the models. */
 export { mats as getSharedMaterials } from './materials';

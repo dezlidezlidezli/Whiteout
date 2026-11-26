@@ -117,8 +117,8 @@ export class WorldView {
         continue;
       }
       const variant = d.model === 'pineSnowy' || d.model === 'rock' || d.model === 'snowDrift' ? (d.seed ?? 0) % 3 : 0;
-      const cx = Math.floor(d.x / 24);
-      const cz = Math.floor(d.z / 24);
+      const cx = Math.floor(d.x / 40);
+      const cz = Math.floor(d.z / 40);
       const key = `${d.model}|${variant}|${cx}|${cz}`;
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(d);
@@ -126,7 +126,7 @@ export class WorldView {
     for (const [key, list] of groups) {
       const [model, variant] = key.split('|');
       const far = list.every((d) => d.id.startsWith('tree'));
-      const inst = new PropInstancer(this.root, model, { seed: Number(variant) + 1 }, list.length, far ? { cast: quality >= 2, receive: false } : null);
+      const inst = new PropInstancer(this.root, model, { seed: Number(variant) + 1 }, list.length, far ? { cast: false, receive: true } : null);
       list.forEach((d, i) => inst.set(i, trs(_m, d.x, 0, d.z, d.rot ?? 0, d.scale ?? 1)));
       inst.commit();
     }

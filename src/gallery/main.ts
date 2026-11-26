@@ -9,7 +9,7 @@
 //   yaw=<deg> pitch=<deg> camera angles (default 35 / 50)
 import * as THREE from 'three';
 import {
-  PROP_NAMES, animateCharacter, createCharacter, createProp, getCrowdMesh, getItemMesh,
+  PROP_NAMES, PALETTE, FROZEN_TINTS, animateCharacter, createCharacter, createProp, getCrowdMesh, getItemMesh,
   type CharacterAnimState, type CharacterRig, type CharacterRole, type ItemKind,
 } from '../view/models';
 import { triCount } from '../view/models/geo';
@@ -168,6 +168,30 @@ function buildEntries(): Entry[] {
       const o = new THREE.Mesh(d.geometry, d.material);
       E.push({ label: '', obj: o, radius: 0.36, center: new THREE.Vector3(0, 0.08, 0) });
     }
+  } else if (sheet === 'crowdgame') {
+    // game-scale check: 60 queued Icebound facing away from the camera (yaw = PI), dusk light
+    const viewTint = q.get('tint') === 'view';
+    const ICE = new THREE.Color(PALETTE.ice);
+    const mk = (variant: 'frozen' | 'thawed') => {
+      const d = getCrowdMesh(variant);
+      const n = 60;
+      const im = new THREE.InstancedMesh(d.geometry, d.material, n);
+      const m = new THREE.Matrix4(), c = new THREE.Color(), cc = new THREE.Color();
+      for (let i = 0; i < n; i++) {
+        const col = i % 6, row = Math.floor(i / 6);
+        m.makeRotationY(Math.PI + Math.sin(i * 2.7) * 0.25);
+        m.setPosition((col - 2.5) * 0.85 + Math.sin(i * 1.3) * 0.1, 0, (row - 4.5) * 0.85 + Math.cos(i * 1.7) * 0.1);
+        im.setMatrixAt(i, m);
+        const coat = cc.set(COATS[(i * 7) % COATS.length]);
+        if (variant === 'frozen') im.setColorAt(i, viewTint ? c.copy(ICE).lerp(coat, 0.18) : c.set(FROZEN_TINTS[(i * 5) % FROZEN_TINTS.length]));
+        else im.setColorAt(i, c.copy(coat));
+      }
+      im.castShadow = true; im.receiveShadow = true;
+      return im;
+    };
+    const R = Number(q.get('r') ?? 9);
+    E.push({ label: `frozen ×60 ${viewTint ? '(view tint)' : '(FROZEN_TINTS)'}`, obj: mk('frozen'), radius: R, center: new THREE.Vector3(0, 0.6, 0) });
+    E.push({ label: 'thawed ×60', obj: mk('thawed'), radius: R, center: new THREE.Vector3(0, 0.6, 0) });
   } else if (sheet === 'crowd') {
     E.push({ label: 'frozen ×100', obj: crowdBlock('frozen', 100, false) });
     E.push({ label: 'thawed ×100 tinted', obj: crowdBlock('thawed', 100, true) });
@@ -200,12 +224,14 @@ const nav = document.getElementById('nav')!;
 nav.innerHTML = ['characters', 'actions', 'props', 'props2', 'items', 'thumbs', 'crowd'].map((s) => `<a href="?sheet=${s}">${s}</a>`).join('');
 if (q.has('nonav')) nav.remove();
 
+const dusk = q.get('light') === 'dusk' || sheet === 'crowdgame';
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x6f86aa);
+if (dusk) scene.background = new THREE.Color(0x2b3a5c);
 scene.fog = new THREE.Fog(0x6f86aa, 30, 80);
-const hemi = new THREE.HemisphereLight(0xb8cff0, 0x56607a, 1.35);
+const hemi = dusk ? new THREE.HemisphereLight(0x8fa8dc, 0x6f8fc9, 2.4) : new THREE.HemisphereLight(0xb8cff0, 0x56607a, 1.35);
 scene.add(hemi);
-const key = new THREE.DirectionalLight(0xffd9b0, 2.4);
+const key = new THREE.DirectionalLight(dusk ? 0xffc890 : 0xffd9b0, dusk ? 1.6 : 2.4);
 key.castShadow = true;
 key.shadow.mapSize.set(1024, 1024);
 key.shadow.bias = -0.0008;
@@ -265,7 +291,8 @@ function frame(t: number) {
     camera.lookAt(c.x, c.y - (e.label ? r * 0.08 : 0), c.z);
     camera.near = dist * 0.05; camera.far = dist * 4;
     camera.updateProjectionMatrix();
-    key.position.set(c.x - r * 1.2, c.y + r * 2.2, c.z + r * 1.4);
+    if (dusk) key.position.set(c.x - r * 2.0, c.y + r * 0.9, c.z + r * 0.6);
+    else key.position.set(c.x - r * 1.2, c.y + r * 2.2, c.z + r * 1.4);
     key.target.position.copy(c);
     const sc = key.shadow.camera;
     sc.left = -r * 1.6; sc.right = r * 1.6; sc.top = r * 1.6; sc.bottom = -r * 1.6; sc.near = 0.1; sc.far = r * 6;

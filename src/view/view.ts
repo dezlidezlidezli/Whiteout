@@ -86,6 +86,8 @@ export class View {
   private music: 'calm' | 'cozy' | null = null;
   private lastPop = 0;
   frameMs = 16;
+  /** Smoothed CPU time per frame (sim + view + render submit), ms. */
+  cpuMs = 0;
   private tasks: { at: number; fn: () => void }[] = [];
 
   /** Run fn after `sec` seconds of view time (keeps effects in sync with slow frames). */
@@ -117,10 +119,10 @@ export class View {
     const sm = quality >= 2 ? 2048 : 1024;
     this.sun.shadow.mapSize.set(sm, sm);
     const sc = this.sun.shadow.camera;
-    sc.left = -18;
-    sc.right = 18;
-    sc.top = 18;
-    sc.bottom = -18;
+    sc.left = -15;
+    sc.right = 15;
+    sc.top = 17;
+    sc.bottom = -13;
     sc.near = 1;
     sc.far = 70;
     this.sun.shadow.bias = -0.0006;
@@ -707,9 +709,9 @@ export class View {
 
   // ------------------------------------------------------------------ debug/perf
 
-  stats(): { calls: number; triangles: number; crowd: number; frameMs: number } {
+  stats(): { calls: number; triangles: number; crowd: number; frameMs: number; cpuMs: number; quality: number } {
     const info = this.renderer.info.render;
-    return { calls: info.calls, triangles: info.triangles, crowd: this.crowd.count, frameMs: this.frameMs };
+    return { calls: info.calls, triangles: info.triangles, crowd: this.crowd.count, frameMs: Math.round(this.frameMs * 10) / 10, cpuMs: Math.round(this.cpuMs * 100) / 100, quality: this.quality };
   }
 
   /** Debug: fill the camp with villagers (perf testing). */
