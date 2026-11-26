@@ -35,6 +35,9 @@ concurrency:
 
 jobs:
   build:
+    # Work-in-progress checkpoints (commit message starting with "WIP") are saved to the
+    # branch but not built or deployed, so half-finished work never emails a failure.
+    if: ${{ !startsWith(github.event.head_commit.message, 'WIP') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

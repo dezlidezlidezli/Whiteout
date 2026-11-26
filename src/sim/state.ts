@@ -19,6 +19,8 @@ export interface PlayerState {
   padTime: number;
   /** Pile the player is handing items back to (no re-picking from it until they leave). */
   returning: string | null;
+  /** Pile the player has taken from during the current visit (never hand back to it then). */
+  pickedFrom: string | null;
 }
 
 export interface PileState { kind: 'pile'; count: number; acc: number }
@@ -149,7 +151,7 @@ export function createState(data: GameData, seed: number): SimState {
     player: {
       x: data.playerStart.x, z: data.playerStart.z, px: data.playerStart.x, pz: data.playerStart.z,
       vx: 0, vz: 0, facing: Math.PI, stack: [], capacity: data.balance.startCapacity, transferCd: 0,
-      working: null, onPad: null, padTime: 0, returning: null,
+      working: null, onPad: null, padTime: 0, returning: null, pickedFrom: null,
     },
     embers: 0,
     emberPiles: [],
@@ -185,4 +187,5 @@ export function normalizeState(s: SimState, data: GameData): void {
   s.stats = s.stats ?? {};
   s.guideUnload = !!s.guideUnload;
   s.player.returning = s.player.returning ?? null;
+  s.player.pickedFrom = s.player.pickedFrom ?? null;
 }

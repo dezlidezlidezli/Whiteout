@@ -439,9 +439,11 @@ export class Sim {
       }
     }
 
-    if (p.returning) {
-      const rd = this.stationDefs.get(p.returning);
-      if (!rd || Math.hypot(rd.x - p.x, rd.z - p.z) > rd.reach + 0.3) p.returning = null;
+    for (const key of ['returning', 'pickedFrom'] as const) {
+      const id = p[key];
+      if (!id) continue;
+      const rd = this.stationDefs.get(id);
+      if (!rd || Math.hypot(rd.x - p.x, rd.z - p.z) > rd.reach + 0.3) p[key] = null;
     }
 
     // Item transfers at a fixed cadence.
@@ -529,7 +531,7 @@ export class Sim {
       if (d.type !== 'pile') continue;
       const ps = this.state.stations[d.id] as PileState;
       if (ps.count >= d.cap) continue;
-      if (p.returning !== d.id && !(still && p.stack.length >= p.capacity)) continue;
+      if (p.returning !== d.id && !(still && p.stack.length >= p.capacity && p.pickedFrom !== d.id)) continue;
       const i = p.stack.lastIndexOf(d.item);
       if (i < 0) continue;
       p.stack.splice(i, 1);
@@ -553,6 +555,7 @@ export class Sim {
       const moving = Math.hypot(p.vx, p.vz) > 1.6 && Math.hypot(this.moveX, this.moveZ) > 0.3;
       if (moving && top !== it) continue;
       this.take(d.id);
+      if (d.type === 'pile') p.pickedFrom = d.id;
       p.stack.push(it);
       this.addStat(`pickup.${it}`, 1);
       const from: Place = d.type === 'node' ? { kind: 'ground', id: d.id } : { kind: 'station', id: d.id };
