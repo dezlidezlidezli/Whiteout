@@ -8,6 +8,8 @@ import { AutoQuality, detectQuality, type QualityLevel } from './platform/qualit
 import { readPref, SaveStore, writePref } from './platform/storage';
 import { Hud } from './ui/hud';
 import { Joystick } from './ui/joystick';
+import { TitleScreen } from './ui/title';
+import { DebugOverlay } from './ui/debug';
 import { View } from './view/view';
 import * as THREE from 'three';
 
@@ -47,7 +49,9 @@ function createSim(): Sim {
   return new Sim(GAME_DATA, { seed });
 }
 
+const hadSave = !fresh && !!store.read();
 let sim = createSim();
+const showTitle = !autoplayParam && !params.has('skiptitle');
 
 // ---- quality
 const qualityPref = readPref<'auto' | QualityLevel>('quality', 'auto');
@@ -88,10 +92,7 @@ const hud = new Hud(uiRoot, {
     }
   },
   reset: () => {
-    store.clear();
-    sim = new Sim(GAME_DATA, { seed: 1 + Math.floor(Math.random() * 1e6) });
-    view.setSim(sim);
-    save();
+    newGame();
   },
   stats: () => {
     const s = sim.state;
@@ -113,6 +114,13 @@ view = new View(canvas, sim, startQuality, {
   emberLand: () => hud.emberLand(),
 });
 
+function newGame(): void {
+  store.clear();
+  sim = new Sim(GAME_DATA, { seed: 1 + Math.floor(Math.random() * 1e6) });
+  view.setSim(sim);
+  save();
+}
+
 const autoQ = new AutoQuality(() => {
   if (view.quality <= 0) return false;
   view.setQuality((view.quality - 1) as QualityLevel);
@@ -127,21 +135,47 @@ const pilot = new Autopilot();
 if (autoplay) hud.hideHint();
 let audioUnlocked = false;
 // The walk hint only shows at the very start of a brand-new game, until the first movement.
-let touchedOnce = readPref('hintDone', false) || sim.state.time > 3 || sim.state.quest.index > 0;
-if (touchedOnce) hud.hideHint();
+const isBrandNew = () => sim.state.time < 3 && sim.state.quest.index === 0;
+let touchedOnce = !isBrandNew();
+hud.hideHint();
+if (!showTitle && !touchedOnce) hud.showHint(true);
 stick.onTouch = () => {
-  if (!audioUnlocked) {
-    audioUnlocked = true;
-    audio.unlock();
-  }
+  unlockAudio();
   view.rig.skipPan();
 };
 function markMoved(): void {
   if (touchedOnce) return;
   touchedOnce = true;
-  writePref('hintDone', true);
   hud.hideHint();
 }
+
+// ---- title
+let title: TitleScreen | null = null;
+function unlockAudio(): void {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+  audio.unlock();
+}
+if (showTitle) {
+  view.setTitle(true, true);
+  title = new TitleScreen(hud.root, {
+    hasSave: hadSave && !isBrandNew(),
+    onFirstTouch: () => {
+      unlockAudio();
+      audio.music('title');
+    },
+    onNewGame: () => newGame(),
+    onBegin: () => {
+      unlockAudio();
+      audio.sfx('uiTap');
+      view.setTitle(false);
+      touchedOnce = !isBrandNew();
+      if (!touchedOnce) hud.showHint(true);
+      title = null;
+    },
+  });
+}
+const debug = params.get('debug') === '1' ? new DebugOverlay(uiRoot) : null;
 // Extra unlock paths (some browsers only count click/touchend as activation).
 for (const ev of ['touchend', 'click', 'keydown'] as const) {
   window.addEventListener(ev, () => audio.unlock(), { passive: true });
@@ -179,6 +213,7 @@ installLifecycle(canvas, {
       emberLand: () => hud.emberLand(),
     });
     (window.__fk as FkDebug).view = view;
+    if (title) view.setTitle(true, true);
     lost = false;
   },
 });
@@ -255,6 +290,8 @@ const cheat = {
     sim = new Sim(GAME_DATA, { seed: 1 });
     view.setSim(sim);
   },
+  /** Leave the title screen (tests). */
+  begin: () => title?.finish(false),
 };
 window.__fk = { sim, view, cheat: cheat as unknown as FkDebug['cheat'], events: recent };
 Object.defineProperty(window.__fk, 'sim', { get: () => sim });
@@ -265,6 +302,7 @@ let last = performance.now();
 let acc = 0;
 let firstFrame = true;
 const MAX_STEPS = 240;
+const projV = new THREE.Vector3();
 
 function loop(now: number): void {
   requestAnimationFrame(loop);
@@ -279,7 +317,7 @@ function loop(now: number): void {
   if (stick.active && autoplay && !autoplayParam) autoplay = false;
   const settingsOpen = hud.settingsOpen;
   if (!autoplay) {
-    const v = settingsOpen ? { x: 0, z: 0 } : stick.vector();
+    const v = settingsOpen || title ? { x: 0, z: 0 } : stick.vector();
     sim.setMove(v.x, v.z);
     if (!touchedOnce && Math.hypot(v.x, v.z) > 0.2) markMoved();
   }
@@ -301,8 +339,9 @@ function loop(now: number): void {
     if (recent.length > 300) recent.splice(0, recent.length - 300);
   }
   view.frame(acc / STEP, dt);
-  hud.update(sim, dt, (w) => view.project(new THREE.Vector3(w.x, w.y, w.z)));
+  hud.update(sim, dt, (w) => view.project(projV.set(w.x, w.y, w.z)));
   view.cpuMs += (performance.now() - t0 - view.cpuMs) * 0.1;
+  debug?.update(dt, view);
   if (firstFrame) {
     firstFrame = false;
     window.dispatchEvent(new Event('fk-ready'));

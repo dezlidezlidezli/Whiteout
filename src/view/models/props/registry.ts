@@ -7,6 +7,7 @@ import * as camp from './camp';
 import * as nature from './nature';
 import * as stations from './stations';
 import * as lm from './landmarks';
+import * as decor from './decor';
 
 type Factory = (level: number, seed: number) => PropSpec;
 /** Which option each prop varies by (for cache keys). */
@@ -45,9 +46,21 @@ const F: Record<string, { f: Factory; by?: 'level' | 'seed'; seeds?: number }> =
   noticeBoard: { f: () => lm.noticeBoard() },
   bench: { f: () => lm.bench() },
   woodPile: { f: () => lm.woodPile() },
+  emberPile: { f: (l) => decor.emberPile(l), by: 'level' },
+  flagPole: { f: (_l, s) => decor.flagPole(s), by: 'seed', seeds: 5 },
+  lanternString: { f: () => decor.lanternString() },
+  statue: { f: () => decor.statue() },
+  well: { f: () => decor.well() },
+  sleighBell: { f: () => decor.sleighBell() },
+  iceSculpture: { f: () => decor.iceSculpture() },
+  marketStall: { f: (_l, s) => decor.marketStall(s), by: 'seed', seeds: 3 },
+  campfireRing: { f: () => decor.campfireRing() },
+  caravan: { f: () => decor.caravan() },
+  aurora: { f: () => decor.aurora() },
 };
 
 export const PROP_NAMES = Object.keys(F);
+const NO_RANDOM_YAW = new Set(['frostWall', 'fence', 'tent', 'cabin', 'flagPole', 'marketStall']);
 
 function placeholder(): PropSpec {
   const b = new Builder().add(bevel(1, 1, 1, 0.12), 0xff44cc, { p: [0, 0.5, 0] });
@@ -80,7 +93,7 @@ export function buildProp(name: string, opts: ModelOpts = {}): THREE.Object3D {
     // extra free variation from the full seed: yaw + slight scale
     const s = opts.seed ?? 0;
     const h = Math.abs(Math.sin(s * 12.9898) * 43758.5453) % 1;
-    if (name !== 'frostWall' && name !== 'fence' && name !== 'tent' && name !== 'cabin') {
+    if (!NO_RANDOM_YAW.has(name)) {
       g.rotation.y = h * Math.PI * 2;
       const sc = 0.9 + ((h * 7.31) % 1) * 0.2;
       g.scale.setScalar(sc);

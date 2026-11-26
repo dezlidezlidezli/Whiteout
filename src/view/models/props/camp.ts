@@ -324,7 +324,7 @@ export function hearth(level: number): PropSpec {
 // ---------------------------------------------------------------- tent
 /** Round canvas bell tent with a striped skirt, open door flap and pennant. */
 export function tent(seed = 0): PropSpec {
-  const b = new Builder();
+  const b = new Builder(), glow = new Builder();
   const R = 1.25, wallH = 0.55, H = 2.3, seg = 8;
   const stripe = [P.coatRust, P.porter, P.mustard][seed % 3];
   // skirt wall with alternating stripes
@@ -356,9 +356,17 @@ export function tent(seed = 0): PropSpec {
     b.add(box(0.05, 0.14, 0.05), P.woodDark, { p: [x1, 0.05, z1] });
   }
   // lantern by the door + snow
-  b.add(box(0.14, 0.18, 0.14), P.windowGlow, { p: [Math.cos(da) * (R + 0.35), 0.09, Math.sin(da) * (R + 0.35)] });
+  glow.add(box(0.12, 0.16, 0.12), P.windowGlow, { p: [Math.cos(da) * (R + 0.35), 0.1, Math.sin(da) * (R + 0.35)] });
+  b.add(bevel(0.18, 0.04, 0.18, 0.01), P.iron, { p: [Math.cos(da) * (R + 0.35), 0.2, Math.sin(da) * (R + 0.35)] });
+  // warm light spilling from the open doorway
+  glow.add(box(0.62, wallH * 0.95, 0.03), P.windowGlow, { p: [Math.cos(da) * R * 0.86, wallH * 0.48, Math.sin(da) * R * 0.86], r: [0, -da + Math.PI / 2, 0] });
   snowMound(b, 0.55, 0.16, 0.45, [-R - 0.1, 0, -0.5], seed + 1);
-  return { layers: [{ name: 'body', b }], markers: { door: [Math.cos(da) * (R + 0.6), 0, Math.sin(da) * (R + 0.6)] }, userData: { radius: R + 0.3, size: [2 * R + 0.6, 2 * R + 0.6] } };
+  const door: [number, number, number] = [Math.cos(da) * (R + 0.6), 0, Math.sin(da) * (R + 0.6)];
+  return {
+    layers: [{ name: 'body', b }, { name: 'windowGlow', b: glow, mat: 'glow' }],
+    markers: { door, light: [Math.cos(da) * (R + 0.4), 0.5, Math.sin(da) * (R + 0.4)] },
+    userData: { radius: R + 0.3, size: [2 * R + 0.6, 2 * R + 0.6], door, lightPos: [Math.cos(da) * (R + 0.4), 0.5, Math.sin(da) * (R + 0.4)], lightColor: P.windowGlow },
+  };
 }
 
 // ---------------------------------------------------------------- cabin
@@ -413,8 +421,8 @@ export function cabin(seed = 0): PropSpec {
   if (r() > 0.4) b.add(torus(0.16, 0.05, 4, 8), P.pine, { p: [-0.9, 1.6, D / 2 + 0.15] });
   snowMound(b, 0.8, 0.25, 0.6, [W / 2 + 0.2, 0, D / 2 - 0.2], seed + 3);
   return {
-    layers: [{ name: 'body', b }, { name: 'windows', b: glow, mat: 'glow' }],
+    layers: [{ name: 'body', b }, { name: 'windowGlow', b: glow, mat: 'glow' }],
     markers: { door: [-0.9, 0, D / 2 + 0.6], chimneyTop: [-W / 2 + 0.75, roofY + 1.9, -0.6], light: [0.85, 1.4, D / 2 + 0.6] },
-    userData: { size: [W + 0.4, D + 0.6], radius: 2.6, lightPos: [0.85, 1.4, D / 2 + 0.6], lightColor: P.windowGlow },
+    userData: { size: [W + 0.4, D + 0.6], radius: 2.6, door: [-0.9, 0, D / 2 + 0.6], lightPos: [0.85, 1.4, D / 2 + 0.6], lightColor: P.windowGlow },
   };
 }

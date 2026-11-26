@@ -55,6 +55,6 @@ export function renderMusic(mood: MusicMood, seconds = 20, o: RenderOpts = {}): 
   }, o);
 }
 
-export function renderAmbience(levels: { wind?: number; fire?: number }, seconds = 6, o: RenderOpts = {}): Promise<AudioBuffer> {
+export function renderAmbience(levels: { wind?: number; fire?: number; crowd?: number; camp?: number }, seconds = 6, o: RenderOpts = {}): Promise<AudioBuffer> {
   return renderWith(seconds, (e) => e.setAmbience(levels, 0.02), o);
 }

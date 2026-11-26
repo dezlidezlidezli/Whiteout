@@ -88,6 +88,7 @@ export const PALETTE = {
   pie: 0xe0a44a,
   berry: 0xc0334a,
   plate: 0xf0e8da,
+  gold: 0xe8b53a,
 
   // --- crowd ---
   frozenCoat: 0x93a6bf,

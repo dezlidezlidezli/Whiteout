@@ -1,7 +1,7 @@
 // The audio engine: bus graph, voice management, music cross-fades and ambience.
 // Context-agnostic: works on a live AudioContext and on an OfflineAudioContext (for tests).
 import type { MusicMood, SfxName, SfxOpts } from './index';
-import { Ambience } from './ambience';
+import { Ambience, type AmbienceLevels } from './ambience';
 import { MoodPlayer } from './music';
 import { SFX } from './sfx';
 import { holdParam, makeImpulse, makeNoiseBuffer, makeRng, type Rng, type Voice } from './synth';
@@ -9,7 +9,7 @@ import { holdParam, makeImpulse, makeNoiseBuffer, makeRng, type Rng, type Voice 
 /** Headroom: everything is mixed well under full scale before the limiter. */
 const SFX_TRIM = 0.75;
 const MUSIC_TRIM = 1.0;
-const AMB_TRIM = 0.5;
+const AMB_TRIM = 0.42;
 export const MUSIC_FADE = 2.5;
 export const LOOKAHEAD = 0.35;
 
@@ -199,7 +199,7 @@ export class Engine {
     }
   }
 
-  setAmbience(levels: { wind?: number; fire?: number }, smooth?: number): void {
+  setAmbience(levels: AmbienceLevels, smooth?: number): void {
     this.ambience.set(levels, smooth);
   }
 

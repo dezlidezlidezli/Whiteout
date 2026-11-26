@@ -29,6 +29,12 @@ const EXPECT = {
   uiTap: [600, 3000, 0.01, 0.2, 'quiet'],
   error: [200, 1200, 0.15, 0.8, 'normal'],
   footstep: [900, 5000, 0.02, 0.25, 'quiet'],
+  arrive: [250, 2500, 0.2, 1.5, 'quiet'],
+  order: [400, 3500, 0.3, 1.5, 'normal'],
+  orderNew: [800, 4500, 0.1, 0.8, 'normal'],
+  upgrade: [700, 3500, 0.2, 1.2, 'normal'],
+  beaconStage: [60, 900, 1.2, 4.0, 'big'],
+  dawn: [150, 2000, 5.5, 9.5, 'big'],
 };
 
 const f1 = (x) => (Number.isFinite(x) ? x.toFixed(1) : String(x));
@@ -147,17 +153,26 @@ const f3 = (x) => (Number.isFinite(x) ? x.toFixed(3) : String(x));
   // ---- ambience
   console.log('\nAmbience (6 s)');
   const ambs = [
-    [1, 0],
-    [0.3, 0],
-    [0, 1],
-    [1, 1],
+    [1, 0, 0, 0],
+    [0.3, 0, 0, 0],
+    [0, 1, 0, 0],
+    [0, 0, 1, 0],
+    [0, 0, 0, 1],
+    [1, 1, 1, 1],
   ];
-  for (const [w, f] of ambs) {
-    const m = await lab(([w, f]) => window.__audioLab.ambience(w, f), [w, f]);
-    console.log(`wind ${w} fire ${f}: peak ${f1(m.peakDb)} rms ${f1(m.rmsDb)} cent ${Math.round(m.centroid)} active ${m.activeFrac.toFixed(2)}`);
-    if (m.peakDb < -50) fail(`ambience wind ${w} fire ${f} silent`);
-    if (m.peakDb > -3) fail(`ambience wind ${w} fire ${f} too hot`);
-    if (m.rmsDb > median - 4) fail(`ambience wind ${w} fire ${f} louder than sfx`);
+  for (const [w, f, cr, cp] of ambs) {
+    const m = await lab(([w, f, cr, cp]) => window.__audioLab.ambience(w, f, cr, cp), [w, f, cr, cp]);
+    console.log(`wind ${w} fire ${f} crowd ${cr} camp ${cp}: peak ${f1(m.peakDb)} rms ${f1(m.rmsDb)} cent ${Math.round(m.centroid)} active ${m.activeFrac.toFixed(2)}`);
+    const tag = `ambience w${w} f${f} crowd${cr} camp${cp}`;
+    if (m.peakDb < -50) fail(`${tag} silent`);
+    if (m.peakDb > -3 || m.clipped) fail(`${tag} too hot`);
+    if (m.rmsDb > median - 4) fail(`${tag} louder than sfx`);
+    if (m.dc > 0.02) fail(`${tag} DC ${f3(m.dc)}`);
+    if (Math.max(w, f, cr, cp) === 1 && m.activeFrac < 0.9) fail(`${tag} drops out (${m.activeFrac.toFixed(2)})`);
+    // the beds sit under everything; a single bed should be at least 8 dB under the sfx
+    if (w + f + cr + cp === 1 && m.rmsDb > median - 8) fail(`${tag} too loud for a background bed`);
+    if (cr && !w && !f && (m.centroid < 120 || m.centroid > 900)) fail(`${tag} centroid ${Math.round(m.centroid)} (want low murmur)`);
+    if (cp && !w && !f && (m.centroid < 150 || m.centroid > 1500)) fail(`${tag} centroid ${Math.round(m.centroid)} (want soft, distant)`);
   }
 
   // ---- live playback after a real click (retried if the dev server reloads the page mid-way)

@@ -301,17 +301,33 @@ export function bridge(): PropSpec {
 
 export function noticeBoard(): PropSpec {
   const b = new Builder();
-  for (const sx of [-1, 1]) b.add(cyl(0.07, 0.08, 2.3, 6), P.woodDark, { p: [sx * 0.85, 1.15, 0] });
-  b.add(bevel(1.8, 1.1, 0.1, 0.03), P.woodLight, { p: [0, 1.35, 0] });
-  b.add(bevel(1.9, 0.08, 0.14, 0.02), P.woodDark, { p: [0, 1.93, 0] });
-  const notes: [number, number, number, number][] = [[-0.55, 1.5, P.cream, 0.1], [-0.1, 1.55, 0xf7d6dc, -0.08], [0.4, 1.45, P.cream, 0.05], [-0.4, 1.05, 0xdfe9f5, -0.05], [0.25, 1.05, P.cream, 0.12], [0.65, 1.15, 0xfbe3a0, -0.1]];
-  for (const [x, y, c, rz] of notes) {
-    b.add(box(0.32, 0.36, 0.02), c, { p: [x, y, 0.06], r: [0, 0, rz] });
-    b.add(box(0.2, 0.025, 0.01), 0x6b5a4a, { p: [x, y + 0.06, 0.075], r: [0, 0, rz] });
-    b.add(sphere(0.022, 4, 3), P.berry, { p: [x, y + 0.15, 0.08] });
+  for (const sx of [-1, 1]) b.add(cyl(0.07, 0.08, 2.3, 6), P.woodDark, { p: [sx * 0.95, 1.15, 0] });
+  b.add(bevel(2.0, 1.1, 0.1, 0.03), P.woodLight, { p: [0, 1.35, 0] });
+  b.add(bevel(2.1, 0.08, 0.14, 0.02), P.woodDark, { p: [0, 1.93, 0] });
+  b.add(bevel(2.1, 0.08, 0.14, 0.02), P.woodDark, { p: [0, 0.78, 0] });
+  // three framed slots; the papers are separate nodes slot0..2 the view shows per active order
+  const slots: Record<string, [number, number, number]> = {};
+  const papers: Builder[] = [];
+  const tints = [P.cream, 0xfbe3a0, 0xdfe9f5];
+  for (let k = 0; k < 3; k++) {
+    const x = -0.62 + k * 0.62;
+    b.add(bevel(0.52, 0.86, 0.03, 0.01), P.woodDark, { p: [x, 1.35, 0.05] }); // slot frame / shadow
+    b.add(bevel(0.46, 0.8, 0.03, 0.01), 0xc49a6a, { p: [x, 1.35, 0.06] });
+    const pb = new Builder();
+    pb.add(box(0.4, 0.62, 0.015), tints[k], { p: [0, -0.04, 0], r: [0, 0, (k - 1) * 0.04] });
+    pb.add(box(0.26, 0.04, 0.01), 0x6b5a4a, { p: [0, 0.16, 0.012] });
+    for (const yy of [0.04, -0.06, -0.16]) pb.add(box(0.28, 0.018, 0.01), 0x9a8a7a, { p: [0, yy, 0.012] });
+    pb.add(prism([[0, 0.06], [0.04, 0], [0, -0.06], [-0.04, 0]], 0.01), P.ember, { p: [0.1, -0.26, 0.012] });
+    pb.add(sphere(0.025, 5, 3), P.berry, { p: [0, 0.27, 0.02] }); // pin
+    papers.push(pb);
+    slots[`slot${k}`] = [x, 1.35, 0.09];
   }
-  roofSmall(b, 2.2, 0.7, 2.25);
-  return { layers: [{ name: 'body', b }], markers: { front: [0, 0, 1.0] }, userData: { size: [2.0, 0.6], radius: 1.1 } };
+  roofSmall(b, 2.4, 0.7, 2.25);
+  return {
+    layers: [{ name: 'body', b }, ...papers.map((pb, k) => ({ name: `slot${k}`, b: pb, pos: slots[`slot${k}`] }))],
+    markers: { front: [0, 0, 1.0] },
+    userData: { size: [2.2, 0.6], radius: 1.2, slots: 3 },
+  };
 }
 function roofSmall(b: Builder, w: number, d: number, y: number) {
   for (const sz of [-1, 1]) {

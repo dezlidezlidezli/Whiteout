@@ -16,6 +16,7 @@ import { ItemBatcher } from './items';
 import { PALETTE } from './models';
 import { PadVisual } from './pads';
 import { WorldView } from './world';
+import { Sky } from './sky';
 
 export type Quality = 0 | 1 | 2;
 
@@ -74,6 +75,7 @@ export class View {
   private sparks: Sparks;
   private prints: Footprints;
   private arrow: GuideArrow;
+  private sky: Sky;
   private flyers: Flyer[] = [];
   private hidden = new Map<string, number>();
   private time = 0;
@@ -83,7 +85,9 @@ export class View {
   private emberCombo = 0;
   private emberComboT = 0;
   private sfxGate = new Map<string, number>();
-  private music: 'calm' | 'cozy' | null = null;
+  private music: 'calm' | 'cozy' | 'title' | null = null;
+  /** Title screen showing: camera drifts, arrow hidden, title music. */
+  title = false;
   private lastPop = 0;
   frameMs = 16;
   /** Smoothed CPU time per frame (sim + view + render submit), ms. */
@@ -155,6 +159,7 @@ export class View {
     this.sparks = new Sparks(this.scene, quality >= 1 ? 80 : 30);
     this.prints = new Footprints(this.scene);
     this.arrow = new GuideArrow(this.scene);
+    this.sky = new Sky(this.scene, fogC);
     this.setSim(sim);
     this.resize();
   }
@@ -172,6 +177,11 @@ export class View {
     const p = sim.state.player;
     this.rig.snap(p.x, p.z - 1.2);
     this.music = null;
+  }
+
+  setTitle(on: boolean, instant = false): void {
+    this.title = on;
+    this.rig.setTitle(on, instant);
   }
 
   resize(): void {
@@ -593,7 +603,7 @@ export class View {
     this.prints.update(dt, px, pz, p.facing, distHearth > this.radius + 0.5);
 
     // Guidance.
-    const g = sim.guide();
+    const g = this.title ? null : sim.guide();
     if (g) {
       const w = sim.navFromPlayer(g.x, g.z);
       const my = g.kind === 'station' ? this.world.stationTop(g.id) : g.kind === 'node' ? 2.6 : 0.4;
@@ -616,13 +626,14 @@ export class View {
       if (k > fire) fire = k;
     }
     audio.ambience({ wind: 0.2 + wind * 0.8, fire });
-    const mood = sim.cosy ? 'cozy' : 'calm';
+    const mood = this.title ? 'title' : sim.cosy ? 'cozy' : 'calm';
     if (mood !== this.music) {
       this.music = mood;
       audio.music(mood);
     }
     if (s.population !== this.lastPop) this.lastPop = s.population;
 
+    this.sky.update(t, this.rig.camera.position);
     this.renderer.render(this.scene, this.rig.camera);
   }
 

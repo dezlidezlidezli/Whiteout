@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import type { GameData } from '../data/types';
 import type { CustomerState, Sim } from '../sim';
-import { getCrowdMesh, PALETTE } from './models';
+import { FROZEN_TINTS, getCrowdMesh, PALETTE } from './models';
 
 const COATS = [0xd9534f, 0xe8a33d, 0x4f9d69, 0x3f7cc4, 0x9a5fb5, 0xe0784e, 0x2f9c9c, 0xc94f7c, 0x7a8f3a, 0xb8643a];
 const ICE = new THREE.Color(PALETTE.ice);
@@ -156,12 +156,23 @@ export class Crowd {
       const coat = _c.setHex(COATS[Math.floor(c.look * COATS.length) % COATS.length]);
       if (c.phase === 'queue') {
         const moving = dx * dx + dz * dz > 1e-6;
-        const shiver = Math.sin(time * 38 + c.id) * 0.03;
+        // Per-person deterministic quirks so the huddle never looks like neat rows.
+        const h1 = hash01(c.id * 3 + 1);
+        const h2 = hash01(c.id * 7 + 2);
+        const h3 = hash01(c.id * 11 + 3);
+        const front = (s.stations[c.counter] as { queue?: number[] } | undefined)?.queue?.[0] === c.id;
+        const jitter = front ? 0.05 : 0.32;
+        const jx = (h1 - 0.5) * jitter + Math.sin(time * (0.5 + h2) + h3 * 9) * 0.06;
+        const jz = (h2 - 0.5) * jitter + Math.cos(time * (0.4 + h1) + h1 * 7) * 0.05;
+        const shiverX = moving ? 0 : Math.sin(time * (34 + h3 * 10) + c.id) * 0.018;
+        const shiver = Math.sin(time * (40 + h1 * 12) + c.id) * 0.035;
         const waddle = moving ? Math.sin(time * 9 + c.id) * 0.12 : 0;
-        // Face the counter when waiting.
-        const yaw = moving ? st.yaw : Math.PI;
-        this.put(this.frozen, nf++, x, moving ? Math.abs(Math.sin(time * 9 + c.id)) * 0.05 : 0, z, yaw, waddle + shiver, 1);
-        this.frozen.setColorAt(nf - 1, _c.copy(ICE).lerp(coat, 0.18));
+        // Mostly facing the counter, each with their own lean and glance.
+        const yaw = moving ? st.yaw : Math.PI + (h3 - 0.5) * 0.9 + Math.sin(time * 0.3 + h2 * 6) * 0.15;
+        const sc = 0.9 + h1 * 0.18;
+        const y = moving ? Math.abs(Math.sin(time * 9 + c.id)) * 0.05 : 0;
+        this.put(this.frozen, nf++, x + jx + shiverX, y, z + jz, yaw, waddle + shiver, sc, 1 - h2 * 0.06);
+        this.frozen.setColorAt(nf - 1, _c.setHex(FROZEN_TINTS[Math.floor(h2 * FROZEN_TINTS.length) % FROZEN_TINTS.length]));
       } else {
         // Thaw: colour floods in, a little hop, then a happy trot to camp.
         const t = c.phase === 'thaw' ? Math.min(1, c.t / b.thawTime) : 1;
@@ -292,6 +303,14 @@ export class Crowd {
     _m.compose(_v, _q, _s);
     im.setMatrixAt(i, _m);
   }
+}
+
+function hash01(n: number): number {
+  let x = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b);
+  x ^= x >>> 13;
+  x = Math.imul(x, 0xc2b2ae35);
+  x ^= x >>> 16;
+  return (x >>> 0) / 4294967296;
 }
 
 function blocked(x: number, z: number, tents: { x: number; z: number }[]): boolean {

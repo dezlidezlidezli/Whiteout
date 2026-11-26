@@ -395,6 +395,119 @@ const footstep: SfxFn = (v) => {
   return 0.11;
 };
 
+const arrive: SfxFn = (v) => {
+  const { rng } = v;
+  // two tiny wooden door knocks / latch
+  for (const at of [0, 0.085 + rng() * 0.02]) {
+    noise(v, { at, filter: 'bandpass', f: rand(rng, 900, 1200), q: 3, a: 0.001, d: 0.03, g: 0.5 });
+    tone(v, { at, f: rand(rng, 260, 300), f2: 180, glide: 0.03, a: 0.0015, d: 0.04, g: 0.25 });
+  }
+  // soft contented "mm" bell
+  const f = 659.3 * v.p; // E5
+  tone(v, { at: 0.16, f, a: 0.02, d: 0.55, g: 0.18, rev: 0.3 });
+  tone(v, { at: 0.16, f: f * 2.0, a: 0.02, d: 0.25, g: 0.03, rev: 0.3 });
+  return 0.8;
+};
+
+const order: SfxFn = (v) => {
+  // rubber stamp: dull thump + paper slap
+  tone(v, { f: 180, f2: 90, glide: 0.05, a: 0.002, d: 0.09, g: 0.6 });
+  noise(v, { filter: 'bandpass', f: 1400, q: 0.9, a: 0.001, d: 0.05, g: 0.45 });
+  noise(v, { filter: 'lowpass', f: 600, q: 0.7, a: 0.002, d: 0.06, g: 0.4 });
+  // coin-like ember chime: two bright glassy notes
+  const f = 1174.7 * v.p; // D6
+  [0, 7].forEach((s, i) => {
+    const at = 0.12 + i * 0.07;
+    tone(v, { at, f: f * semis(s), a: 0.002, d: 0.45, g: 0.18, rev: 0.3 });
+    tone(v, { at, f: f * semis(s) * 2.756, a: 0.001, d: 0.12, g: 0.05 });
+    tone(v, { at, f: f * semis(s) * 5.404, a: 0.001, d: 0.05, g: 0.025 });
+  });
+  return 0.75;
+};
+
+const orderNew: SfxFn = (v) => {
+  const { rng } = v;
+  // paper flutter: a few quick soft filtered-noise flaps
+  const n = 4 + Math.floor(rng() * 2);
+  for (let i = 0; i < n; i++) {
+    noise(v, { at: i * 0.035 + rng() * 0.01, filter: 'bandpass', f: rand(rng, 1800, 3200), q: 0.8, a: 0.004, d: 0.03, g: rand(rng, 0.25, 0.4) * (1 - i / (n + 1)) });
+  }
+  // pin pushed in: small tick + short metallic ping
+  const at = 0.2;
+  noise(v, { at, filter: 'highpass', f: 2500, q: 0.7, a: 0.0008, d: 0.008, g: 0.3 });
+  tone(v, { at, f: 2350 * v.p, a: 0.001, d: 0.12, g: 0.1 });
+  tone(v, { at, f: 2350 * 2.21 * v.p, a: 0.001, d: 0.05, g: 0.03 });
+  tone(v, { at, f: 440, f2: 260, glide: 0.02, a: 0.001, d: 0.03, g: 0.2 });
+  return 0.4;
+};
+
+const upgrade: SfxFn = (v) => {
+  const f = 880 * v.p; // A5
+  [0, 5].forEach((s, i) => {
+    const at = i * 0.08;
+    tone(v, { at, f: f * semis(s), a: 0.002, d: 0.3, g: 0.25, rev: 0.3 });
+    tone(v, { at, f: f * semis(s) * 2.756, a: 0.001, d: 0.08, g: 0.05 });
+  });
+  // tiny sparkle on top
+  tone(v, { at: 0.16, f: f * semis(12), a: 0.002, d: 0.3, g: 0.07, rev: 0.4 });
+  tone(v, { at: 0.2, f: f * semis(17), a: 0.002, d: 0.25, g: 0.04, rev: 0.4 });
+  return 0.55;
+};
+
+const beaconStage: SfxFn = (v) => {
+  const { rng } = v;
+  // heavy stone settling: deep thud + gritty rumble + a couple of trailing grinds
+  tone(v, { f: 70, f2: 36, glide: 0.3, a: 0.004, d: 0.6, g: 0.9 });
+  noise(v, { filter: 'lowpass', f: 300, q: 0.8, a: 0.004, d: 0.5, g: 0.9 });
+  noise(v, { filter: 'bandpass', f: 700, q: 1.2, a: 0.01, d: 0.25, g: 0.3 });
+  for (let i = 0; i < 3; i++) {
+    noise(v, { at: 0.18 + i * 0.12 + rng() * 0.05, filter: 'bandpass', f: rand(rng, 400, 900), q: 2, a: 0.01, d: 0.12, g: 0.18 });
+  }
+  // low bell (inharmonic partials, long ring)
+  const f = 130.8 * v.p; // C3
+  tone(v, { at: 0.12, f, a: 0.004, d: 2.4, g: 0.35, rev: 0.4 });
+  tone(v, { at: 0.12, f: f * 2.0, a: 0.004, d: 1.6, g: 0.16, rev: 0.4 });
+  tone(v, { at: 0.12, f: f * 2.4, a: 0.003, d: 1.1, g: 0.1, rev: 0.4 });
+  tone(v, { at: 0.12, f: f * 3.0, a: 0.003, d: 0.8, g: 0.08 });
+  tone(v, { at: 0.12, f: f * 4.2, a: 0.002, d: 0.4, g: 0.05 });
+  return 2.7;
+};
+
+const dawn: SfxFn = (v) => {
+  const ac = v.ac;
+  const t = v.t;
+  const root = 146.8 * v.p; // D3; the chord below is G major add9, the key of the finale music
+  // a long warm swell: detuned saw/triangle chord through a slowly opening lowpass
+  const lp = ac.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.Q.value = 0.6;
+  lp.frequency.setValueAtTime(220, t);
+  lp.frequency.exponentialRampToValueAtTime(2200, t + 4.0);
+  lp.frequency.exponentialRampToValueAtTime(900, t + 7.0);
+  lp.connect(v.out);
+  if (v.rev) {
+    const s = ac.createGain();
+    s.gain.value = 0.45;
+    lp.connect(s);
+    s.connect(v.rev);
+  }
+  // G major add9 voiced wide: G2 D3 G3 B3 D4 A4
+  const chord = [-7, 0, 5, 9, 12, 19];
+  chord.forEach((s, i) => {
+    for (const dt of [-7, 7]) {
+      tone(v, { at: i * 0.12, type: i < 2 ? 'triangle' : 'sawtooth', f: root * semis(s), detune: dt, a: 2.8, hold: 1.6, d: 2.8, g: i < 2 ? 0.09 : 0.035, dest: lp });
+    }
+  });
+  // shimmering high bells drifting in as the light rises
+  const bells = [24, 28, 31, 33, 36, 31, 35, 38, 36, 43];
+  bells.forEach((s, i) => {
+    const at = 1.4 + i * 0.42 + v.rng() * 0.1;
+    tone(v, { at, f: root * semis(s), a: 0.003, d: 1.4, g: 0.05, rev: 0.6 });
+    tone(v, { at, f: root * semis(s) * 2.756, a: 0.002, d: 0.25, g: 0.01 });
+  });
+  return 7.4;
+};
+
 // ---------------------------------------------------------------------------------------------
 
 export const SFX: Record<SfxName, SfxSpec> = {
@@ -419,6 +532,12 @@ export const SFX: Record<SfxName, SfxSpec> = {
   uiTap: { fn: uiTap, level: 1.6, minGap: 0.03, poly: 2, cents: 10 },
   error: { fn: error, level: 1, minGap: 0.15, poly: 1, cents: 0 },
   footstep: { fn: footstep, level: 1.4, minGap: 0.07, poly: 2, cents: 100 },
+  arrive: { fn: arrive, level: 0.6, minGap: 0.25, poly: 2, cents: 40 },
+  order: { fn: order, level: 1, minGap: 0.3, poly: 2, cents: 0 },
+  orderNew: { fn: orderNew, level: 2.2, minGap: 0.3, poly: 1, cents: 30 },
+  upgrade: { fn: upgrade, level: 1, minGap: 0.12, poly: 2, cents: 0 },
+  beaconStage: { fn: beaconStage, level: 0.55, minGap: 1.0, poly: 1, cents: 0, duck: 0.5 },
+  dawn: { fn: dawn, level: 0.8, minGap: 5.0, poly: 1, cents: 0, duck: 0.7 },
 };
 
 export const SFX_NAMES = Object.keys(SFX) as SfxName[];

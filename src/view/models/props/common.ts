@@ -4,11 +4,13 @@ import { Builder, cone, cyl, ico, octa, rng, type V3 } from '../geo';
 import { mats } from '../materials';
 import { PALETTE as P } from '../palette';
 
-export type MatKey = 'std' | 'glow' | 'ice' | 'ember';
+export type MatKey = 'std' | 'glow' | 'ice' | 'ember' | 'aurora';
 
 export interface LayerSpec {
   name: string;
   b: Builder;
+  /** Prebuilt geometry instead of a builder (e.g. RGBA vertex colours). */
+  geo?: THREE.BufferGeometry;
   mat?: MatKey;
   /** Node position: geometry is built relative to it (e.g. flame base, lid hinge). */
   pos?: V3;
@@ -37,13 +39,13 @@ export function define(key: string, make: () => PropSpec): PropDef {
   if (!d) {
     const spec = make();
     let tris = 0;
-    const layers = spec.layers.filter((l) => !l.b.empty).map((l) => {
-      tris += l.b.triangles;
-      const geo = l.b.build();
+    const layers = spec.layers.filter((l) => l.geo || !l.b.empty).map((l) => {
+      const geo = l.geo ?? l.b.build();
+      tris += (geo.index ? geo.index.count : geo.attributes.position.count) / 3;
       geo.name = `${key}:${l.name}`;
       return {
         name: l.name, geo, mat: l.mat ?? 'std', pos: l.pos ?? ([0, 0, 0] as V3),
-        visible: l.visible ?? true, shadow: l.shadow ?? (l.mat !== 'glow' && l.mat !== 'ice'),
+        visible: l.visible ?? true, shadow: l.shadow ?? (l.mat !== 'glow' && l.mat !== 'ice' && l.mat !== 'aurora'),
       };
     });
     d = { layers, markers: spec.markers ?? {}, userData: { ...(spec.userData ?? {}), triangles: tris }, tris };
@@ -62,7 +64,8 @@ export function instantiate(name: string, d: PropDef): THREE.Group {
     mesh.position.set(...l.pos);
     mesh.visible = l.visible;
     mesh.castShadow = l.shadow;
-    mesh.receiveShadow = l.mat !== 'glow';
+    mesh.receiveShadow = l.mat !== 'glow' && l.mat !== 'aurora';
+    if (l.mat === 'aurora') { mesh.frustumCulled = false; mesh.renderOrder = -1; }
     g.add(mesh);
   }
   for (const [k, p] of Object.entries(d.markers)) {

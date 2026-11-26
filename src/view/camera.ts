@@ -15,6 +15,12 @@ export class CameraRig {
   /** Extra zoom-out (0..1) e.g. for big moments. */
   private punch = 0;
   private bias = -1.2;
+  /** 1 = title drift, 0 = gameplay; eases between. */
+  private titleBlend = 0;
+  private titleWant = 0;
+  private titleT = 0;
+  private gamePos = new THREE.Vector3();
+  private gameLook = new THREE.Vector3();
 
   constructor(aspect: number) {
     this.camera = new THREE.PerspectiveCamera(42, aspect, 0.5, 160);
@@ -32,6 +38,15 @@ export class CameraRig {
     const want = 11.5;
     const d = want / 2 / Math.tan(hfov / 2);
     return Math.min(30, Math.max(17, d));
+  }
+
+  setTitle(on: boolean, instant = false): void {
+    this.titleWant = on ? 1 : 0;
+    if (instant) this.titleBlend = this.titleWant;
+  }
+
+  get inTitle(): boolean {
+    return this.titleBlend > 0.001;
   }
 
   startPan(x: number, z: number, dur = 3): void {
@@ -93,8 +108,24 @@ export class CameraRig {
       sy = (Math.random() - 0.5) * a;
       if (this.shakeT <= 0) this.shakeAmp = 0;
     }
-    c.position.set(this.target.x + sx, this.target.y + this.dist * Math.sin(PITCH) + sy, this.target.z + this.dist * Math.cos(PITCH));
-    this.look.set(this.target.x + sx * 0.5, 0.6, this.target.z);
+    this.gamePos.set(this.target.x + sx, this.target.y + this.dist * Math.sin(PITCH) + sy, this.target.z + this.dist * Math.cos(PITCH));
+    this.gameLook.set(this.target.x + sx * 0.5, 0.6, this.target.z);
+    // Title: a slow, low drift around the camp with the aurora sky above.
+    const tb = this.titleWant > this.titleBlend ? 1.2 : 0.75;
+    this.titleBlend += Math.sign(this.titleWant - this.titleBlend) * Math.min(Math.abs(this.titleWant - this.titleBlend), dt * tb);
+    if (this.titleBlend > 0.001) {
+      this.titleT += dt;
+      const a = Math.sin(this.titleT * 0.06) * 0.55 + 0.25;
+      const r = 19 + Math.sin(this.titleT * 0.09) * 2;
+      const tx = Math.sin(a) * r;
+      const tz = 4 + Math.cos(a) * r;
+      const k = this.titleBlend * this.titleBlend * (3 - 2 * this.titleBlend);
+      c.position.set(tx, 6.5 + Math.sin(this.titleT * 0.13) * 0.8, tz).lerp(this.gamePos, 1 - k);
+      this.look.set(0, 3.2, 1).lerp(this.gameLook, 1 - k);
+    } else {
+      c.position.copy(this.gamePos);
+      this.look.copy(this.gameLook);
+    }
     c.lookAt(this.look);
   }
 

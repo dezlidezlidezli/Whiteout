@@ -21,7 +21,11 @@ export type PropName =
   | 'sawmill' | 'smokehouse' | 'iceHole' | 'oreVein' | 'forge' | 'greatKitchen'
   | 'beacon' // opts.level 0..4 (0 = foundation, 4 = complete, lit handled by view)
   | 'fence' | 'gate' | 'frostWall' | 'conveyor' | 'brazier' | 'lantern' | 'signpost'
-  | 'sled' | 'crate' | 'barrel' | 'snowman' | 'bridge' | 'noticeBoard' | 'bench' | 'woodPile';
+  | 'sled' | 'crate' | 'barrel' | 'snowman' | 'bridge' | 'noticeBoard' | 'bench' | 'woodPile'
+  // endless-mode decor & extras
+  | 'emberPile' // opts.level 1..4 (small -> large heap)
+  | 'flagPole' | 'lanternString' | 'statue' | 'well' | 'sleighBell' | 'iceSculpture' | 'marketStall'
+  | 'campfireRing' | 'caravan' | 'aurora';
 
 export interface ModelOpts {
   level?: number;

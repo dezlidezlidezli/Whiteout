@@ -123,9 +123,11 @@ function buildEntries(): Entry[] {
     E.push(charEntry(role, `${role} · run`, { speed: 6 }));
     E.push(charEntry(role, `${role} · carry walk`, { speed: 3 }, 8));
     for (const a of ACTIONS) E.push(charEntry(role, `${role} · ${a}`, { action: a }));
-  } else if (sheet === 'props' || sheet === 'props2' || sheet === 'allprops' || sheet === 'hero') {
+  } else if (sheet === 'props' || sheet === 'props2' || sheet === 'allprops' || sheet === 'hero' || sheet === 'props3') {
     const list: Entry[] = [];
-    const names = sheet === 'hero' ? ['kettle', 'counter', 'fishCrate', 'hearth', 'pine', 'pineSnowy', 'tent', 'cabin', 'frostWall'] : (q.get('names')?.split(',') ?? PROP_NAMES);
+    const NEW3 = ['emberPile', 'flagPole', 'lanternString', 'statue', 'well', 'sleighBell', 'iceSculpture', 'marketStall', 'campfireRing', 'caravan', 'noticeBoard', 'tent', 'cabin', 'aurora'];
+    const names = sheet === 'hero' ? ['kettle', 'counter', 'fishCrate', 'hearth', 'pine', 'pineSnowy', 'tent', 'cabin', 'frostWall']
+      : sheet === 'props3' ? NEW3 : (q.get('names')?.split(',') ?? PROP_NAMES);
     const levels = q.get('levels')?.split(',').map(Number);
     for (const name of names) {
       if (name === 'hearth') for (let l = 1; l <= 5; l++) { if (!levels || levels.includes(l)) list.push(propEntry('hearth', { level: l }, `hearth L${l}`)); }
@@ -142,6 +144,19 @@ function buildEntries(): Entry[] {
         const g = new THREE.Group();
         for (let i = 0; i < 3; i++) { const w = createProp('fence', { seed: i }); w.position.x = (i - 1) * 2; g.add(w); }
         list.push({ label: 'fence ×3', sub: `${Math.round(triCount(g) / 3)} tris each`, obj: g });
+      } else if (name === 'emberPile') {
+        for (let l = 1; l <= 4; l++) list.push(propEntry('emberPile', { level: l }, `emberPile L${l}`));
+      } else if (name === 'flagPole') {
+        const g = new THREE.Group();
+        for (let i = 0; i < 3; i++) { const w = createProp('flagPole', { seed: i }); w.position.set((i - 1) * 1.6, 0, (i % 2) * -1.2); g.add(w); }
+        list.push({ label: 'flagPole ×3 seeds', sub: `~${Math.round(triCount(g) / 3)} tris`, obj: g });
+      } else if (name === 'lanternString') {
+        const g = new THREE.Group();
+        for (let i = 0; i < 2; i++) { const w = createProp('lanternString'); w.position.x = (i - 0.5) * 4; g.add(w); }
+        list.push({ label: 'lanternString ×2 tiled', sub: `${Math.round(triCount(g) / 2)} tris each`, obj: g });
+      } else if (name === 'aurora') {
+        const o = createProp('aurora');
+        list.push({ label: 'aurora (60 m)', sub: `${triCount(o)} tris`, obj: o, radius: 26, center: new THREE.Vector3(0, 9, 0) });
       } else if (name === 'rock') {
         const g = new THREE.Group();
         for (let i = 0; i < 4; i++) { const w = createProp('rock', { seed: i }); w.rotation.y = 0; w.scale.setScalar(1); w.position.set((i % 2) * 2.6 - 1.3, 0, Math.floor(i / 2) * 2.4 - 1.2); g.add(w); }
@@ -152,7 +167,7 @@ function buildEntries(): Entry[] {
         list.push({ label: `${name} ×3 seeds`, sub: `~${Math.round(triCount(g) / 3)} tris`, obj: g });
       } else list.push(propEntry(name, {}));
     }
-    if (sheet !== 'hero' && !q.has('names')) list.push(propEntry('notARealProp', {}, 'unknown → placeholder'));
+    if (sheet !== 'hero' && sheet !== 'props3' && !q.has('names')) list.push(propEntry('notARealProp', {}, 'unknown → placeholder'));
     const half = Math.ceil(list.length / 2);
     E.push(...(sheet === 'props' ? list.slice(0, half) : sheet === 'props2' ? list.slice(half) : list));
   } else if (sheet === 'items') {
@@ -221,7 +236,7 @@ renderer.setScissorTest(true);
 const wrap = document.getElementById('wrap')!;
 wrap.appendChild(renderer.domElement);
 const nav = document.getElementById('nav')!;
-nav.innerHTML = ['characters', 'actions', 'props', 'props2', 'items', 'thumbs', 'crowd'].map((s) => `<a href="?sheet=${s}">${s}</a>`).join('');
+nav.innerHTML = ['characters', 'actions', 'props', 'props2', 'props3', 'crowdgame', 'items', 'thumbs', 'crowd'].map((s) => `<a href="?sheet=${s}">${s}</a>`).join('');
 if (q.has('nonav')) nav.remove();
 
 const dusk = q.get('light') === 'dusk' || sheet === 'crowdgame';

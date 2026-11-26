@@ -31,7 +31,7 @@ setInterval(refresh, 500);
 
 const sfxGrid = $('sfx');
 for (const name of SFX_NAMES) {
-  const warm = ['thaw', 'hearthUp', 'fanfare', 'padComplete', 'unlock', 'questComplete', 'ember'].includes(name);
+  const warm = ['thaw', 'hearthUp', 'fanfare', 'padComplete', 'unlock', 'questComplete', 'ember', 'order', 'upgrade', 'beaconStage', 'dawn'].includes(name);
   btn(sfxGrid, name, () => audio.sfx(name), warm ? 'warm' : '');
 }
 
@@ -45,6 +45,13 @@ btn(streaks, 'pickup 30/s', ladder('pickup', 30, 30), 'cold');
 btn(streaks, 'padTick run', () => {
   for (let i = 0; i < 40; i++) setTimeout(() => audio.sfx('padTick', { pitch: 1 + i * 0.015 }), 1000 * (1 - Math.pow(1 - i / 40, 1.6)) * 2);
   setTimeout(() => audio.sfx('padComplete'), 2100);
+});
+btn(streaks, 'arrivals', () => {
+  for (let i = 0; i < 6; i++) setTimeout(() => audio.sfx('arrive'), i * 450);
+});
+btn(streaks, 'dawn+finale', () => {
+  audio.sfx('dawn');
+  setTimeout(() => audio.music('finale'), 3000);
 });
 btn(streaks, 'walk', () => {
   for (let i = 0; i < 12; i++) setTimeout(() => audio.sfx('footstep'), i * 320);
@@ -91,6 +98,8 @@ function slider(label: string, value: number, onInput: (v: number) => void): voi
 }
 slider('wind', 0, (v) => audio.ambience({ wind: v }));
 slider('fire', 0, (v) => audio.ambience({ fire: v }));
+slider('crowd', 0, (v) => audio.ambience({ crowd: v }));
+slider('camp', 0, (v) => audio.ambience({ camp: v }));
 slider('sfx', audio.getVolumes().sfx, (v) => audio.setVolumes({ sfx: v }));
 slider('music', audio.getVolumes().music, (v) => audio.setVolumes({ music: v }));
 
@@ -101,7 +110,7 @@ const lab = {
   names: SFX_NAMES,
   moods: MOODS,
   async sfx(name: SfxName, pitch = 1, seed = 1234) {
-    return analyze(await renderSfx(name, { pitch }, 5, { seed }), PREROLL - 0.05);
+    return analyze(await renderSfx(name, { pitch }, name === 'dawn' ? 11 : 5, { seed }), PREROLL - 0.05);
   },
   async streak(name: SfxName, count: number, rate: number) {
     return analyze(await renderStreak(name, count, rate, (i) => ladderPitch(i), 2 + count / rate + 2), PREROLL - 0.05);
@@ -124,8 +133,8 @@ const lab = {
     const ms = performance.now() - t0;
     return { ...analyze(buf, 0.5), renderMs: ms };
   },
-  async ambience(wind: number, fire: number) {
-    return analyze(await renderAmbience({ wind, fire }, 6), 1.5);
+  async ambience(wind: number, fire: number, crowd = 0, camp = 0) {
+    return analyze(await renderAmbience({ wind, fire, crowd, camp }, 12), 1.5);
   },
   api: audio,
   liveState() {

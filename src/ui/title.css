@@ -1,0 +1,92 @@
+/* Title screen: the live world drifts behind an original wordmark. */
+
+.fk-title {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(var(--fk-top) + 9vh) 24px calc(var(--fk-bottom) + 8vh);
+  box-sizing: border-box;
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgba(8, 12, 28, 0.55), rgba(8, 12, 28, 0) 70%),
+    linear-gradient(0deg, rgba(8, 12, 28, 0.55), rgba(8, 12, 28, 0) 34%);
+  transition: opacity 0.6s ease;
+  touch-action: none;
+}
+.fk-title.fk-leave { opacity: 0; pointer-events: none; }
+
+.fk-mark { text-align: center; animation: fk-mark-in 1.2s cubic-bezier(0.2, 1.3, 0.4, 1) both; }
+.fk-mark .fk-kettle { width: 84px; height: 84px; margin: 0 auto -6px; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35)); }
+.fk-mark .fk-kettle .fk-steam { animation: fk-steam 2.8s ease-in-out infinite; transform-origin: 50% 100%; }
+.fk-mark .fk-kettle .fk-steam.fk-s2 { animation-delay: 1.4s; }
+.fk-word {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  font-size: min(17vw, 76px);
+  line-height: 0.95;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+.fk-word .fk-frost {
+  color: #eaf6ff;
+  -webkit-text-stroke: 2px #6fa7d8;
+  text-shadow: 0 3px 0 #2c4f7c, 0 6px 0 #1b2f52, 0 0 24px rgba(160, 215, 255, 0.55);
+}
+.fk-word .fk-kettleword {
+  background: linear-gradient(180deg, #fff0bd 10%, #ffb347 55%, #ff6a2b 95%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-stroke: 2px #8a3410;
+  filter: drop-shadow(0 3px 0 #5a1f08) drop-shadow(0 0 16px rgba(255, 150, 60, 0.55));
+}
+.fk-tag {
+  margin-top: 12px;
+  font-size: 17px;
+  font-weight: 800;
+  color: #e6efff;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+  opacity: 0.92;
+}
+
+.fk-actions { display: flex; flex-direction: column; align-items: center; gap: 14px; animation: fk-mark-in 1.2s 0.25s cubic-bezier(0.2, 1.3, 0.4, 1) both; }
+.fk-begin {
+  pointer-events: auto;
+  min-width: 230px;
+  padding: 18px 40px 20px;
+  border: 0;
+  border-radius: 30px;
+  font: inherit;
+  font-size: 30px;
+  font-weight: 900;
+  color: #3a1606;
+  background: linear-gradient(180deg, #ffe7a6, #ffb347 55%, #ff8a3a);
+  box-shadow: 0 6px 0 #9a3a10, 0 12px 30px rgba(255, 140, 50, 0.45), inset 0 2px 0 rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  animation: fk-begin-pulse 2.4s ease-in-out infinite;
+}
+.fk-begin:active { transform: translateY(4px); box-shadow: 0 2px 0 #9a3a10, 0 6px 16px rgba(255, 140, 50, 0.4); }
+.fk-newgame {
+  pointer-events: auto;
+  border: 0;
+  background: rgba(20, 28, 50, 0.6);
+  color: #dbe6fa;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  padding: 9px 16px;
+  border-radius: 14px;
+  cursor: pointer;
+}
+.fk-newgame.fk-armed { background: #ff5a3a; color: #fff; }
+
+@keyframes fk-mark-in { from { opacity: 0; transform: translateY(-18px) scale(0.92); } to { opacity: 1; transform: none; } }
+@keyframes fk-steam { 0% { opacity: 0; transform: translateY(6px) scale(0.7); } 40% { opacity: 0.9; } 100% { opacity: 0; transform: translateY(-14px) scale(1.25); } }
+@keyframes fk-begin-pulse { 50% { transform: scale(1.04); } }
+
+.fk-ui.fk-titling .fk-top, .fk-ui.fk-titling .fk-quest, .fk-ui.fk-titling .fk-toasts, .fk-ui.fk-titling .fk-hint, .fk-ui.fk-titling .fk-floaters { opacity: 0; pointer-events: none; }
+.fk-ui .fk-top, .fk-ui .fk-quest { transition: opacity 0.5s; }

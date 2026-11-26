@@ -15,6 +15,37 @@ export interface StationView {
   appear: number;
   shown: boolean;
   wobble: number;
+  parts?: Parts;
+}
+
+interface Parts {
+  lid?: THREE.Object3D;
+  lidY: number;
+  blade?: THREE.Object3D;
+  flames: THREE.Object3D[];
+  steam?: THREE.Object3D;
+  smoke?: THREE.Object3D;
+  chimney?: THREE.Object3D;
+  light?: THREE.Vector3;
+  lightColor: number;
+  lightPower: number;
+  emitT: number;
+}
+
+function findParts(o: THREE.Object3D): Parts {
+  const lid = o.getObjectByName('lid');
+  const flames: THREE.Object3D[] = [];
+  o.traverse((c) => {
+    if (c.name === 'flame') flames.push(c);
+  });
+  const ud = o.userData as { lightPos?: number[]; lightColor?: number; lightIntensity?: number };
+  const lightM = o.getObjectByName('light');
+  const light = lightM ? lightM.position.clone() : ud.lightPos ? new THREE.Vector3(ud.lightPos[0], ud.lightPos[1], ud.lightPos[2]) : undefined;
+  return {
+    lid, lidY: lid ? lid.position.y : 0, blade: o.getObjectByName('blade'), flames,
+    steam: o.getObjectByName('steamPoint'), smoke: o.getObjectByName('smokePoint'), chimney: o.getObjectByName('chimneyTop'),
+    light, lightColor: ud.lightColor ?? 0xffa860, lightPower: ud.lightIntensity ?? 1, emitT: Math.random(),
+  };
 }
 
 interface NodeView {
@@ -61,7 +92,12 @@ export class WorldView {
   private hearthObj: THREE.Object3D | null = null;
   private hearthLevel = 0;
   readonly hearthLight: THREE.PointLight;
-  private fireLights: { light: THREE.PointLight; id: string; base: number }[] = [];
+  private firePool: { light: THREE.PointLight; id: string; want: number }[] = [];
+  /** Particle emitter callback (steam/smoke) wired by the view. */
+  onEmit: (kind: 'steam' | 'smoke', x: number, y: number, z: number) => void = () => {};
+  private hearthParts: Parts | null = null;
+  /** 0 = out of fuel (dim), 1 = normal, 1.3 = Cosy. */
+  hearthHeat = 1;
   private data: GameData;
   /** Callbacks for juice. */
   onAppear: (x: number, z: number, size: number) => void = () => {};
@@ -90,15 +126,14 @@ export class WorldView {
     this.hearthLight.castShadow = false;
     this.root.add(this.hearthLight);
     this.stations.set('hearth', { def: hd, obj: new THREE.Group(), ghost: null, top: 1, appear: 1, shown: true, wobble: 0 });
-    // Kettle glows.
-    if (quality >= 1) {
-      for (const d of data.stations) {
-        if (d.model !== 'kettle' && d.model !== 'sawmill') continue;
-        const l = new THREE.PointLight(0xffa860, 0, 6, 1.8);
-        l.position.set(d.x, 1.3, d.z + 0.3);
-        this.root.add(l);
-        this.fireLights.push({ light: l, id: d.id, base: d.model === 'kettle' ? 5 : 2 });
-      }
+    // A fixed pool of warm point lights that follows the nearest working fires (constant light
+    // count = no shader recompiles; cheap on mobile).
+    const poolN = quality >= 1 ? 2 : 1;
+    for (let i = 0; i < poolN; i++) {
+      const l = new THREE.PointLight(0xffa860, 0, 6, 1.8);
+      l.castShadow = false;
+      this.root.add(l);
+      this.firePool.push({ light: l, id: '', want: 0 });
     }
 
     // ---- decor: unlockables as objects, static ones instanced in chunks
@@ -228,6 +263,7 @@ export class WorldView {
     this.hearthObj.position.set(hd.def.x, 0, hd.def.z);
     this.root.add(this.hearthObj);
     hd.obj = this.hearthObj;
+    this.hearthParts = findParts(this.hearthObj);
     hd.top = Math.max(0.8, new THREE.Box3().setFromObject(this.hearthObj).max.y);
     hd.appear = 0;
   }
@@ -404,13 +440,94 @@ export class WorldView {
     const flick = 0.85 + Math.sin(time * 13) * 0.06 + Math.sin(time * 7.3) * 0.08 + Math.sin(time * 23) * 0.04;
     this.hearthLight.intensity = (24 + lvl * 10) * flick * (sim.cosy ? 1.35 : 1);
     this.hearthLight.distance = 10 + lvl * 4;
-    for (const f of this.fireLights) {
-      const on = sim.isActive(f.id);
-      const ps = sim.state.stations[f.id];
-      const working = ps && ps.kind === 'processor' && ps.active;
-      const want = on ? f.base * (working ? 1.4 : 0.8) : 0;
-      f.light.intensity += (want * (0.9 + Math.sin(time * 17 + f.base) * 0.1) - f.light.intensity) * Math.min(1, dt * 6);
+    // Hearth flame breathes with its fuel.
+    if (this.hearthParts) {
+      const hp = this.hearthParts;
+      for (const f of hp.flames) {
+        const fl = 1 + Math.sin(time * 11) * 0.08 + Math.sin(time * 17.3) * 0.05;
+        const k = 0.45 + this.hearthHeat * 0.55;
+        f.scale.set(k * (1 + Math.sin(time * 9) * 0.04), k * fl, k * (1 + Math.cos(time * 8) * 0.04));
+      }
     }
+    this.hearthLight.intensity *= 0.55 + this.hearthHeat * 0.45;
+    this.animateStations(sim, time, dt);
+  }
+
+  private animateStations(sim: Sim, time: number, dt: number): void {
+    const p = sim.state.player;
+    // Candidates for the warm light pool.
+    let best1: StationView | null = null;
+    let best2: StationView | null = null;
+    let d1 = Infinity;
+    let d2 = Infinity;
+    for (const v of this.stations.values()) {
+      if (!v.shown || v.def.id === 'hearth') continue;
+      const parts = (v.parts ??= findParts(v.obj));
+      const st = sim.state.stations[v.def.id];
+      const working = !!st && st.kind === 'processor' && st.active;
+      if (parts.lid) parts.lid.position.y = parts.lidY + (working ? Math.abs(Math.sin(time * 13 + v.def.x)) * 0.05 : 0);
+      if (parts.blade) parts.blade.rotation.x += dt * (working ? 22 : 1.5);
+      for (const f of parts.flames) {
+        const fl = (working ? 1.15 : 0.9) + Math.sin(time * 12 + v.def.z) * 0.08;
+        f.scale.set(1, fl, 1);
+      }
+      parts.emitT -= dt;
+      if (parts.emitT <= 0) {
+        parts.emitT = working ? 0.28 : 1.1;
+        const m = parts.steam ?? parts.smoke;
+        if (m && Math.hypot(v.def.x - p.x, v.def.z - p.z) < 22) {
+          m.getWorldPosition(_v);
+          this.onEmit(parts.steam ? 'steam' : 'smoke', _v.x, _v.y, _v.z);
+        }
+      }
+      if (parts.light) {
+        const d = Math.hypot(v.def.x - p.x, v.def.z - p.z);
+        if (d < d1) {
+          d2 = d1;
+          best2 = best1;
+          d1 = d;
+          best1 = v;
+        } else if (d < d2) {
+          d2 = d;
+          best2 = v;
+        }
+      }
+    }
+    // Cabin chimneys.
+    for (const v of this.decor.values()) {
+      if (!v.shown) continue;
+      const parts = ((v as { parts?: Parts }).parts ??= findParts(v.obj));
+      if (!parts.chimney) continue;
+      parts.emitT -= dt;
+      if (parts.emitT <= 0) {
+        parts.emitT = 0.7 + Math.random() * 0.4;
+        if (Math.hypot(v.def.x - p.x, v.def.z - p.z) < 22) {
+          parts.chimney.getWorldPosition(_v);
+          this.onEmit('smoke', _v.x, _v.y, _v.z);
+        }
+      }
+    }
+    const picks = [best1, best2];
+    this.firePool.forEach((f, i) => {
+      const v = picks[i];
+      if (!v || !v.parts?.light) {
+        f.light.intensity += (0 - f.light.intensity) * Math.min(1, dt * 6);
+        return;
+      }
+      if (f.id !== v.def.id) {
+        f.id = v.def.id;
+        f.light.intensity = 0;
+        f.light.color.setHex(v.parts.lightColor);
+        _v.copy(v.parts.light);
+        v.obj.localToWorld(_v);
+        f.light.position.copy(_v);
+        f.light.position.y += 0.4;
+      }
+      const st = sim.state.stations[v.def.id];
+      const working = !!st && st.kind === 'processor' && st.active;
+      const want = 4 * v.parts.lightPower * (working ? 1.35 : 0.85) * (0.9 + Math.sin(time * 17 + i) * 0.1);
+      f.light.intensity += (want - f.light.intensity) * Math.min(1, dt * 6);
+    });
   }
 
   bump(id: string): void {
