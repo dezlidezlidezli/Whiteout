@@ -245,6 +245,11 @@ const cheat = {
   },
   save,
   stats: () => view.stats(),
+  /** Force a graphics quality (0..2) and disable auto fallback. */
+  quality: (q: QualityLevel) => {
+    autoQ.enabled = false;
+    view.setQuality(q);
+  },
   reset: () => {
     store.clear();
     sim = new Sim(GAME_DATA, { seed: 1 });

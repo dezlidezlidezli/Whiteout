@@ -336,7 +336,7 @@ export class WorldView {
         const s = backOut(n.grow) * NODE_SCALE;
         const sh = Math.sin(time * 45) * n.shake * 0.08;
         const o = n.occ;
-        _m2.makeScale(1 + o * 0.15, 1 - o * 0.72, 1 + o * 0.15);
+        _m2.makeScale(1 + o * 0.1, 1 - o * 0.55, 1 + o * 0.1);
         trs(_m, n.def.x, 0, n.def.z, rot, Math.max(0.001, s), sh, sh * 0.6);
         inst.set(n.index, _m.multiply(_m2));
       } else if (tree) {
