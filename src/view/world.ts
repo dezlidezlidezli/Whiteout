@@ -26,6 +26,7 @@ interface NodeView {
   shake: number;
   variant: number;
   index: number;
+  key: string;
 }
 
 interface WallView {
@@ -46,7 +47,8 @@ export class WorldView {
   readonly stations = new Map<string, StationView>();
   private decor = new Map<string, { def: DecorDef; obj: THREE.Object3D; ghost: THREE.Object3D | null; appear: number; shown: boolean }>();
   private nodes: NodeView[] = [];
-  private pineInst: PropInstancer[] = [];
+  private nodeInst = new Map<string, PropInstancer>();
+  private nodeCount = new Map<string, number>();
   private stumpInst: PropInstancer;
   private tentInst: PropInstancer;
   private tentAppear: number[] = [];
@@ -128,14 +130,17 @@ export class WorldView {
     // ---- harvest nodes (trees) – instanced with per-tree animation
     const nodeDefs = data.stations.filter((s): s is StationDef & { type: 'node' } => s.type === 'node');
     const variants = 3;
-    const perVariant: number[] = [0, 0, 0];
+    const perKey = new Map<string, number>();
     nodeDefs.forEach((d, i) => {
-      const v = i % variants;
-      this.nodes.push({ def: d, alive: true, fall: 0, fallDir: (hashId(d.id) % 628) / 100, grow: 1, shake: 0, variant: v, index: perVariant[v]++ });
+      const key = `${d.model}|${i % variants}`;
+      const idx = perKey.get(key) ?? 0;
+      perKey.set(key, idx + 1);
+      this.nodes.push({ def: d, alive: true, fall: 0, fallDir: (hashId(d.id) % 628) / 100, grow: 1, shake: 0, variant: -1, index: idx, key } as NodeView);
     });
-    const models = new Set(nodeDefs.map((d) => d.model));
-    const model = models.size ? [...models][0] : 'pine';
-    for (let v = 0; v < variants; v++) this.pineInst.push(new PropInstancer(this.root, model, { seed: v + 11 }, Math.max(1, perVariant[v])));
+    for (const [key, n] of perKey) {
+      const [model, v] = key.split('|');
+      this.nodeInst.set(key, new PropInstancer(this.root, model, { seed: Number(v) + 11 }, n));
+    }
     this.stumpInst = new PropInstancer(this.root, 'stump', { seed: 1 }, Math.max(1, nodeDefs.length));
 
     // ---- tents
@@ -299,11 +304,13 @@ export class WorldView {
         v.obj.scale.setScalar(backOut(v.appear) * (v.def.scale ?? 1));
       }
     }
-    // Trees.
-    const counts = [0, 0, 0];
+    // Harvest nodes (trees fall and leave a stump; other nodes sink and regrow).
+    this.nodeCount.clear();
     let stumps = 0;
     for (const n of this.nodes) {
       const st = sim.state.stations[n.def.id] as NodeState;
+      const inst = this.nodeInst.get(n.key)!;
+      const tree = /pine|tree/i.test(n.def.model);
       if (st.alive && !n.alive) {
         n.alive = true;
         n.grow = 0;
@@ -314,32 +321,30 @@ export class WorldView {
         n.fallDir = Math.atan2(n.def.x - sim.state.player.x, n.def.z - sim.state.player.z);
       }
       n.shake = Math.max(0, n.shake - dt * 3);
-      let m: THREE.Matrix4;
       const rot = n.def.rot ?? 0;
       if (n.alive) {
         n.grow = Math.min(1, n.grow + dt / 0.8);
         const s = backOut(n.grow);
         const sh = Math.sin(time * 45) * n.shake * 0.08;
-        m = trs(_m, n.def.x, 0, n.def.z, rot, s, sh, sh * 0.6);
-        this.pineInst[n.variant].set(n.index, m);
-      } else {
+        inst.set(n.index, trs(_m, n.def.x, 0, n.def.z, rot, Math.max(0.001, s), sh, sh * 0.6));
+      } else if (tree) {
         n.fall = Math.min(1.6, n.fall + dt);
         const f = Math.min(1, n.fall / 0.75);
         const ang = f * f * (Math.PI / 2) * 0.96;
         const sink = n.fall > 1 ? (n.fall - 1) / 0.6 : 0;
-        // Rotate around the base towards fallDir.
         const ax = Math.cos(n.fallDir) * ang;
         const az = -Math.sin(n.fallDir) * ang;
-        const s = 1 - sink;
-        m = trs(_m, n.def.x, -sink * 0.4, n.def.z, rot, Math.max(0.001, s), ax, az);
-        this.pineInst[n.variant].set(n.index, m);
+        inst.set(n.index, trs(_m, n.def.x, -sink * 0.4, n.def.z, rot, Math.max(0.001, 1 - sink), ax, az));
         this.stumpInst.set(stumps++, trs(_m, n.def.x, 0, n.def.z, rot, 1));
+      } else {
+        n.fall = Math.min(1, n.fall + dt * 2);
+        inst.set(n.index, trs(_m, n.def.x, -n.fall * 0.3, n.def.z, rot, Math.max(0.001, 1 - n.fall * 0.7)));
       }
-      counts[n.variant]++;
+      this.nodeCount.set(n.key, Math.max(this.nodeCount.get(n.key) ?? 0, n.index + 1));
     }
-    for (let v = 0; v < this.pineInst.length; v++) {
-      this.pineInst[v].setCount(counts[v]);
-      this.pineInst[v].commit();
+    for (const [key, inst] of this.nodeInst) {
+      inst.setCount(this.nodeCount.get(key) ?? 0);
+      inst.commit();
     }
     this.stumpInst.setCount(stumps);
     this.stumpInst.commit();
