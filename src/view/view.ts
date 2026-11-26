@@ -687,7 +687,10 @@ export class View {
     this.actors.update(sim, this.items, alpha, t, dt);
     this.crowd.update(sim, alpha, t, dt, px, pz);
     this.world.update(sim, t, dt);
-    for (const pv of this.pads.values()) pv.update(sim, t, dt, p.onPad === pv.def.id);
+    for (const pv of this.pads.values()) {
+      pv.update(sim, t, dt, p.onPad === pv.def.id);
+      if (this.title) pv.root.visible = false; // nothing in-world competes with the title buttons
+    }
     this.drawBuffers(t);
     this.updateFlyers(dt, t);
     this.items.end();

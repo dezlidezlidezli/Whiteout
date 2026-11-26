@@ -3,6 +3,7 @@
 
 import './hud.css';
 import type { Sim } from '../sim';
+import { VERSION_LABEL } from '../platform/version';
 import { ICON_CHECK, ICON_EMBER, ICON_FLAG, ICON_FLAME, ICON_GEAR, ICON_PEOPLE } from './icons';
 
 export interface SettingsApi {
@@ -397,6 +398,10 @@ class SettingsSheet {
       }
     });
     this.sheet.appendChild(this.resetBtn);
+    const ver = h('div', 'fk-msg');
+    ver.style.cssText = 'margin-top:18px;text-align:center;opacity:.65;font-size:12px';
+    ver.textContent = VERSION_LABEL;
+    this.sheet.appendChild(ver);
 
     // Optional "update ready" hook from the PWA layer.
     window.addEventListener('fk-update-ready', () => {
