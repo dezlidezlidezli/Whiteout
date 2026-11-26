@@ -63,7 +63,7 @@ const ARM_LEN = 0.36;
 interface Parts {
   rig: THREE.Object3D; body: THREE.Object3D; head: THREE.Object3D;
   armL: THREE.Object3D; armR: THREE.Object3D; legL: THREE.Object3D; legR: THREE.Object3D;
-  tail?: THREE.Object3D; legBL?: THREE.Object3D; legBR?: THREE.Object3D;
+  tail?: THREE.Object3D; legBL?: THREE.Object3D; legBR?: THREE.Object3D; tool?: THREE.Object3D;
   quad: boolean; phase: number;
 }
 const partsMap = new WeakMap<THREE.Object3D, Parts>();
@@ -305,7 +305,7 @@ function buildHumanoid(role: Exclude<CharacterRole, 'dog'>, opts: ModelOpts): Ch
   body.add(carryAnchor);
 
   const phase = ((opts.seed ?? 0) * 0.6180339) % 1 * Math.PI * 2;
-  partsMap.set(root, { rig, body, head, armL, armR, legL, legR, quad: false, phase });
+  partsMap.set(root, { rig, body, head, armL, armR, legL, legR, quad: false, phase, tool: armR.getObjectByName('tool') });
   root.userData.radius = 0.35;
   const height = HIP + NECK + 0.24 + 0.27 + (st.hat === 'bobble' ? 0.25 : 0.12);
   return { root, carryAnchor, height };
@@ -438,6 +438,7 @@ export function animate(rigDef: CharacterRig, s: CharacterAnimState): void {
     p.head.rotation.x = Math.sin(t * 0.7) * 0.04;
   }
 
+  if (p.tool) p.tool.visible = !s.carrying; // tool is stowed while carrying a stack
   if (s.carrying) {
     const bob = moving ? Math.sin(t * (7 + speed * 1.5) * 2) * 0.05 : Math.sin(t * 2.1) * 0.02;
     p.armL.rotation.set(-1.4 + bob, 0, -0.18);

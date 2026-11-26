@@ -4,17 +4,6 @@ import { PALETTE as P } from '../palette';
 import { fishBody } from '../items';
 import { coals, flame, logBetween, snowMound, stoneRing, type PropSpec } from './common';
 
-/** Pitched plank roof with a snow layer, ridge along X. */
-function roof(b: Builder, w: number, d: number, y: number, rise: number, wood: number = P.woodDark) {
-  const slope = Math.atan2(rise, d / 2);
-  const slab = Math.hypot(d / 2, rise) + 0.25;
-  for (const sz of [-1, 1]) {
-    b.add(bevel(w, 0.1, slab, 0.03), wood, { p: [0, y + rise / 2, sz * (d / 4 + 0.06)], r: [sz * slope, 0, 0] });
-    b.add(bevel(w - 0.06, 0.12, slab - 0.06, 0.05), P.snow, { p: [0, y + rise / 2 + 0.1, sz * (d / 4 + 0.1)], r: [sz * slope, 0, 0], bottom: P.snowShade, topY: 0.3, jitter: 0.015, seed: sz + 3 });
-  }
-  b.add(box(w + 0.02, 0.16, 0.26), P.snow, { p: [0, y + rise + 0.1, 0] });
-}
-
 // ---------------------------------------------------------------- sawmill
 export function sawmill(): PropSpec {
   const b = new Builder(), blade = new Builder();

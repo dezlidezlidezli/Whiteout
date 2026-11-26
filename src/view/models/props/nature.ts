@@ -1,5 +1,5 @@
 // Trees, rocks, ice and other landscape props.
-import { Builder, bevel, box, cone, cyl, dodec, ico, octa, rng, sphere } from '../geo';
+import { Builder, box, cone, cyl, dodec, ico, octa, rng, sphere } from '../geo';
 import { PALETTE as P } from '../palette';
 import { snowMound, type PropSpec } from './common';
 
@@ -156,6 +156,5 @@ export function oreVein(seed = 0): PropSpec {
   // a couple of loose chunks on the ground
   for (let i = 0; i < 3; i++) b.add(dodec(0.12), P.ore, { p: [-0.4 + i * 0.45, 0.08, 1.05 + r() * 0.2], jitter: 0.02, seed: i });
   b.add(sphere(0.3, 6, 4), P.snow, { p: [-0.3, 1.12, -0.1], s: [1.4, 0.4, 1.1] });
-  void bevel;
   return { layers: [{ name: 'body', b }], userData: { radius: 1.35 } };
 }
