@@ -439,6 +439,11 @@ export class Sim {
       }
     }
 
+    if (p.returning) {
+      const rd = this.stationDefs.get(p.returning);
+      if (!rd || Math.hypot(rd.x - p.x, rd.z - p.z) > rd.reach + 0.3) p.returning = null;
+    }
+
     // Item transfers at a fixed cadence.
     if (p.transferCd > 0) p.transferCd -= dt;
     if (p.transferCd <= 0) {
@@ -506,7 +511,8 @@ export class Sim {
         }
       }
     }
-    for (const d of this.stationsInReach()) {
+    const inReach = this.stationsInReach();
+    for (const d of inReach) {
       for (let i = p.stack.length - 1; i >= 0; i--) {
         const it = p.stack[i];
         if (this.room(d.id, it) > 0) {
@@ -517,6 +523,21 @@ export class Sim {
         }
       }
     }
+    // Hand items back to their crate: standing still with a full pack (then keep going until done).
+    const still = Math.hypot(this.moveX, this.moveZ) < 0.2;
+    for (const d of inReach) {
+      if (d.type !== 'pile') continue;
+      const ps = this.state.stations[d.id] as PileState;
+      if (ps.count >= d.cap) continue;
+      if (p.returning !== d.id && !(still && p.stack.length >= p.capacity)) continue;
+      const i = p.stack.lastIndexOf(d.item);
+      if (i < 0) continue;
+      p.stack.splice(i, 1);
+      ps.count++;
+      p.returning = d.id;
+      this.emit({ type: 'drop', item: d.item, to: { kind: 'station', id: d.id }, by: PLAYER, height: i });
+      return true;
+    }
     return false;
   }
 
@@ -524,6 +545,7 @@ export class Sim {
     const p = this.state.player;
     if (p.stack.length >= p.capacity) return false;
     for (const d of this.stationsInReach()) {
+      if (d.id === p.returning) continue;
       const it = this.takeable(d.id);
       if (!it) continue;
       // Walking past a station only tops up the item already on top; pause to start a new kind.

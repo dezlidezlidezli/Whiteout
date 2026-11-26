@@ -12,25 +12,18 @@ export function updateCustomers(sim: Sim, dt: number): void {
   const b = sim.data.balance;
   const counters = sim.data.stations.filter((d): d is CounterDef => d.type === 'counter' && sim.isUsable(d.id));
 
-  // Spawning.
+  // Spawning: each counter draws its own trickle of Icebound out of the storm.
   s.spawnT += dt * s.mods.spawnRate;
   if (s.spawnT >= b.spawnInterval) {
+    s.spawnT -= b.spawnInterval;
     let waiting = 0;
     for (const c of s.customers) if (c.phase === 'queue') waiting++;
-    let best: CounterDef | null = null;
-    let bestLen = Infinity;
     for (const c of counters) {
       const q = (s.stations[c.id] as CounterState).queue.length;
-      if (q < c.queueLen && q < bestLen) {
-        bestLen = q;
-        best = c;
+      if (q < c.queueLen && waiting < b.maxCustomers) {
+        waiting++;
+        sim.spawnCustomerAt(c, c.spawn.x + (sim.rand() - 0.5) * 3, c.spawn.z + sim.rand() * 2);
       }
-    }
-    if (best && waiting < b.maxCustomers) {
-      s.spawnT -= b.spawnInterval;
-      sim.spawnCustomerAt(best, best.spawn.x + (sim.rand() - 0.5) * 3, best.spawn.z + sim.rand() * 2);
-    } else {
-      s.spawnT = b.spawnInterval;
     }
   }
 

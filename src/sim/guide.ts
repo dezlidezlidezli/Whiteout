@@ -100,6 +100,15 @@ function unloadJunk(sim: Sim, wanted: Set<ItemKind> | null): GuideTarget | null 
       s.guideUnload = true;
       return dest;
     }
+    // Nothing takes it: hand it back to a crate of its kind.
+    for (const d of sim.data.stations) {
+      if (d.type !== 'pile' || d.item !== it || !sim.isUsable(d.id)) continue;
+      const ps = sim.state.stations[d.id] as import('./state').PileState;
+      if (ps.count < d.cap) {
+        s.guideUnload = true;
+        return stTarget(d);
+      }
+    }
   }
   s.guideUnload = false;
   return null;
@@ -284,7 +293,7 @@ function earn(sim: Sim): GuideTarget | null {
   }
   // Serve the busiest counter's dish.
   let best: CounterDef | null = null;
-  let bq = -1;
+  let bq = -Infinity;
   for (const d of sim.data.stations) {
     if (d.type !== 'counter' || !sim.isUsable(d.id)) continue;
     const cs = s.stations[d.id] as CounterState;
