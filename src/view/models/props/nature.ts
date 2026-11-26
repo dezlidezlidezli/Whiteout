@@ -86,7 +86,7 @@ export function rock(seed = 0): PropSpec {
   const boulder = (x: number, z: number, s: number, sy: number, sxz: [number, number], k: number) =>
     b.add(ico(s, 1), cols[k % 3], {
       p: [x, s * sy * 0.62, z], s: [sxz[0], sy, sxz[1]], r: [0, r() * 6, (r() - 0.5) * 0.2],
-      jitter: s * 0.16, seed: seed * 7 + k, top: P.snow, topY: 0.62, shade: 0.1,
+      jitter: s * 0.16, seed: seed * 7 + k, top: P.snow, topY: 0.8, shade: 0.1,
     });
   let radius = 1;
   if (v === 0) { boulder(0, 0, 0.75, 0.8, [1.15, 1], 0); radius = 0.95; }                         // round boulder
@@ -98,7 +98,7 @@ export function rock(seed = 0): PropSpec {
     const a = r() * Math.PI * 2, d = radius * (0.95 + r() * 0.25);
     b.add(ico(0.1 + r() * 0.08, 0), cols[i % 3], { p: [Math.cos(a) * d, 0.06, Math.sin(a) * d], s: [1.2, 0.7, 1], r: [r(), r(), r()], jitter: 0.015, seed: i });
   }
-  snowMound(b, radius * 0.7, 0.12, radius * 0.5, [radius * 0.35, 0, radius * 0.5], seed + 9);
+  snowMound(b, radius * 0.45, 0.1, radius * 0.3, [radius * 0.5, 0, radius * 0.6], seed + 9);
   return { layers: [{ name: 'body', b }], userData: { radius, variant: v } };
 }
 

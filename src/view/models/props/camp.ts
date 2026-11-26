@@ -250,7 +250,7 @@ export function hearth(level: number): PropSpec {
     b.add(box(0.02, 0.35, 0.02), P.iron, { p: [0.75, 0.22 + wallH * 0.72 - 0.35, -0.22] });
     b.add(lathe([[0, 0], [0.16, 0.02], [0.22, 0.14], [0.2, 0.28], [0.17, 0.3]], 8), P.copper, { p: [0.75, 0.22 + wallH * 0.72 - 0.85, -0.22], top: P.copperLight });
     // firewood stacked by the hearth
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < (L === 5 ? 3 : 5); i++) {
       const row = i < 3 ? 0 : 1;
       const x = -1.85 + (row ? (i - 3) * 0.26 + 0.13 : i * 0.26);
       logBetween(b, [x, 0.36 + row * 0.22, -0.2], [x, 0.36 + row * 0.22, 0.6], 0.12, P.bark, P.woodPale, 5);
@@ -267,11 +267,11 @@ export function hearth(level: number): PropSpec {
     const courses = 5;
     for (let i = 0; i <= courses; i++) {
       const t = i / courses, y = cy0 + t * CH;
-      b.add(bevel(wAt(t) + 0.12, 0.1, dAt(t) + 0.12, 0.03), i % 2 ? P.stoneDark : P.stone, { p: [0, y, cz] });
+      b.add(box(wAt(t) + 0.12, 0.1, dAt(t) + 0.12), i % 2 ? P.stoneDark : P.stone, { p: [0, y, cz] });
       if (i === courses) break;
       for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
         const tq = t + 0.5 / courses, alt = (i % 2 === 0) === (sx > 0);
-        b.add(bevel(alt ? 0.32 : 0.2, CH / courses - 0.16, alt ? 0.2 : 0.32, 0.03), (i + (sx > 0 ? 1 : 0)) % 2 ? P.stone : 0x9aa0ab, {
+        b.add(box(alt ? 0.32 : 0.2, CH / courses - 0.16, alt ? 0.2 : 0.32), (i + (sx > 0 ? 1 : 0)) % 2 ? P.stone : 0x9aa0ab, {
           p: [sx * (wAt(tq) / 2 - 0.06), cy0 + tq * CH, cz + sz * (dAt(tq) / 2 - 0.06)], shade: 0.05, seed: i * 4 + sx + sz,
         });
       }

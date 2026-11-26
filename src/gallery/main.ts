@@ -142,6 +142,10 @@ function buildEntries(): Entry[] {
         const g = new THREE.Group();
         for (let i = 0; i < 3; i++) { const w = createProp('fence', { seed: i }); w.position.x = (i - 1) * 2; g.add(w); }
         list.push({ label: 'fence ×3', sub: `${Math.round(triCount(g) / 3)} tris each`, obj: g });
+      } else if (name === 'rock') {
+        const g = new THREE.Group();
+        for (let i = 0; i < 4; i++) { const w = createProp('rock', { seed: i }); w.rotation.y = 0; w.scale.setScalar(1); w.position.set((i % 2) * 2.6 - 1.3, 0, Math.floor(i / 2) * 2.4 - 1.2); g.add(w); }
+        list.push({ label: 'rock ×4 variants', sub: `~${Math.round(triCount(g) / 4)} tris`, obj: g });
       } else if (name === 'pine' || name === 'pineSnowy') {
         const g = new THREE.Group();
         for (let i = 0; i < 3; i++) { const w = createProp(name, { seed: i }); w.position.x = (i - 1) * 2.6; w.position.z = i === 1 ? -1 : 0; g.add(w); }
