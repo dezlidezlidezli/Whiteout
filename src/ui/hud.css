@@ -310,3 +310,9 @@
 /* When the Cosy meter is showing, the quest chip sits a little lower. */
 .fk-ui.fk-has-cosy .fk-quest { top: calc(var(--fk-top) + 104px); }
 .fk-ui.fk-has-cosy .fk-toasts { top: calc(var(--fk-top) + 198px); }
+
+/* Cosy: the pill glows and breathes warmly. */
+.fk-cosy.fk-on { animation: fk-cosy-glow 2.2s ease-in-out infinite; background: linear-gradient(90deg, rgba(90, 36, 14, 0.85), rgba(40, 24, 30, 0.82)); }
+.fk-cosy.fk-on .fk-ico { animation: fk-flicker 0.9s ease-in-out infinite; }
+@keyframes fk-cosy-glow { 50% { box-shadow: 0 3px 0 rgba(0, 0, 0, 0.28), inset 0 0 0 2px rgba(255, 190, 100, 1), 0 0 26px rgba(255, 140, 50, 0.75); } }
+@keyframes fk-flicker { 50% { transform: scale(1.12) rotate(-4deg); } }

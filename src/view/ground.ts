@@ -26,7 +26,7 @@ float fkMelt(vec2 xz) {
 }
 `;
 
-export function createGround(size = 260, segs = 130): { mesh: THREE.Mesh; uniforms: GroundUniforms } {
+export function createGround(size = 240, segs = 96): { mesh: THREE.Mesh; uniforms: GroundUniforms } {
   const geo = new THREE.PlaneGeometry(size, size, segs, segs);
   geo.rotateX(-Math.PI / 2);
   const uniforms: GroundUniforms = {

@@ -216,6 +216,8 @@ export class Effects {
   private shards: ParticlePool;
   private puffs: ParticlePool;
   private glints: ParticlePool;
+  private steam: ParticlePool;
+  private smokeP: ParticlePool;
   private rings: { mesh: THREE.Mesh; t: number; max: number; size: number }[] = [];
   private ringGeo = new THREE.RingGeometry(0.86, 1, 64).rotateX(-Math.PI / 2);
   private parent: THREE.Object3D;
@@ -228,6 +230,10 @@ export class Effects {
     this.puffs = new ParticlePool(parent, new THREE.IcosahedronGeometry(0.25, 0), puffMat, 220, -0.6, 3.2);
     const glintMat = new THREE.MeshBasicMaterial({ color: PALETTE.ember, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
     this.glints = new ParticlePool(parent, new THREE.OctahedronGeometry(0.07, 0), glintMat, 200, 2.5, 1.2);
+    const steamMat = new THREE.MeshBasicMaterial({ color: 0xf2f6ff, transparent: true, opacity: 0.55, depthWrite: false, fog: true });
+    this.steam = new ParticlePool(parent, new THREE.IcosahedronGeometry(0.2, 1), steamMat, 120, -0.9, 1.5);
+    const smokeMat = new THREE.MeshBasicMaterial({ color: 0x8a90a8, transparent: true, opacity: 0.45, depthWrite: false, fog: true });
+    this.smokeP = new ParticlePool(parent, new THREE.IcosahedronGeometry(0.28, 1), smokeMat, 120, -0.5, 0.8);
   }
 
   /** The icy shell cracking off a thawing villager. */
@@ -258,6 +264,18 @@ export class Effects {
     }
   }
 
+  /** Soft rising steam (kettles, breath) or chimney smoke. */
+  vapour(kind: 'steam' | 'smoke' | 'breath', x: number, y: number, z: number, dx = 0, dz = 0): void {
+    const pool = kind === 'smoke' ? this.smokeP : this.steam;
+    const small = kind === 'breath';
+    pool.spawn({
+      x: x + (Math.random() - 0.5) * 0.1, y, z: z + (Math.random() - 0.5) * 0.1,
+      vx: dx + (Math.random() - 0.5) * 0.25 + (kind === 'smoke' ? 0.25 : 0), vy: small ? 0.25 : 0.6 + Math.random() * 0.4, vz: dz + (Math.random() - 0.5) * 0.25,
+      rx: Math.random() * 6, ry: Math.random() * 6, vr: 0.6,
+      life: 0, max: small ? 0.8 : kind === 'smoke' ? 2.6 : 1.4, size: small ? 0.45 : kind === 'smoke' ? 0.9 : 0.7, grow: small ? 1.8 : 2.6,
+    });
+  }
+
   /** Warm glints (pad complete, ember bursts). */
   glint(x: number, y: number, z: number, n = 12, sp = 2.5): void {
     for (let i = 0; i < n; i++) {
@@ -284,6 +302,8 @@ export class Effects {
     this.shards.update(dt);
     this.puffs.update(dt);
     this.glints.update(dt);
+    this.steam.update(dt);
+    this.smokeP.update(dt);
     for (let i = this.rings.length - 1; i >= 0; i--) {
       const r = this.rings[i];
       r.t += dt;

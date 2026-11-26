@@ -151,9 +151,13 @@ export class WorldView {
         this.decor.set(d.id, { def: d, obj, ghost, appear: 1, shown: false });
         continue;
       }
-      const variant = d.model === 'pineSnowy' || d.model === 'rock' || d.model === 'snowDrift' ? (d.seed ?? 0) % 3 : 0;
-      const cx = Math.floor(d.x / 40);
-      const cz = Math.floor(d.z / 40);
+      // Deep forest far from any walkable area sits in fog: skip it (triangle budget).
+      if (d.id.startsWith('tree') && distToPlay(data, d.x, d.z) > 13) continue;
+      // Few variants and coarse chunks: each (model, variant, chunk) is one instanced draw.
+      const variant = d.model === 'pineSnowy' ? (d.seed ?? 0) % 2 : 0;
+      const forest = d.model === 'pineSnowy' || d.model === 'rock' || d.model === 'snowDrift';
+      const cx = forest ? Math.floor(d.x / 64) : 0;
+      const cz = forest ? Math.floor(d.z / 64) : 0;
       const key = `${d.model}|${variant}|${cx}|${cz}`;
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(d);
@@ -161,7 +165,9 @@ export class WorldView {
     for (const [key, list] of groups) {
       const [model, variant] = key.split('|');
       const far = list.every((d) => d.id.startsWith('tree'));
-      const inst = new PropInstancer(this.root, model, { seed: Number(variant) + 1 }, list.length, far ? { cast: false, receive: true } : null);
+      // Decor never casts real shadows (draw-call budget); stations, trees, tents and characters do.
+      const inst = new PropInstancer(this.root, model, { seed: Number(variant) + 1 }, list.length, { cast: false, receive: !far || model !== 'pineSnowy' });
+      void far;
       list.forEach((d, i) => inst.set(i, trs(_m, d.x, 0, d.z, d.rot ?? 0, d.scale ?? 1)));
       inst.commit();
     }
@@ -199,7 +205,7 @@ export class WorldView {
           pieces.push({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, rot: rot + ((k * 1.7) % 0.4) - 0.2, s: 0.9 + ((k * 0.37) % 0.35) });
         }
       }
-      const inst = new PropInstancer(this.root, 'frostWall', { seed: hashId(w.id) % 5 }, pieces.length);
+      const inst = new PropInstancer(this.root, 'frostWall', { seed: hashId(w.id) % 5 }, pieces.length, { cast: false, receive: true });
       pieces.forEach((p, i) => inst.set(i, trs(_m, p.x, 0, p.z, p.rot, p.s)));
       inst.commit();
       this.walls.push({ id: w.id, area: w.area, inst, pieces, state: 'up', t: 0 });
@@ -325,6 +331,7 @@ export class WorldView {
 
   update(sim: Sim, time: number, dt: number): void {
     this.updateGhosts(sim, time);
+    this.syncStages(sim);
     // Scale-in with overshoot for anything newly built.
     for (const v of this.stations.values()) {
       if (v.appear < 1) {
@@ -530,6 +537,32 @@ export class WorldView {
     });
   }
 
+  /** Multi-stage stations (e.g. the Beacon): rebuild the prop with its current stage as `level`. */
+  private syncStages(sim: Sim): void {
+    for (const v of this.stations.values()) {
+      if (v.def.id === 'hearth') continue;
+      const st = sim.state.stations[v.def.id] as unknown as { stage?: number; level?: number } | undefined;
+      const lvl = st ? (typeof st.stage === 'number' ? st.stage : typeof st.level === 'number' ? st.level : undefined) : undefined;
+      if (lvl === undefined) continue;
+      const cur = (v.obj.userData.fkLevel as number | undefined) ?? -1;
+      if (cur === lvl) continue;
+      const next = createProp(v.def.model, { seed: hashId(v.def.id), level: lvl });
+      next.position.copy(v.obj.position);
+      next.rotation.copy(v.obj.rotation);
+      next.visible = v.obj.visible;
+      next.userData.fkLevel = lvl;
+      v.obj.removeFromParent();
+      this.root.add(next);
+      v.obj = next;
+      v.parts = undefined;
+      v.top = Math.max(0.5, new THREE.Box3().setFromObject(next).max.y);
+      if (cur >= 0 && v.shown) {
+        v.appear = 0.35; // build-up: grows from the old size with overshoot
+        this.onAppear(v.def.x, v.def.z, 2.5);
+      }
+    }
+  }
+
   bump(id: string): void {
     const s = this.stations.get(id);
     if (s && s.appear >= 1) s.wobble = 1;
@@ -549,6 +582,14 @@ export class WorldView {
       return out.set(0, 1, 0);
     }
     const d = v.def;
+    // Prefer the model's own markers when the art provides them.
+    const mk = d.type === 'processor' ? (role === 'out' ? 'outputPoint' : 'inputPoint') : d.type === 'counter' ? 'itemAnchor' : d.type === 'deposit' ? 'fuelPoint' : '';
+    const marker = mk && d.type !== 'deposit' ? v.obj.getObjectByName(mk) : undefined;
+    if (marker) {
+      marker.getWorldPosition(out);
+      if (d.type === 'processor') out.y = 0;
+      return out;
+    }
     const l = localSpot(d, item, role, v.top);
     const rot = d.rot ?? 0;
     const c = Math.cos(rot);
@@ -592,6 +633,18 @@ function makeGhost(model: string, x: number, z: number, rot: number): THREE.Obje
   g.rotation.y = rot;
   g.visible = false;
   return g;
+}
+
+function distToPlay(data: GameData, x: number, z: number): number {
+  let best = Infinity;
+  for (const a of data.areas) {
+    for (const r of a.rects) {
+      const dx = Math.max(r.x0 - x, 0, x - r.x1);
+      const dz = Math.max(r.z0 - z, 0, z - r.z1);
+      best = Math.min(best, Math.hypot(dx, dz));
+    }
+  }
+  return best;
 }
 
 export function backOut(t: number): number {

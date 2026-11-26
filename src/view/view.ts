@@ -76,6 +76,9 @@ export class View {
   private prints: Footprints;
   private arrow: GuideArrow;
   private sky: Sky;
+  private fuelBubble: THREE.Sprite;
+  private heat = 1;
+  private breathT = 0;
   private flyers: Flyer[] = [];
   private hidden = new Map<string, number>();
   private time = 0;
@@ -140,6 +143,9 @@ export class View {
       this.fx.puff(x, 0.1, z, Math.round(10 + size * 6), size, 1.8 + size);
       this.fx.ring(x, z, 1.6 + size, 0xffd9a0, 0.6);
     };
+    this.world.onEmit = (kind, x, y, z) => this.fx.vapour(kind, x, y, z);
+    this.fuelBubble = makeFuelBubble();
+    this.scene.add(this.fuelBubble);
     for (const p of this.data.pads) {
       const pv = new PadVisual(p);
       this.pads.set(p.id, pv);
@@ -152,7 +158,9 @@ export class View {
     this.crowd.onEnterHome = (x, z) => {
       this.fx.puff(x, 0.3, z, 5, 0.5, 0.9);
       this.fx.glint(x, 0.9, z, 5, 1.2);
-      if (Math.hypot(x - this.sim.state.player.x, z - this.sim.state.player.z) < 14) this.hooks.float('+1', new THREE.Vector3(x, 1.8, z), 'info');
+      const near = Math.hypot(x - this.sim.state.player.x, z - this.sim.state.player.z) < 14;
+      if (near) this.hooks.float('+1', new THREE.Vector3(x, 1.8, z), 'info');
+      this.sfx('arrive', { volume: 0.5, pitch: 0.9 + Math.random() * 0.2 }, 0.12, { x, z });
     };
     this.fx = new Effects(this.scene);
     this.snow = new Snowfall(this.scene, [450, 1000, 1700][quality]);
@@ -444,14 +452,24 @@ export class View {
           const d = this.sim.stationDefs.get(e.node)!;
           this.world.shakeNode(e.node);
           const tree = /pine|tree/i.test(d.model);
-          this.sfx(tree ? 'chop' : 'mine', { pitch: 0.9 + Math.random() * 0.2, volume: e.by.kind === 'player' ? 1 : 0.3 }, 0.05, d);
-          this.fx.puff(d.x, 1.6, d.z, 3, 0.5, 1.2);
+          const water = /ice|hole|lake|fish/i.test(d.model);
+          this.sfx(tree ? 'chop' : water ? 'splash' : 'mine', { pitch: 0.9 + Math.random() * 0.2, volume: e.by.kind === 'player' ? 1 : 0.3 }, 0.05, d);
+          if (tree) this.fx.puff(d.x, 1.6, d.z, 3, 0.5, 1.2);
+          else if (water) {
+            this.fx.shatter(d.x, 0.1, d.z, 5, 0.5);
+            this.fx.vapour('steam', d.x, 0.2, d.z);
+          } else this.fx.glint(d.x, 0.7, d.z, 6, 1.5);
           break;
         }
         case 'nodeDeplete': {
           const d = this.sim.stationDefs.get(e.node)!;
-          this.sfx('treeFall', {}, 0.1, d);
-          this.later(0.6, () => this.fx.puff(d.x, 0.2, d.z, 12, 1.6, 2.2));
+          if (/pine|tree/i.test(d.model)) {
+            this.sfx('treeFall', {}, 0.1, d);
+            this.later(0.6, () => this.fx.puff(d.x, 0.2, d.z, 12, 1.6, 2.2));
+          } else {
+            this.sfx(/ice|hole/i.test(d.model) ? 'iceCrack' : 'mine', { pitch: 0.8 }, 0.1, d);
+            this.fx.puff(d.x, 0.2, d.z, 8, 1, 1.5);
+          }
           break;
         }
         case 'nodeRegrow': {
@@ -602,6 +620,31 @@ export class View {
     this.sparks.update(t, this.renderer.getPixelRatio(), 0.8 + s.hearth.level * 0.25 + (sim.cosy ? 0.5 : 0));
     this.prints.update(dt, px, pz, p.facing, distHearth > this.radius + 0.5);
 
+    // Hearth heat: dims visibly with no fuel (once logs exist), glows warmer when Cosy.
+    const fuelGame = this.data.stations.some((d) => d.type === 'node' && d.item === 'log' && sim.isUsable(d.id));
+    const empty = fuelGame && !sim.cosy && sim.fuelFraction() <= 0;
+    const heatWant = !fuelGame ? 1 : sim.cosy ? 1.3 : empty ? 0.25 : 1;
+    this.heat += (heatWant - this.heat) * Math.min(1, dt * 2);
+    this.world.hearthHeat = this.heat;
+    const hb = this.fuelBubble;
+    const bubbleWant = empty && !this.title ? 1 : 0;
+    const bs = hb.userData.s = (hb.userData.s ?? 0) + (bubbleWant - (hb.userData.s ?? 0)) * Math.min(1, dt * 5);
+    hb.visible = bs > 0.02;
+    if (hb.visible) {
+      const hc = this.data.camp.hearth;
+      hb.position.set(hc.x, this.world.stationTop('hearth') + 1.1 + Math.sin(t * 2.4) * 0.12, hc.z);
+      hb.scale.set(1.3 * bs, 1.3 * bs, 1);
+    }
+    // Breath puffs in the cold.
+    this.breathT -= dt;
+    if (this.breathT <= 0) {
+      this.breathT = 1.4 + Math.random() * 0.6;
+      if (distHearth > this.radius - 1 && !this.title) {
+        const fy = p.facing;
+        this.fx.vapour('breath', px + Math.sin(fy) * 0.35, 1.25, pz + Math.cos(fy) * 0.35, Math.sin(fy) * 0.4, Math.cos(fy) * 0.4);
+      }
+    }
+
     // Guidance.
     const g = this.title ? null : sim.guide();
     if (g) {
@@ -625,7 +668,16 @@ export class View {
       const k = Math.max(0, 1 - Math.hypot(px - d.x, pz - d.z) / 4) * 0.6;
       if (k > fire) fire = k;
     }
-    audio.ambience({ wind: 0.2 + wind * 0.8, fire });
+    // Crowd murmur near a big Icebound queue; cosy camp life near a populated Hearth.
+    let crowd = 0;
+    for (const d of this.data.stations) {
+      if (d.type !== 'counter' || !sim.isUsable(d.id)) continue;
+      const q = (s.stations[d.id] as { queue: number[] }).queue.length;
+      const k = Math.max(0, 1 - Math.hypot(px - d.queueStart.x, pz - (d.queueStart.z + 2)) / 12) * Math.min(1, q / 25);
+      if (k > crowd) crowd = k;
+    }
+    const camp = Math.max(0, 1 - distHearth / 12) * Math.min(1, s.population / 30);
+    audio.ambience({ wind: 0.2 + wind * 0.8, fire, crowd, camp });
     const mood = this.title ? 'title' : sim.cosy ? 'cozy' : 'calm';
     if (mood !== this.music) {
       this.music = mood;
@@ -739,6 +791,45 @@ export class View {
   dispose(): void {
     this.renderer.dispose();
   }
+}
+
+/** Friendly "needs a log" bubble that floats over a cold Hearth (no popups, no nagging). */
+function makeFuelBubble(): THREE.Sprite {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d')!;
+  g.fillStyle = 'rgba(255,248,236,0.95)';
+  g.strokeStyle = 'rgba(120,70,30,0.9)';
+  g.lineWidth = 6;
+  g.beginPath();
+  g.arc(64, 56, 44, 0, Math.PI * 2);
+  g.fill();
+  g.stroke();
+  g.beginPath();
+  g.moveTo(52, 96);
+  g.lineTo(64, 120);
+  g.lineTo(76, 96);
+  g.closePath();
+  g.fill();
+  // Log icon.
+  g.fillStyle = '#a8703c';
+  g.strokeStyle = '#4a2a12';
+  g.lineWidth = 5;
+  g.beginPath();
+  g.roundRect(30, 42, 60, 28, 14);
+  g.fill();
+  g.stroke();
+  g.fillStyle = '#e7c08a';
+  g.beginPath();
+  g.ellipse(90, 56, 10, 14, 0, 0, Math.PI * 2);
+  g.fill();
+  g.stroke();
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthWrite: false, toneMapped: false }));
+  sp.renderOrder = 30;
+  sp.visible = false;
+  return sp;
 }
 
 function pathPoint(path: { x: number; z: number }[], p: number, out: THREE.Vector3): THREE.Vector3 {

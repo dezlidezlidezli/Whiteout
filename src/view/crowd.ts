@@ -37,6 +37,9 @@ const _c = new THREE.Color();
 
 export class Crowd {
   private frozen: THREE.InstancedMesh;
+  /** One instanced soft disc under every crowd member. */
+  private blobs: THREE.InstancedMesh;
+  private nb = 0;
   private thawed: THREE.InstancedMesh;
   private villagers: Villager[] = [];
   private cheerT = 0;
@@ -54,11 +57,16 @@ export class Crowd {
     this.thawed = new THREE.InstancedMesh(t.geometry, t.material, maxVillagers + 200);
     for (const im of [this.frozen, this.thawed]) {
       im.count = 0;
-      im.castShadow = true;
+      im.castShadow = false; // cheap blob shadows instead (see `blobs`)
       im.receiveShadow = true;
       im.frustumCulled = false;
       parent.add(im);
     }
+    this.blobs = new THREE.InstancedMesh(blobGeometry(), blobMaterial(), 260 + maxVillagers + 200);
+    this.blobs.count = 0;
+    this.blobs.frustumCulled = false;
+    this.blobs.renderOrder = 1;
+    parent.add(this.blobs);
     this.frozen.setColorAt(0, new THREE.Color(1, 1, 1));
     this.thawed.setColorAt(0, new THREE.Color(1, 1, 1));
   }
@@ -284,6 +292,9 @@ export class Crowd {
     }
     this.frozen.count = nf;
     this.thawed.count = nt;
+    this.blobs.count = this.nb;
+    this.blobs.instanceMatrix.needsUpdate = true;
+    this.nb = 0;
     this.frozen.instanceMatrix.needsUpdate = true;
     this.thawed.instanceMatrix.needsUpdate = true;
     if (this.frozen.instanceColor) this.frozen.instanceColor.needsUpdate = true;
@@ -296,6 +307,11 @@ export class Crowd {
 
   private put(im: THREE.InstancedMesh, i: number, x: number, y: number, z: number, yaw: number, roll: number, scale: number, squash = 1): void {
     if (i >= im.instanceMatrix.count) return;
+    if (this.nb < this.blobs.instanceMatrix.count) {
+      const bs = scale * (1 - Math.min(0.5, y * 0.8));
+      _m.makeScale(bs, 1, bs).setPosition(x, 0.03, z);
+      this.blobs.setMatrixAt(this.nb++, _m);
+    }
     _e.set(0, yaw, roll, 'YXZ');
     _q.setFromEuler(_e);
     _v.set(x, y, z);
@@ -303,6 +319,24 @@ export class Crowd {
     _m.compose(_v, _q, _s);
     im.setMatrixAt(i, _m);
   }
+}
+
+function blobGeometry(): THREE.BufferGeometry {
+  return new THREE.CircleGeometry(0.34, 14).rotateX(-Math.PI / 2);
+}
+
+function blobMaterial(): THREE.Material {
+  // Radial falloff via vertex-free trick: a soft dark disc with low opacity.
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d')!;
+  const grd = g.createRadialGradient(32, 32, 4, 32, 32, 32);
+  grd.addColorStop(0, 'rgba(10,18,40,0.55)');
+  grd.addColorStop(1, 'rgba(10,18,40,0)');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 64, 64);
+  const tex = new THREE.CanvasTexture(c);
+  return new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, fog: true });
 }
 
 function hash01(n: number): number {
