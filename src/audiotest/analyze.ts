@@ -11,12 +11,15 @@ export interface Metrics {
   dur: number;
   /** |mean| / peak. */
   dc: number;
-  /** Max |x| in the first 0.5 ms after onset, relative to peak (click indicator). */
+  /** Max |x| in the first 0.25 ms after onset, relative to peak (click indicator). */
   attack: number;
   /** Max |x| over the last 20 ms of the render (should be ~0). */
   tail: number;
   /** Max sample-to-sample step relative to peak, outside the first 2 ms (discontinuity indicator). */
   maxStep: number;
+  /** Max ratio of |x| to the RMS of its ±2 ms neighbourhood, for samples above -20 dB re peak
+   *  (an isolated single-sample spike / click scores very high; tones ~1.4, noise ~4-6). */
+  spike: number;
   /** Energy-weighted spectral centroid (Hz). */
   centroid: number;
   /** Fraction of 100 ms windows above -50 dBFS. */
@@ -59,13 +62,30 @@ export function analyze(buf: AudioBuffer, skipSeconds = 0): Metrics {
   let end = m - 1;
   const endThr = safe * Math.pow(10, -40 / 20);
   while (end > onset && Math.abs(mono[end]) < endThr) end--;
-  const attackN = Math.max(1, Math.floor(sr * 0.0005));
+  const attackN = Math.max(1, Math.floor(sr * 0.00025));
   let atk = 0;
   for (let i = onset; i < Math.min(m, onset + attackN); i++) atk = Math.max(atk, Math.abs(mono[i]));
   let tail = 0;
   for (let i = Math.max(0, m - Math.floor(sr * 0.02)); i < m; i++) tail = Math.max(tail, Math.abs(mono[i]));
   let maxStep = 0;
   for (let i = onset + Math.floor(sr * 0.002); i < m; i++) maxStep = Math.max(maxStep, Math.abs(mono[i] - mono[i - 1]));
+
+  // isolated spikes
+  let spike = 0;
+  {
+    const h = Math.max(2, Math.floor(sr * 0.002));
+    const sq = new Float64Array(m + 1);
+    for (let i = 0; i < m; i++) sq[i + 1] = sq[i] + mono[i] * mono[i];
+    const thr = safe * 0.1;
+    for (let i = h; i < m - h; i++) {
+      const a = Math.abs(mono[i]);
+      if (a < thr) continue;
+      const e = sq[i + h + 1] - sq[i - h] - a * a;
+      const r = Math.sqrt(e / (2 * h));
+      const ratio = a / Math.max(r, 1e-9);
+      if (ratio > spike) spike = ratio;
+    }
+  }
 
   // K-weighting (BS.1770 approximation)
   const kw = kWeight(mono, sr);
@@ -101,6 +121,7 @@ export function analyze(buf: AudioBuffer, skipSeconds = 0): Metrics {
     attack: atk / safe,
     tail,
     maxStep: maxStep / safe,
+    spike,
     centroid: centroid(mono, sr, onset, end),
     activeFrac: windows ? active / windows : 0,
   };

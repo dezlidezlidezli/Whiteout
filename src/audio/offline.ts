@@ -3,6 +3,12 @@
 import type { MusicMood, SfxName, SfxOpts } from './index';
 import { Engine } from './engine';
 
+/**
+ * Browser compressors start in a fully-compressed state and settle within ~0.3 s of silence, so
+ * offline renders trigger sounds after this pre-roll and analysis skips it (live use is always settled).
+ */
+export const PREROLL = 0.4;
+
 export interface RenderOpts {
   sampleRate?: number;
   seed?: number;
@@ -22,9 +28,9 @@ export async function renderWith(
   return ac.startRendering();
 }
 
-/** One sound at t = 0.02 s, followed by enough tail for reverb to die out. */
+/** One sound after the pre-roll, followed by enough tail for reverb to die out. */
 export function renderSfx(name: SfxName, opts: SfxOpts = {}, seconds = 5, o: RenderOpts = {}): Promise<AudioBuffer> {
-  return renderWith(seconds, (e) => e.sfx(name, opts, 0.02), o);
+  return renderWith(PREROLL + seconds, (e) => e.sfx(name, opts, PREROLL), o);
 }
 
 /** A rapid streak: `count` triggers at `rate` per second, pitch from `pitchOf(i)`. */
@@ -36,8 +42,8 @@ export function renderStreak(
   seconds = 4,
   o: RenderOpts = {},
 ): Promise<AudioBuffer> {
-  return renderWith(seconds, (e) => {
-    for (let i = 0; i < count; i++) e.sfx(name, { pitch: pitchOf(i) }, 0.02 + i / rate);
+  return renderWith(PREROLL + seconds, (e) => {
+    for (let i = 0; i < count; i++) e.sfx(name, { pitch: pitchOf(i) }, PREROLL + i / rate);
   }, o);
 }
 

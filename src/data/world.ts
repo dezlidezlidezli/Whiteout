@@ -43,11 +43,11 @@ export const STATIONS: StationDef[] = [
   },
   {
     id: 'kettleA', type: 'processor', area: 'kettleYard', name: 'Kettle', model: 'kettle', x: -1.0, z: 10.6,
-    solid: { r: 0.8 }, reach: 1.85, recipe: 'stew', inputCap: 10, outputCap: 10, operator: 'none',
+    solid: { r: 0.8 }, reach: 1.85, recipe: 'stew', inputCap: 10, outputCap: 10, operator: 'none', speedMod: 'cookSpeed',
   },
   {
     id: 'kettleB', type: 'processor', area: 'kettleYard', name: 'Second kettle', model: 'kettle', x: 2.6, z: 10.6,
-    solid: { r: 0.8 }, reach: 1.85, recipe: 'stew', inputCap: 10, outputCap: 10, operator: 'boost', boost: 2,
+    solid: { r: 0.8 }, reach: 1.85, recipe: 'stew', inputCap: 10, outputCap: 10, operator: 'boost', boost: 2, speedMod: 'cookSpeed',
     unlockedBy: 'pad_kettleB',
   },
   {
@@ -81,7 +81,7 @@ function counter(id: string, x: number, unlockedBy: string | undefined, name: st
       { x: side * 6.0, z: 8.5 },
       { x: side * 3.0, z: 5.2 },
     ],
-    spawn: { x, z: 38 },
+    spawn: { x, z: 32 },
     wantMin: 1, wantMax: 1,
     unlockedBy,
   };

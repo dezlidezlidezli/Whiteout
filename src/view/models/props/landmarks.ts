@@ -1,0 +1,17 @@
+import { Builder, bevel } from '../geo';
+import type { PropSpec } from './common';
+const ph = (c = 0x888888): PropSpec => ({ layers: [{ name: 'body', b: new Builder().add(bevel(1, 1, 1), c, { p: [0, 0.5, 0] }) }], userData: { radius: 0.7 } });
+export const beacon = (_l: number) => ph();
+export const fence = (_s: number) => ph();
+export const gate = () => ph();
+export const brazier = () => ph();
+export const lantern = () => ph();
+export const signpost = () => ph();
+export const sled = () => ph();
+export const crate = (_s: number) => ph();
+export const barrel = () => ph();
+export const snowman = (_s: number) => ph();
+export const bridge = () => ph();
+export const noticeBoard = () => ph();
+export const bench = () => ph();
+export const woodPile = () => ph();

@@ -1,15 +1,21 @@
 // Carryable items: one merged vertex-coloured geometry + one shared material each.
 // Every item sits on y = 0, is roughly 0.5 m across and flat enough to stack 30+ high.
 import * as THREE from 'three';
-import { Builder, bevel, box, cone, cyl, dodec, lathe, octa, prism, sphere } from './geo';
+import { Builder, bevel, box, cone, cyl, dodec, ico, lathe, octa, prism, sphere } from './geo';
 import { mats } from './materials';
 import { PALETTE as P } from './palette';
 import type { ItemKind, ItemMeshDef } from './index';
 
 const cache = new Map<string, ItemMeshDef>();
 
-function fishBody(b: Builder, body: number, back: number, belly: number, fin: number, o: { stripes?: number; y?: number } = {}) {
+export function fishBody(b: Builder, body: number, back: number, belly: number, fin: number, o: { stripes?: number; y?: number; lod?: boolean } = {}) {
   const y = o.y ?? 0.065;
+  if (o.lod) {
+    b.add(sphere(0.2, 6, 4), body, { p: [0.02, y, 0], s: [1.25, 0.34, 0.58], top: back, topY: 0.85 });
+    b.add(prism([[0, 0], [0.17, 0.13], [0.12, 0], [0.17, -0.13]], 0.03), fin, { p: [-0.2, y, 0], r: [Math.PI / 2, 0, Math.PI] });
+    b.add(box(0.03, 0.02, 0.03), 0x1a1a22, { p: [0.21, y + 0.06, -0.02] });
+    return;
+  }
   // lying on its side (profile visible from above), head at +X, back towards -Z
   b.add(sphere(0.2, 10, 6), body, { p: [0.02, y, 0], s: [1.25, 0.34, 0.58] });
   b.add(sphere(0.2, 8, 4), back, { p: [0.0, y + 0.005, -0.05], s: [1.05, 0.3, 0.33] });
@@ -85,7 +91,8 @@ function make(kind: ItemKind): ItemMeshDef {
       break;
     case 'ingot':
       // classic trapezoid bar
-      b.add(trapezoid(0.48, 0.38, 0.22, 0.14, 0.1), P.ingot, { top: 0xdde5ee, shade: 0.04, seed: 2 });
+      b.add(trapezoid(0.48, 0.38, 0.22, 0.14, 0.1), P.ingot, { top: 0xe4ecf4, shade: 0.06, seed: 2 });
+      b.add(box(0.38, 0.006, 0.012), 0x8f9aa8, { p: [0, 0.101, 0.05] });
       b.add(box(0.12, 0.005, 0.05), 0x8f9aa8, { p: [0, 0.101, 0] }); // stamp
       stackHeight = 0.1;
       radius = 0.26;
@@ -110,12 +117,13 @@ function make(kind: ItemKind): ItemMeshDef {
       break;
     case 'ember':
       // glowing amber shard cluster
-      b.add(octa(0.13), P.ember, { p: [0, 0.09, 0], s: [1, 0.7, 0.85], r: [0, 0.4, 0], top: P.emberCore, topY: 0.3, jitter: 0.01, seed: 1 });
-      b.add(octa(0.07), P.emberHot, { p: [0.1, 0.05, 0.05], s: [1, 0.7, 1], r: [0.3, 0, 0.2] });
-      b.add(octa(0.06), P.emberCore, { p: [-0.08, 0.045, -0.06], s: [1, 0.8, 1], r: [0, 0, 0.4] });
+      b.add(ico(0.15, 0), 0xd8460a, { p: [0, 0.1, 0], s: [1.1, 0.75, 0.9], r: [0, 0.4, 0], top: 0xff9a1a, topY: 0.55, jitter: 0.012, seed: 1, shade: 0.12 });
+      b.add(octa(0.085), 0xc0300a, { p: [0.12, 0.06, 0.06], s: [1, 0.8, 1], r: [0.3, 0, 0.2], top: 0xff8a12, topY: 0.5 });
+      b.add(octa(0.075), 0xe0600e, { p: [-0.11, 0.055, -0.06], s: [1, 0.9, 1], r: [0, 0, 0.4], top: 0xffc23a, topY: 0.5 });
+      b.add(octa(0.05), 0xffb020, { p: [-0.03, 0.04, 0.12], r: [0.5, 0.2, 0] });
       material = mats().ember;
-      stackHeight = 0.12;
-      radius = 0.17;
+      stackHeight = 0.14;
+      radius = 0.2;
       break;
     default:
       b.add(bevel(0.4, 0.18, 0.4), 0xff00ff, { p: [0, 0.09, 0] });

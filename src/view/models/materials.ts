@@ -14,7 +14,7 @@ function make() {
   /** Lit but self-illuminated amber (embers, hot coals). */
   const ember = new THREE.MeshStandardMaterial({
     vertexColors: true, flatShading: true, roughness: 0.45, metalness: 0,
-    emissive: new THREE.Color(PALETTE.emberHot), emissiveIntensity: 0.85,
+    emissive: new THREE.Color(0xff4a08), emissiveIntensity: 0.55,
   });
   ember.name = 'fk-ember';
   /** Translucent ice. */

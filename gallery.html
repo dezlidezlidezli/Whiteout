@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Frostkettle model gallery</title>
+  <style>
+    html, body { margin: 0; background: #2b3a55; color: #f3e6c8; font: 13px/1.2 system-ui, sans-serif; }
+    #wrap { position: relative; }
+    canvas { display: block; }
+    .lbl { position: absolute; text-align: center; pointer-events: none; }
+    .lbl div { display: inline-block; background: #1b2638d9; border-radius: 8px; padding: 3px 10px; }
+    .lbl b { display: block; font-size: 14px; color: #fff; }
+    .lbl span { font-size: 11px; color: #ffc98a; }
+    #nav { padding: 6px 10px; background: #1b2638; }
+    #nav a { color: #ffb347; margin-right: 12px; }
+  </style>
+</head>
+<body>
+  <div id="nav"></div>
+  <div id="wrap"></div>
+  <script type="module" src="./src/gallery/main.ts"></script>
+</body>
+</html>

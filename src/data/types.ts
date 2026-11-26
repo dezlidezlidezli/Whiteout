@@ -110,8 +110,10 @@ export interface ProcessorDef extends StationBase {
   inputCap: number;
   outputCap: number;
   operator: 'none' | 'boost' | 'required';
-  /** Speed multiplier while operated (for 'boost'). */
+  /** Speed multiplier while operated by a helper (for 'boost'). */
   boost?: number;
+  /** Global modifier that scales this processor's speed (e.g. 'cookSpeed'). */
+  speedMod?: ModKey;
 }
 
 export interface CounterDef extends StationBase {

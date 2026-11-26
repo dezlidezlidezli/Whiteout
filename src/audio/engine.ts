@@ -7,8 +7,8 @@ import { SFX } from './sfx';
 import { holdParam, makeImpulse, makeNoiseBuffer, makeRng, type Rng, type Voice } from './synth';
 
 /** Headroom: everything is mixed well under full scale before the limiter. */
-const SFX_TRIM = 0.42;
-const MUSIC_TRIM = 0.42;
+const SFX_TRIM = 0.75;
+const MUSIC_TRIM = 1.0;
 const AMB_TRIM = 0.5;
 export const MUSIC_FADE = 2.5;
 export const LOOKAHEAD = 0.35;
@@ -49,8 +49,10 @@ export class Engine {
 
     // master chain: buses -> master -> limiter (compressor) -> soft safety clipper -> out
     const limiter = ac.createDynamicsCompressor();
-    limiter.threshold.value = -9;
-    limiter.knee.value = 6;
+    // High threshold on purpose: WebAudio compressors add automatic makeup gain derived from the
+    // threshold/ratio, which would otherwise pump quiet material up after the first loud hit.
+    limiter.threshold.value = -4;
+    limiter.knee.value = 3;
     limiter.ratio.value = 12;
     limiter.attack.value = 0.003;
     limiter.release.value = 0.2;
@@ -136,7 +138,7 @@ export class Engine {
     const pitch = clamp(Number.isFinite(opts.pitch) ? (opts.pitch as number) : 1, 0.25, 4);
     const cents = spec.cents ? (this.rng() * 2 - 1) * spec.cents : 0;
     // dense streams get slightly quieter so they don't stack into mush
-    const density = 1 / Math.sqrt(1 + 0.35 * list.length);
+    const density = 1 / (1 + 0.25 * list.length);
     const level = spec.level * vol * density;
 
     const g = ac.createGain();

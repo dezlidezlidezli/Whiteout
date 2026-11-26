@@ -54,6 +54,10 @@ export function envelope(
   const g = ac.createGain();
   const a = Math.max(0.001, attack);
   const p = Math.max(MIN * 2, peak);
+  // Zero the intrinsic value too: a source starting at a fractional time can render its first
+  // frame before the setValueAtTime(0, t) event lands, and the default gain (1) would let a
+  // full-scale single-sample spike through.
+  g.gain.value = 0;
   g.gain.setValueAtTime(0, t);
   g.gain.linearRampToValueAtTime(p, t + a);
   if (hold > 0) g.gain.setValueAtTime(p, t + a + hold);

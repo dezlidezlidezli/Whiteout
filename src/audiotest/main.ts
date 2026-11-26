@@ -2,7 +2,7 @@
 // offline measurement (tests/audio/measure.cjs).
 import { audio, ladderPitch, type MusicMood, type SfxName } from '../audio/index';
 import { SFX_NAMES } from '../audio/sfx';
-import { renderAmbience, renderMusic, renderSfx, renderStreak } from '../audio/offline';
+import { PREROLL, renderAmbience, renderMusic, renderSfx, renderStreak } from '../audio/offline';
 import { analyze } from './analyze';
 
 const MOODS: MusicMood[] = ['title', 'calm', 'cozy', 'storm', 'finale'];
@@ -101,20 +101,21 @@ const lab = {
   names: SFX_NAMES,
   moods: MOODS,
   async sfx(name: SfxName, pitch = 1, seed = 1234) {
-    return analyze(await renderSfx(name, { pitch }, 5, { seed }));
+    return analyze(await renderSfx(name, { pitch }, 5, { seed }), PREROLL - 0.05);
   },
   async streak(name: SfxName, count: number, rate: number) {
-    return analyze(await renderStreak(name, count, rate, (i) => ladderPitch(i), 2 + count / rate + 2));
+    return analyze(await renderStreak(name, count, rate, (i) => ladderPitch(i), 2 + count / rate + 2), PREROLL - 0.05);
   },
   async allAtOnce() {
     const { renderWith } = await import('../audio/offline');
     return analyze(
       await renderWith(6, (e) => {
-        for (const n of SFX_NAMES) e.sfx(n, {}, 0.02);
+        for (const n of SFX_NAMES) e.sfx(n, {}, PREROLL);
         e.music('cozy', 0);
         e.update(6);
         e.setAmbience({ wind: 1, fire: 1 }, 0.02);
       }),
+      PREROLL - 0.05,
     );
   },
   async music(mood: MusicMood, seconds = 20, seed = 77) {
@@ -126,6 +127,7 @@ const lab = {
   async ambience(wind: number, fire: number) {
     return analyze(await renderAmbience({ wind, fire }, 6), 1.5);
   },
+  api: audio,
   liveState() {
     refresh();
     return status.textContent;

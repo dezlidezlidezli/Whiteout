@@ -109,6 +109,23 @@ export class Builder {
     return this;
   }
 
+  /** Append another builder's triangles (keeping their colours), transformed. */
+  merge(other: Builder, o: { p?: V3; r?: V3; s?: V3 | number } = {}): this {
+    const sc = o.s === undefined ? 1 : o.s;
+    _s.set(...(typeof sc === 'number' ? ([sc, sc, sc] as V3) : sc));
+    _q.setFromEuler(_e.set(...(o.r ?? [0, 0, 0])));
+    _v.set(...(o.p ?? [0, 0, 0]));
+    _m.compose(_v, _q, _s);
+    for (let i = 0; i < other.pos.length; i += 3) {
+      _a.set(other.pos[i], other.pos[i + 1], other.pos[i + 2]).applyMatrix4(_m);
+      this.pos.push(_a.x, _a.y, _a.z);
+    }
+    for (const c of other.col) this.col.push(c);
+    for (const m of other.msk) this.msk.push(m);
+    if (other.useMask) this.useMask = true;
+    return this;
+  }
+
   get triangles(): number { return this.pos.length / 9; }
   get empty(): boolean { return this.pos.length === 0; }
 

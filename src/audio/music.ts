@@ -261,6 +261,7 @@ function playPad(
   lp.frequency.linearRampToValueAtTime(def.padCut * rand(rng, 0.9, 1.25), t + dur * 0.5);
   lp.frequency.linearRampToValueAtTime(def.padCut * 0.6, t + dur);
   const g = ac.createGain();
+  g.gain.value = 0;
   const att = Math.min(2.2, dur * 0.35);
   const rel = 2.2;
   const level = def.pad / Math.sqrt(notes.length);

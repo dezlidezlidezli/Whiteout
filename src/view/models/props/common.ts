@@ -78,10 +78,9 @@ export function instantiate(name: string, d: PropDef): THREE.Group {
 // ---------------------------------------------------------------- shared bits
 
 /** Stylised flame: yellow core tongue surrounded by orange tongues. Base at y = 0. */
-export function flame(b: Builder, h: number, r: number, seed = 1, o: V3 = [0, 0, 0]): Builder {
+export function flame(b: Builder, h: number, r: number, seed = 1, o: V3 = [0, 0, 0], n = 5): Builder {
   const R = rng(seed);
   b.add(cone(r * 0.55, h, 5), P.flameCore, { p: [o[0], o[1] + h / 2, o[2]], jitter: r * 0.06, seed });
-  const n = 5;
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2 + R();
     const th = h * (0.5 + R() * 0.25);

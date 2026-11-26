@@ -100,7 +100,8 @@ function torsoGeo(role: string, st: Style): THREE.BufferGeometry {
     // quilting bands
     for (const y of [0.12, 0.3]) b.add(cyl(0.335, 0.335, 0.03, 10, true), st.coatDark, { p: [0, y, 0], s: [w, 1, w * 0.92] });
     // front seam + toggles
-    b.add(box(0.04, 0.5, 0.03), st.coatDark, { p: [0, 0.22, 0.3 * w * 0.92], r: [-0.08, 0, 0] });
+    b.add(box(0.035, 0.46, 0.03), st.coatDark, { p: [0, 0.24, 0.3 * w * 0.94], r: [-0.06, 0, 0] });
+    for (const y of [0.2, 0.36]) b.add(box(0.08, 0.035, 0.04), P.cream, { p: [0, y, 0.31 * w * 0.94], r: [-0.08, 0, 0] });
     // belt
     b.add(cyl(0.34, 0.34, 0.07, 10), P.boot, { p: [0, 0.02, 0], s: [w, 1, w * 0.92] });
     b.add(bevel(0.09, 0.07, 0.03, 0.01), P.copper, { p: [0, 0.02, 0.33 * w * 0.92] });
@@ -111,8 +112,8 @@ function torsoGeo(role: string, st: Style): THREE.BufferGeometry {
     }
     if (st.scarf !== undefined) {
       b.add(torus(0.17, 0.075, 4, 10), st.scarf, { p: [0, 0.6, 0], r: [Math.PI / 2, 0, 0], s: [1.1, 1, 1] });
-      b.add(bevel(0.12, 0.3, 0.05, 0.02), st.scarf, { p: [0.11, 0.42, 0.29 * w], r: [-0.25, 0, 0.12] });
-      b.add(box(0.12, 0.03, 0.052), st.coatDark === P.coatRustDark ? P.coatRust : st.coatDark, { p: [0.12, 0.31, 0.32 * w], r: [-0.25, 0, 0.12] });
+      b.add(bevel(0.1, 0.24, 0.045, 0.02), st.scarf, { p: [0.15, 0.47, 0.28 * w], r: [-0.3, 0.3, 0.35] });
+      b.add(box(0.1, 0.025, 0.05), st.hatColor, { p: [0.19, 0.38, 0.31 * w], r: [-0.3, 0.3, 0.35] });
     }
     if (st.apron) {
       b.add(bevel(0.42, 0.5, 0.04, 0.015), P.cream, { p: [0, 0.08, 0.31 * w], r: [-0.06, 0, 0] });
@@ -136,19 +137,25 @@ function headGeo(role: string, st: Style): THREE.BufferGeometry {
     const R = 0.27;
     const cy = 0.24;
     b.add(sphere(R, 10, 8), P.skin, { p: [0, cy, 0] });
-    // face
+    // face: big friendly eyes with a highlight, rosy cheeks, button nose, little smile
     for (const sx of [-1, 1]) {
-      b.add(bevel(0.05, 0.075, 0.03, 0.012), P.eye, { p: [sx * 0.095, cy + 0.03, R - 0.02] });
-      b.add(sphere(0.05, 6, 4), P.blush, { p: [sx * 0.15, cy - 0.06, R - 0.06], s: [1, 0.6, 0.5] });
+      b.add(sphere(0.042, 6, 5), P.eye, { p: [sx * 0.1, cy + 0.0, R - 0.025], s: [0.9, 1.25, 0.6] });
+      b.add(sphere(0.013, 4, 3), 0xffffff, { p: [sx * 0.1 + 0.012, cy + 0.025, R + 0.0] });
+      b.add(sphere(0.055, 6, 4), P.blush, { p: [sx * 0.165, cy - 0.075, R - 0.07], s: [1, 0.6, 0.5] });
     }
-    b.add(sphere(0.045, 6, 4), P.skinDark, { p: [0, cy - 0.03, R + 0.005] });
-    // hair fringe peeking out
-    if (st.hat !== 'helmet') b.add(sphere(0.2, 8, 4), st.hair, { p: [0, cy + 0.1, -0.08], s: [1.25, 0.9, 1.1] });
+    b.add(sphere(0.045, 6, 4), P.nose, { p: [0, cy - 0.045, R + 0.0], s: [1.1, 0.85, 0.9] });
+    b.add(torus(0.045, 0.011, 3, 6, Math.PI), 0x8a3a2a, { p: [0, cy - 0.1, R - 0.03], r: [0.25, 0, Math.PI] });
+    // hair peeking out at the back and sides
+    if (st.hat !== 'helmet') b.add(sphere(0.21, 8, 5), st.hair, { p: [0, cy + 0.06, -0.1], s: [1.25, 1.0, 1.05] });
     if (st.beard) {
-      b.add(sphere(0.2, 8, 5), st.hair, { p: [0, cy - 0.14, 0.1], s: [1.15, 0.9, 0.9], jitter: 0.015, seed: 4 });
-      b.add(box(0.12, 0.03, 0.03), 0x8a3a2a, { p: [0, cy - 0.08, R - 0.0] }); // mouth line under moustache
+      b.add(sphere(0.2, 8, 5), st.hair, { p: [0, cy - 0.17, 0.11], s: [1.15, 0.85, 0.85], jitter: 0.015, seed: 4 });
+      b.add(sphere(0.06, 6, 4), st.hair, { p: [0.05, cy - 0.08, R - 0.02], s: [1.3, 0.6, 0.7] });
+      b.add(sphere(0.06, 6, 4), st.hair, { p: [-0.05, cy - 0.08, R - 0.02], s: [1.3, 0.6, 0.7] });
     }
-    hat(b, st, cy, R);
+    const h = new Builder();
+    hat(h, st, 0, R);
+    const tilt = st.hat === 'headscarf' || st.hat === 'earmuffs' ? 0 : -0.16;
+    b.merge(h, { p: [0, cy + 0.07, -0.015], r: [tilt, 0, 0] });
     return b;
   });
 }
@@ -270,7 +277,8 @@ function buildHumanoid(role: Exclude<CharacterRole, 'dog'>, opts: ModelOpts): Ch
   head.add(mesh(headGeo(role, st), 'headMesh'));
   if (st.hat === 'helmet') {
     const lamp = mesh(cached('lamp', () => new Builder().add(cyl(0.05, 0.05, 0.02, 8), P.minerLamp, { r: [Math.PI / 2, 0, 0] })), 'lamp', mats().glow);
-    lamp.position.set(0, 0.41, 0.33);
+    lamp.position.set(0, 0.525, 0.29);
+    lamp.rotation.x = -0.16;
     head.add(lamp);
   }
   const sx = 0.31 * st.stout;

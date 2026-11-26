@@ -68,6 +68,7 @@ export class Ambience {
     const src2 = ac.createBufferSource();
     src2.buffer = this.noise;
     src2.loop = true;
+    src2.playbackRate.value = 0.83;
     const bp2 = ac.createBiquadFilter();
     bp2.type = 'bandpass';
     bp2.frequency.value = 950;
@@ -102,13 +103,26 @@ export class Ambience {
     g.gain.value = 0;
     g.connect(this.out);
     this.fireGain = g;
-    const src = ac.createBufferSource();
-    src.buffer = makeFireBuffer(ac);
-    src.loop = true;
-    src.loopStart = 0;
-    src.loopEnd = FIRE_LOOP_END;
-    src.connect(g);
-    src.start(now);
+    const buf = makeFireBuffer(ac);
+    // two readers of the same loop at incommensurate rates: the crackle pattern only realigns
+    // after about a minute, so the 5 s loop never sounds like a loop
+    const layers: [number, number, number][] = [
+      [1, 0.8, 0],
+      [0.917, 0.45, 2.2],
+    ];
+    for (const [rate, level, offset] of layers) {
+      const src = ac.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      src.loopStart = 0;
+      src.loopEnd = FIRE_LOOP_END;
+      src.playbackRate.value = rate;
+      const lg = ac.createGain();
+      lg.gain.value = level;
+      src.connect(lg);
+      lg.connect(g);
+      src.start(now, offset);
+    }
   }
 }
 

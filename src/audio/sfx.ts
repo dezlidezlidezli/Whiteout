@@ -27,7 +27,7 @@ const pickup: SfxFn = (v) => {
   // rounded woody body with a quick downward "pop" glide
   tone(v, { f: f * 1.5, f2: f, glide: 0.014, a: 0.0015, d: 0.12, g: 0.6 });
   // marimba-like 4th partial gives the wood
-  tone(v, { f: f * 3.99, a: 0.001, d: 0.035, g: 0.16 });
+  tone(v, { f: f * 3.99, a: 0.001, d: 0.04, g: 0.24 });
   // soft knock transient
   noise(v, { filter: 'bandpass', f: 1800 + 600 * v.rng(), q: 1.2, a: 0.001, d: 0.012, g: 0.2 });
   return 0.14;
@@ -255,8 +255,8 @@ const fanfare: SfxFn = (v) => {
 
 const chop: SfxFn = (v) => {
   const { rng } = v;
-  noise(v, { filter: 'bandpass', f: 1100 * v.p, q: 3.5, a: 0.001, d: 0.06, g: 0.9 });
-  tone(v, { f: 210 * v.p, f2: 120 * v.p, glide: 0.04, a: 0.001, d: 0.07, g: 0.5 });
+  noise(v, { filter: 'bandpass', f: 1100 * v.p, q: 3, a: 0.001, d: 0.07, g: 1.1 });
+  tone(v, { f: 210 * v.p, f2: 130 * v.p, glide: 0.04, a: 0.0015, d: 0.06, g: 0.3 });
   noise(v, { filter: 'highpass', f: 4000, q: 0.7, a: 0.0008, d: 0.006, g: 0.25 });
   // little woody resonance
   tone(v, { f: rand(rng, 520, 600) * v.p, a: 0.001, d: 0.05, g: 0.1 });
@@ -273,6 +273,7 @@ const treeFall: SfxFn = (v) => {
   bp.Q.value = 5;
   bp.connect(v.out);
   const [cg, cend] = [ac.createGain(), t + 0.75];
+  cg.gain.value = 0;
   cg.gain.setValueAtTime(0, t);
   cg.gain.linearRampToValueAtTime(0.5, t + 0.12);
   cg.gain.setValueAtTime(0.5, t + 0.45);
@@ -320,26 +321,26 @@ const iceCrack: SfxFn = (v) => {
   for (let i = 0; i < 7; i++) {
     noise(v, {
       at: Math.pow(rng(), 1.3) * 0.12,
-      filter: 'highpass',
-      f: rand(rng, 2500, 5000),
-      q: 0.8,
+      filter: 'bandpass',
+      f: rand(rng, 1800, 4000),
+      q: 1.2,
       a: 0.0008,
       d: rand(rng, 0.008, 0.025),
-      g: rand(rng, 0.2, 0.45),
+      g: rand(rng, 0.25, 0.5),
     });
   }
   // resonant descending "ping" of the ice sheet
-  noise(v, { filter: 'bandpass', f: 3400 * v.p, f2: 900 * v.p, glide: 0.3, q: 14, a: 0.002, d: 0.32, g: 1.1 });
-  tone(v, { f: 2600 * v.p, f2: 1100 * v.p, glide: 0.18, a: 0.001, d: 0.18, g: 0.06 });
-  tone(v, { f: 150, f2: 90, glide: 0.05, a: 0.002, d: 0.08, g: 0.25 });
+  noise(v, { filter: 'bandpass', f: 2800 * v.p, f2: 700 * v.p, glide: 0.3, q: 12, a: 0.002, d: 0.34, g: 1.3 });
+  tone(v, { f: 2200 * v.p, f2: 900 * v.p, glide: 0.18, a: 0.0015, d: 0.18, g: 0.08 });
+  tone(v, { f: 160, f2: 95, glide: 0.05, a: 0.002, d: 0.09, g: 0.35 });
   return 0.5;
 };
 
 const splash: SfxFn = (v) => {
   const { rng } = v;
-  tone(v, { f: 320 * v.p, f2: 120 * v.p, glide: 0.07, a: 0.002, d: 0.08, g: 0.45 });
-  noise(v, { filter: 'bandpass', f: 450, f2: 2200, glide: 0.12, q: 1.0, a: 0.008, d: 0.38, g: 0.6 });
-  noise(v, { at: 0.02, filter: 'highpass', f: 3500, q: 0.6, a: 0.01, d: 0.25, g: 0.12 });
+  tone(v, { f: 320 * v.p, f2: 120 * v.p, glide: 0.07, a: 0.002, d: 0.08, g: 0.3 });
+  noise(v, { filter: 'bandpass', f: 400, f2: 1500, glide: 0.12, q: 1.0, a: 0.008, d: 0.38, g: 0.75 });
+  noise(v, { at: 0.02, filter: 'highpass', f: 3500, q: 0.6, a: 0.01, d: 0.2, g: 0.05 });
   // droplets: tiny rising chirps
   for (let i = 0; i < 6; i++) {
     const f = rand(rng, 700, 1500) * v.p;
@@ -397,27 +398,27 @@ const footstep: SfxFn = (v) => {
 // ---------------------------------------------------------------------------------------------
 
 export const SFX: Record<SfxName, SfxSpec> = {
-  pickup: { fn: pickup, level: 1, minGap: 0.02, poly: 6, cents: 8 },
+  pickup: { fn: pickup, level: 0.95, minGap: 0.02, poly: 6, cents: 8 },
   drop: { fn: drop, level: 1, minGap: 0.025, poly: 5, cents: 25 },
-  ember: { fn: ember, level: 1, minGap: 0.02, poly: 6, cents: 6 },
-  thaw: { fn: thaw, level: 1, minGap: 0.08, poly: 3, cents: 30 },
-  serve: { fn: serve, level: 1, minGap: 0.06, poly: 3, cents: 20 },
+  ember: { fn: ember, level: 0.85, minGap: 0.02, poly: 4, cents: 6 },
+  thaw: { fn: thaw, level: 1.35, minGap: 0.08, poly: 3, cents: 30 },
+  serve: { fn: serve, level: 0.85, minGap: 0.06, poly: 3, cents: 20 },
   craft: { fn: craft, level: 1, minGap: 0.06, poly: 3, cents: 40 },
-  padTick: { fn: padTick, level: 1, minGap: 0.03, poly: 3, cents: 15 },
-  padComplete: { fn: padComplete, level: 1, minGap: 0.2, poly: 2, cents: 10 },
+  padTick: { fn: padTick, level: 1.6, minGap: 0.03, poly: 3, cents: 15 },
+  padComplete: { fn: padComplete, level: 0.45, minGap: 0.2, poly: 2, cents: 10 },
   unlock: { fn: unlock, level: 1, minGap: 0.5, poly: 1, cents: 0, duck: 0.5 },
-  questComplete: { fn: questComplete, level: 1, minGap: 0.4, poly: 1, cents: 0, duck: 0.4 },
-  chop: { fn: chop, level: 1, minGap: 0.06, poly: 3, cents: 60 },
-  treeFall: { fn: treeFall, level: 1, minGap: 0.3, poly: 2, cents: 40 },
-  mine: { fn: mine, level: 1, minGap: 0.06, poly: 3, cents: 50 },
+  questComplete: { fn: questComplete, level: 0.7, minGap: 0.4, poly: 1, cents: 0, duck: 0.4 },
+  chop: { fn: chop, level: 1.7, minGap: 0.06, poly: 3, cents: 60 },
+  treeFall: { fn: treeFall, level: 0.36, minGap: 0.3, poly: 2, cents: 40 },
+  mine: { fn: mine, level: 1.2, minGap: 0.06, poly: 3, cents: 50 },
   iceCrack: { fn: iceCrack, level: 1, minGap: 0.08, poly: 3, cents: 60 },
-  splash: { fn: splash, level: 1, minGap: 0.1, poly: 3, cents: 60 },
-  hammer: { fn: hammer, level: 1, minGap: 0.06, poly: 3, cents: 50 },
-  hearthUp: { fn: hearthUp, level: 1, minGap: 1.0, poly: 1, cents: 0, duck: 0.6 },
-  fanfare: { fn: fanfare, level: 1, minGap: 2.0, poly: 1, cents: 0, duck: 0.85 },
-  uiTap: { fn: uiTap, level: 1, minGap: 0.03, poly: 2, cents: 10 },
+  splash: { fn: splash, level: 1.25, minGap: 0.1, poly: 3, cents: 60 },
+  hammer: { fn: hammer, level: 1.35, minGap: 0.06, poly: 3, cents: 50 },
+  hearthUp: { fn: hearthUp, level: 0.55, minGap: 1.0, poly: 1, cents: 0, duck: 0.6 },
+  fanfare: { fn: fanfare, level: 0.65, minGap: 2.0, poly: 1, cents: 0, duck: 0.85 },
+  uiTap: { fn: uiTap, level: 1.6, minGap: 0.03, poly: 2, cents: 10 },
   error: { fn: error, level: 1, minGap: 0.15, poly: 1, cents: 0 },
-  footstep: { fn: footstep, level: 1, minGap: 0.07, poly: 2, cents: 100 },
+  footstep: { fn: footstep, level: 1.4, minGap: 0.07, poly: 2, cents: 100 },
 };
 
 export const SFX_NAMES = Object.keys(SFX) as SfxName[];
