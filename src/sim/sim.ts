@@ -236,6 +236,14 @@ export class Sim {
       if (d.unlockedBy && !this.state.unlocked[d.id]) continue;
       add(d.x, d.z, d.solid);
     }
+    // Yard palisades: one thin box per axis-aligned leg.
+    for (const w of this.data.dressing?.walls ?? []) {
+      for (let i = 1; i < w.points.length; i++) {
+        const a = w.points[i - 1];
+        const b = w.points[i];
+        out.push({ kind: 'box', x: (a.x + b.x) / 2, z: (a.z + b.z) / 2, hw: Math.abs(b.x - a.x) / 2 + 0.15, hd: Math.abs(b.z - a.z) / 2 + 0.15 });
+      }
+    }
     const tents = this.data.camp.tentSpots;
     for (let i = 0; i < Math.min(this.state.tents, tents.length); i++) {
       out.push({ kind: 'circle', x: tents[i].x, z: tents[i].z, r: 0.85 });
@@ -404,17 +412,24 @@ export class Sim {
     const d = this.stationDefs.get(id);
     if (!d) return 0;
     const st = this.state.stations[id];
+    // ---- SOFT-CAP RULE (mirrors the main-checkout anti-soft-lock hotfix) ----
+    // A player drop is never refused: any buffer that accepts the kind takes it with no hard cap.
+    // Caps are soft target levels, respected only by helpers and links (byHelper = true).
+    const SOFT = 999;
     switch (d.type) {
       case 'processor': {
         const need = this.data.recipes[d.recipe].inputs[item];
         if (!need) return 0;
+        if (!byHelper) return SOFT;
         return Math.max(0, d.inputCap - ((st as ProcState).inputs[item] ?? 0));
       }
       case 'counter':
-        return d.item === item ? Math.max(0, d.cap - (st as CounterState).stock) : 0;
+        if (d.item !== item) return 0;
+        return byHelper ? Math.max(0, d.cap - (st as CounterState).stock) : SOFT;
       case 'deposit':
         if (d.role === 'orders') return byHelper ? 0 : orderRoom(this, item);
-        return d.accepts.includes(item) ? Math.max(0, d.cap - (st as DepositState).count) : 0;
+        if (!d.accepts.includes(item)) return 0;
+        return byHelper ? Math.max(0, d.cap - (st as DepositState).count) : SOFT;
       case 'pile':
         return byHelper && d.accepts && d.item === item ? Math.max(0, d.cap - (st as PileState).count) : 0;
       default:
@@ -615,20 +630,21 @@ export class Sim {
         }
       }
     }
-    // Hand items back to their crate: standing still with a full pack (then keep going until done).
+    // Hand items back: standing still with a full pack (then keep going until done). SOFT-CAP RULE: any pile
+    // or processor output holding kind K takes K back, uncapped, so a full pack can never strand the player.
     const still = Math.hypot(this.moveX, this.moveZ) < 0.2;
     for (const d of inReach) {
-      if (d.type !== 'pile') continue;
-      const ps = this.state.stations[d.id] as PileState;
-      // Accepting piles (racks, woodpile) take a full pack back even past their cap, so a pack is never stuck full.
-      if (ps.count >= d.cap + (d.accepts ? p.capacity : 0)) continue;
+      if (d.type !== 'pile' && d.type !== 'processor') continue;
+      const kind = d.type === 'pile' ? d.item : this.data.recipes[d.recipe].output;
       if (p.returning !== d.id && !(still && p.stack.length >= p.capacity && p.pickedFrom !== d.id)) continue;
-      const i = p.stack.lastIndexOf(d.item);
+      const i = p.stack.lastIndexOf(kind);
       if (i < 0) continue;
       p.stack.splice(i, 1);
-      ps.count++;
+      const hs = this.state.stations[d.id];
+      if (hs.kind === 'pile') hs.count++;
+      else if (hs.kind === 'processor') hs.output++;
       p.returning = d.id;
-      this.emit({ type: 'drop', item: d.item, to: { kind: 'station', id: d.id }, by: PLAYER, height: i });
+      this.emit({ type: 'drop', item: kind, to: { kind: 'station', id: d.id }, by: PLAYER, height: i });
       return true;
     }
     return false;
@@ -882,7 +898,8 @@ export class Sim {
       if (hd && hd.role === 'operate' && hd.station === d.id && h.phase === 'work') helperOp = true;
     }
     st.operated = helperOp || playerNear;
-    let can = st.output + r.outputCount <= d.outputCap;
+    // SOFT-CAP RULE: outputs get a generous buffer (60+) before the processor pauses.
+    let can = st.output + r.outputCount <= Math.max(d.outputCap, 60);
     for (const k in r.inputs) {
       const kk = k as ItemKind;
       if ((st.inputs[kk] ?? 0) < (r.inputs[kk] ?? 0)) can = false;

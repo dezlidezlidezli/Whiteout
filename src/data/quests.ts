@@ -23,6 +23,8 @@ export const QUESTS: QuestDef[] = [
   { id: 'q_pack2', text: 'Get an even bigger pack', goal: { type: 'pad', pad: 'pad_pack2' }, reward: 20 },
   { id: 'q_pop25', text: 'Welcome 25 villagers', goal: { type: 'pop', n: 25 }, guide: { type: 'earn' }, reward: 20 },
   { id: 'q_cook_hire', text: 'Hire a cook', goal: { type: 'pad', pad: 'pad_cook' }, reward: 25 },
+  { id: 'q_serve30', text: 'Serve 30 bowls', goal: { type: 'stat', stat: 'served', n: 30 },
+    guide: { type: 'deliver', item: 'stew', to: ['counterA', 'counterB'] }, reward: 30 },
   { id: 'q_hearth2', text: 'Raise the Hearth', goal: { type: 'pad', pad: 'pad_hearth2' }, reward: 30,
     hint: 'A bigger fire melts the frost wall' },
   // ---- Pinewood ----

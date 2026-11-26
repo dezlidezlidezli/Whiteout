@@ -2,6 +2,7 @@
 // so "the arrow always leads somewhere useful" is tested headlessly.
 
 import type { CounterDef, ItemKind, NodeDef, PadDef, ProcessorDef, StationDef } from '../data/types';
+import { orderRoom } from './endless';
 import type { Sim } from './sim';
 import type { CounterState, NodeState, ProcState } from './state';
 
@@ -23,7 +24,10 @@ export function computeGuide(sim: Sim): GuideTarget | null {
   const q = sim.data.quests[s.quest.index];
   if (!q) return null;
   const g = q.guide ?? (q.goal.type === 'pad' ? undefined : { type: 'earn' as const });
-  const junk = unloadJunk(sim, wantedItems(sim, q.goal.type === 'pad' && !q.guide ? { pad: q.goal.pad } : g));
+  const wanted = wantedItems(sim, q.goal.type === 'pad' && !q.guide ? { pad: q.goal.pad } : g);
+  // Carrying goods an Open Season order wants: hand those in first (that frees the pack) instead of unloading junk.
+  const handIn = (g?.type === 'orders' || g?.type === 'openSeason') && s.player.stack.some((it) => orderRoom(sim, it) > 0);
+  const junk = handIn ? null : unloadJunk(sim, wanted);
   if (junk) return junk;
   const t = q.goal.type === 'pad' && !q.guide ? padGuide(sim, q.goal.pad) : g ? baseGuide(sim, g) : null;
   // Never lead a full pack to a station that can neither take nor give anything: make room somewhere first.
@@ -161,7 +165,7 @@ function earnItems(sim: Sim, addUp: (it: ItemKind, d: number) => void, out: Set<
   for (const d of sim.data.stations) if (d.type === 'counter' && sim.isUsable(d.id)) addUp(d.item, 0);
   if (sim.isUsable('hearth')) {
     out.add('log');
-    if (sim.room('hearth', 'log') > 0) finalWanted.add('log');
+    if (sim.room('hearth', 'log', true) > 0) finalWanted.add('log');
   }
   return out;
 }
@@ -194,7 +198,7 @@ function useful(sim: Sim, wanted: Set<ItemKind>, it: ItemKind): boolean {
   if (!cs || cs.length === 0) return true;
   // A final item of the goal (e.g. the dish itself) stays useful even if it is also an ingredient elsewhere.
   if (finalWanted.has(it)) return true;
-  return cs.some((id) => sim.isUsable(id) && sim.room(id, it) > 0);
+  return cs.some((id) => sim.isUsable(id) && sim.room(id, it, true) > 0);
 }
 const finalWanted = new Set<ItemKind>();
 
@@ -215,15 +219,26 @@ function unloadJunk(sim: Sim, wanted: Set<ItemKind> | null, force = false): Guid
       s.guideUnload = true;
       return dest;
     }
-    // Nothing takes it: hand it back to a crate of its kind.
+    // Nothing takes it: hand it back (uncapped) to a pile or processor output holding its kind. Hand-back
+    // only works with a full pack (or once started), so only lead there then.
+    if (!full(sim) && !p.returning) continue;
+    let back: StationDef | null = null;
+    let bd = Infinity;
     for (const d of sim.data.stations) {
-      if (d.type !== 'pile' || d.item !== it || !sim.isUsable(d.id)) continue;
-      const ps = sim.state.stations[d.id] as import('./state').PileState;
-      // Hand-back only works with a full pack (or once started), so only lead there then.
-      if (ps.count < d.cap + (d.accepts ? p.capacity : 0) && (full(sim) || p.returning === d.id)) {
-        s.guideUnload = true;
-        return stTarget(d);
+      if (!sim.isUsable(d.id)) continue;
+      const kind = d.type === 'pile' ? d.item : d.type === 'processor' ? sim.data.recipes[d.recipe].output : null;
+      if (kind !== it) continue;
+      // Avoid a processor that would swallow useful items we carry first (e.g. logs into the sawmill).
+      const swallows = d.type === 'processor' && p.stack.some((x) => x !== it && useful(sim, wanted, x) && sim.room(d.id, x) > 0);
+      const dd = p.returning === d.id ? -1 : dist(sim, d.x, d.z) + (swallows ? 1000 : 0);
+      if (dd < bd) {
+        bd = dd;
+        back = d;
       }
+    }
+    if (back) {
+      s.guideUnload = true;
+      return stTarget(back);
     }
   }
   s.guideUnload = false;
@@ -336,7 +351,7 @@ function source(sim: Sim, item: ItemKind, depth: number): GuideTarget | null {
     for (const m of missing) {
       // Bring it once we carry as much as the processor can take (or can't get more): no over-fetching.
       const c = carrying(sim, m);
-      if (c > 0 && (c >= sim.room(pd.id, m) || full(sim) || !sourceAvailable(sim, m))) return stTarget(pd);
+      if (c > 0 && (c >= sim.room(pd.id, m, true) || full(sim) || !sourceAvailable(sim, m))) return stTarget(pd);
     }
     for (const m of missing) {
       const sub = full(sim) ? null : source(sim, m, depth + 1);
@@ -433,9 +448,9 @@ function earn(sim: Sim): GuideTarget | null {
     }
   }
   // Keep the Hearth fed (Cosy doubles every bowl): unload carried logs, or fetch some when low.
-  if (sim.isUsable('hearth') && sim.room('hearth', 'log') > 0) {
+  if (sim.isUsable('hearth') && sim.room('hearth', 'log', true) > 0) {
     const hd = sim.stationDefs.get('hearth')!;
-    if (carrying(sim, 'log') > 0 && carrying(sim, 'log') >= sim.room('hearth', 'log')) {
+    if (carrying(sim, 'log') > 0 && carrying(sim, 'log') >= sim.room('hearth', 'log', true)) {
       s.guideMemo = 'log';
       return stTarget(hd);
     }

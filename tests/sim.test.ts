@@ -174,8 +174,8 @@ describe('Counter + Icebound', () => {
   });
   it('collects embers by proximity', () => {
     const sim = fresh();
-    sim.addEmbers({ x: 0, z: 12 }, 25, 'test');
-    tp(sim, 0, 13);
+    sim.addEmbers({ x: -3, z: 12.2 }, 25, 'test');
+    tp(sim, -3, 12.6);
     stand(sim, 1);
     expect(sim.state.embers).toBe(25);
     expect(sim.state.emberPiles.find((e) => e.id === 'test')).toBeUndefined();

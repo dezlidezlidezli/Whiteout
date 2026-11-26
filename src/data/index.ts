@@ -1,6 +1,7 @@
 import { BALANCE } from './balance';
 import { ITEMS, RECIPES } from './items';
 import { QUESTS } from './quests';
+import { DRESSING } from './dressing';
 import { ENDLESS, FINALE, LATE_DECOR, LATE_HELPERS, LATE_LINKS, LATE_PADS, LATE_STATIONS } from './late';
 import type { GameData } from './types';
 import { AREAS, CAMP, DECOR, HELPERS, LINKS, PADS, PLAYER_START, STATIONS, WALLS } from './world';
@@ -26,4 +27,5 @@ export const GAME_DATA: GameData = {
   playerStart: PLAYER_START,
   endless: ENDLESS,
   finale: FINALE,
+  dressing: DRESSING,
 };
