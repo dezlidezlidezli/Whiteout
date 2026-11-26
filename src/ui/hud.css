@@ -84,6 +84,7 @@
 .fk-cosy.fk-off .fk-ico { filter: grayscale(1) brightness(0.8); }
 .fk-cosy.fk-on { box-shadow: 0 3px 0 rgba(0, 0, 0, 0.28), inset 0 0 0 2px rgba(255, 170, 80, 0.85), 0 0 18px rgba(255, 140, 50, 0.45); }
 .fk-cosy .fk-x2 { color: #ffd27a; }
+.fk-cosy span:last-child { white-space: nowrap; }
 
 .fk-btn {
   pointer-events: auto;
@@ -150,7 +151,7 @@
 /* Toasts */
 .fk-toasts {
   position: absolute;
-  top: calc(var(--fk-top) + 132px);
+  top: calc(var(--fk-top) + 156px);
   left: 0;
   right: 0;
   display: flex;
@@ -308,4 +309,4 @@
 
 /* When the Cosy meter is showing, the quest chip sits a little lower. */
 .fk-ui.fk-has-cosy .fk-quest { top: calc(var(--fk-top) + 104px); }
-.fk-ui.fk-has-cosy .fk-toasts { top: calc(var(--fk-top) + 172px); }
+.fk-ui.fk-has-cosy .fk-toasts { top: calc(var(--fk-top) + 198px); }

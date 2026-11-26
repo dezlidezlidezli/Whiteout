@@ -27,6 +27,7 @@ interface NodeView {
   variant: number;
   index: number;
   key: string;
+  occ: number;
 }
 
 interface WallView {
@@ -40,6 +41,9 @@ interface WallView {
 
 const _m = new THREE.Matrix4();
 const _v = new THREE.Vector3();
+const _m2 = new THREE.Matrix4();
+/** Harvestable trees are drawn a little smaller than decor so the player stays readable. */
+const NODE_SCALE = 0.82;
 const ghostMat = new THREE.MeshStandardMaterial({ color: 0xbfe0ff, transparent: true, opacity: 0.28, emissive: 0x6aa8ff, emissiveIntensity: 0.25, depthWrite: false });
 
 export class WorldView {
@@ -135,7 +139,7 @@ export class WorldView {
       const key = `${d.model}|${i % variants}`;
       const idx = perKey.get(key) ?? 0;
       perKey.set(key, idx + 1);
-      this.nodes.push({ def: d, alive: true, fall: 0, fallDir: (hashId(d.id) % 628) / 100, grow: 1, shake: 0, variant: -1, index: idx, key } as NodeView);
+      this.nodes.push({ def: d, alive: true, fall: 0, fallDir: (hashId(d.id) % 628) / 100, grow: 1, shake: 0, variant: -1, index: idx, key, occ: 0 } as NodeView);
     });
     for (const [key, n] of perKey) {
       const [model, v] = key.split('|');
@@ -322,11 +326,19 @@ export class WorldView {
       }
       n.shake = Math.max(0, n.shake - dt * 3);
       const rot = n.def.rot ?? 0;
+      // Duck trees that stand between the camera and the player so nobody gets lost in the grove.
+      const p = sim.state.player;
+      const ahead = n.def.z - p.z;
+      const occluding = ahead > -0.2 && ahead < 7.5 && Math.abs(n.def.x - p.x) < 1.3 + ahead * 0.12;
+      n.occ += ((occluding ? 1 : 0) - n.occ) * Math.min(1, dt * 7);
       if (n.alive) {
         n.grow = Math.min(1, n.grow + dt / 0.8);
-        const s = backOut(n.grow);
+        const s = backOut(n.grow) * NODE_SCALE;
         const sh = Math.sin(time * 45) * n.shake * 0.08;
-        inst.set(n.index, trs(_m, n.def.x, 0, n.def.z, rot, Math.max(0.001, s), sh, sh * 0.6));
+        const o = n.occ;
+        _m2.makeScale(1 + o * 0.15, 1 - o * 0.72, 1 + o * 0.15);
+        trs(_m, n.def.x, 0, n.def.z, rot, Math.max(0.001, s), sh, sh * 0.6);
+        inst.set(n.index, _m.multiply(_m2));
       } else if (tree) {
         n.fall = Math.min(1.6, n.fall + dt);
         const f = Math.min(1, n.fall / 0.75);
@@ -334,7 +346,7 @@ export class WorldView {
         const sink = n.fall > 1 ? (n.fall - 1) / 0.6 : 0;
         const ax = Math.cos(n.fallDir) * ang;
         const az = -Math.sin(n.fallDir) * ang;
-        inst.set(n.index, trs(_m, n.def.x, -sink * 0.4, n.def.z, rot, Math.max(0.001, 1 - sink), ax, az));
+        inst.set(n.index, trs(_m, n.def.x, -sink * 0.4, n.def.z, rot, Math.max(0.001, (1 - sink) * NODE_SCALE), ax, az));
         this.stumpInst.set(stumps++, trs(_m, n.def.x, 0, n.def.z, rot, 1));
       } else {
         n.fall = Math.min(1, n.fall + dt * 2);

@@ -6,7 +6,7 @@ import type {
 } from '../data/types';
 import { moveCircle, navNext } from './collision';
 import type { Actor, Place, SimEvent } from './events';
-import { updateCustomers, updateHelpers, hireHelper } from './agents';
+import { queueSlot, updateCustomers, updateHelpers, hireHelper } from './agents';
 import { computeGuide, type GuideTarget } from './guide';
 import { migrate } from './save';
 import { nextRandom } from './rng';
@@ -59,7 +59,10 @@ export class Sim {
     this.startQuest(0, false);
     const c = this.stationDefs.get('counterA');
     if (c && c.type === 'counter') {
-      for (let i = 0; i < 3; i++) this.spawnCustomerAt(c, c.queueStart.x, c.queueStart.z + i * c.queueSpacing + 0.01);
+      for (let i = 0; i < 18; i++) {
+        const q = queueSlot(c, i);
+        this.spawnCustomerAt(c, q.x, q.z + 0.01);
+      }
     }
   }
 

@@ -86,6 +86,12 @@ export class View {
   private music: 'calm' | 'cozy' | null = null;
   private lastPop = 0;
   frameMs = 16;
+  private tasks: { at: number; fn: () => void }[] = [];
+
+  /** Run fn after `sec` seconds of view time (keeps effects in sync with slow frames). */
+  private later(sec: number, fn: () => void): void {
+    this.tasks.push({ at: this.time + sec, fn });
+  }
 
   constructor(canvas: HTMLCanvasElement, sim: Sim, quality: Quality, hooks: ViewHooks) {
     this.sim = sim;
@@ -135,7 +141,13 @@ export class View {
     }
     this.items = new ItemBatcher(this.scene);
     this.actors = new Actors(this.scene, this.data);
-    this.crowd = new Crowd(this.scene, this.data, quality >= 1 ? 340 : 200);
+    this.crowd = new Crowd(this.scene, this.data);
+    this.crowd.residentCap = quality >= 1 ? 52 : 34;
+    this.crowd.onEnterHome = (x, z) => {
+      this.fx.puff(x, 0.3, z, 5, 0.5, 0.9);
+      this.fx.glint(x, 0.9, z, 5, 1.2);
+      if (Math.hypot(x - this.sim.state.player.x, z - this.sim.state.player.z) < 14) this.hooks.float('+1', new THREE.Vector3(x, 1.8, z), 'info');
+    };
     this.fx = new Effects(this.scene);
     this.snow = new Snowfall(this.scene, [450, 1000, 1700][quality]);
     this.sparks = new Sparks(this.scene, quality >= 1 ? 80 : 30);
@@ -294,7 +306,7 @@ export class View {
           const at = this.stationXZ(e.station);
           this.sfx('craft', { volume: 0.55 }, 0.12, at);
           const d = this.sim.stationDefs.get(e.station);
-          if (d) this.fx.puff(d.x + (Math.random() - 0.5) * 0.4, 1.3, d.z, 2, 0.3, 0.5);
+          if (d && Math.random() < 0.5) this.fx.puff(d.x + (Math.random() - 0.5) * 0.4, this.world.stationTop(d.id), d.z, 1, 0.2, 0.3, 0.35);
           break;
         }
         case 'serve': {
@@ -392,8 +404,17 @@ export class View {
             this.fx.puff(pc.x, 0.3, pc.z, 4, 1.2, 2);
           }
           this.sfx('iceCrack');
-          window.setTimeout(() => this.sfx('unlock'), 400);
-          window.setTimeout(() => this.rig.startPan(a.focus.x, a.focus.z, 3.2), 1300);
+          this.later(0.4, () => this.sfx('unlock'));
+          const wall = this.data.walls.find((w) => w.area === e.area);
+          let fx = a.focus.x;
+          let fz = a.focus.z;
+          if (wall) {
+            const cx = wall.points.reduce((m, q) => m + q.x, 0) / wall.points.length;
+            const cz = wall.points.reduce((m, q) => m + q.z, 0) / wall.points.length;
+            fx = cx + (a.focus.x - cx) * 0.45;
+            fz = cz + (a.focus.z - cz) * 0.45;
+          }
+          this.later(1.1, () => this.rig.startPan(fx, fz, 2.6));
           this.rig.shake(0.5, 0.6);
           this.hooks.toast(`${a.name} is open!`, 'area');
           break;
@@ -418,7 +439,7 @@ export class View {
         case 'nodeDeplete': {
           const d = this.sim.stationDefs.get(e.node)!;
           this.sfx('treeFall', {}, 0.1, d);
-          window.setTimeout(() => this.fx.puff(d.x, 0.2, d.z, 12, 1.6, 2.2), 600);
+          this.later(0.6, () => this.fx.puff(d.x, 0.2, d.z, 12, 1.6, 2.2));
           break;
         }
         case 'nodeRegrow': {
@@ -427,7 +448,7 @@ export class View {
           break;
         }
         case 'arrive':
-          this.crowd.addVillager(e.x, e.z, e.customer * 0.37);
+          this.crowd.arrive(e.x, e.z, e.customer * 0.37);
           this.crowd.hopNear(e.x, e.z, 3);
           break;
         case 'tent':
@@ -525,6 +546,11 @@ export class View {
     const s = sim.state;
     this.time += dt;
     const t = this.time;
+    if (this.tasks.length) {
+      const due = this.tasks.filter((k) => k.at <= t);
+      this.tasks = this.tasks.filter((k) => k.at > t);
+      for (const k of due) k.fn();
+    }
     const p = s.player;
     const px = p.px + (p.x - p.px) * alpha;
     const pz = p.pz + (p.z - p.pz) * alpha;
@@ -544,7 +570,7 @@ export class View {
 
     this.items.begin();
     this.actors.update(sim, this.items, alpha, t, dt);
-    this.crowd.update(sim, alpha, t, dt);
+    this.crowd.update(sim, alpha, t, dt, px, pz);
     this.world.update(sim, t, dt);
     for (const pv of this.pads.values()) pv.update(sim, t, dt, p.onPad === pv.def.id);
     this.drawBuffers(t);
@@ -689,9 +715,10 @@ export class View {
   /** Debug: fill the camp with villagers (perf testing). */
   addCrowd(n: number): void {
     const r = this.sim.warmRadius();
+    this.crowd.residentCap += n;
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2;
-      const rr = 2.4 + Math.random() * Math.max(1, r - 3);
+      const rr = 2.4 + Math.random() * Math.max(1, Math.min(8, r) - 3);
       this.crowd.addVillager(Math.cos(a) * rr, Math.sin(a) * rr);
     }
   }

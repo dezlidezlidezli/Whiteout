@@ -68,10 +68,8 @@ export function updateCustomers(sim: Sim, dt: number): void {
     const c = sim.data.stations.find((d) => d.id === cu.counter) as CounterDef;
     if (cu.phase === 'queue') {
       const cs = s.stations[c.id] as CounterState;
-      const slot = Math.max(0, cs.queue.indexOf(cu.id));
-      const tx = c.queueStart.x + c.queueDir.x * c.queueSpacing * slot;
-      const tz = c.queueStart.z + c.queueDir.z * c.queueSpacing * slot;
-      moveTo(cu, tx, tz, b.customerSpeed * dt);
+      const q = queueSlot(c, Math.max(0, cs.queue.indexOf(cu.id)));
+      moveTo(cu, q.x, q.z, b.customerSpeed * dt);
     } else if (cu.phase === 'thaw') {
       cu.t += dt;
       if (cu.t >= b.thawTime) {
@@ -94,6 +92,34 @@ export function updateCustomers(sim: Sim, dt: number): void {
     }
   }
   void camp;
+}
+
+/**
+ * Where the n-th waiting Icebound stands: a hungry crowd fanning out behind the counter
+ * (front row of one, then rows of up to five), with a little deterministic jostle.
+ */
+export function queueSlot(c: CounterDef, slot: number): { x: number; z: number } {
+  if (slot === 0) return { x: c.queueStart.x, z: c.queueStart.z };
+  let row = 1;
+  let first = 1;
+  let cap = 3;
+  while (slot >= first + cap) {
+    first += cap;
+    row++;
+    cap = Math.min(5, 1 + row * 2);
+  }
+  const col = slot - first - (cap - 1) / 2 + (row % 2 ? 0.35 : -0.15);
+  const sp = c.queueSpacing;
+  const jx = ((slot * 0.618034) % 1 - 0.5) * sp * 0.7;
+  const jz = ((slot * 0.414214) % 1 - 0.5) * sp * 0.6;
+  // Rows bulge forward in the middle so the crowd reads as a blob pressing at the counter.
+  const along = row * sp * 0.82 + jz + Math.abs(col) * sp * 0.22;
+  const side = col * sp * (1 + row * 0.03) + jx;
+  // queueDir is the direction away from the counter; its perpendicular spreads the rows.
+  return {
+    x: c.queueStart.x + c.queueDir.x * along - c.queueDir.z * side,
+    z: c.queueStart.z + c.queueDir.z * along + c.queueDir.x * side,
+  };
 }
 
 function moveTo(o: { x: number; z: number }, tx: number, tz: number, step: number): boolean {

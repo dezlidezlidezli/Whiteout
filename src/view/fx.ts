@@ -245,7 +245,7 @@ export class Effects {
   }
 
   /** Soft snow puff (new building, footsteps on landing, tree fall). */
-  puff(x: number, y: number, z: number, n = 10, radius = 1, speed = 1.6): void {
+  puff(x: number, y: number, z: number, n = 10, radius = 1, speed = 1.6, scale = 1): void {
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + Math.random() * 0.5;
       const r = radius * (0.6 + Math.random() * 0.5);
@@ -253,7 +253,7 @@ export class Effects {
         x: x + Math.cos(a) * r * 0.5, y: y + Math.random() * 0.2, z: z + Math.sin(a) * r * 0.5,
         vx: Math.cos(a) * speed * (0.6 + Math.random()), vy: 0.4 + Math.random() * 0.9, vz: Math.sin(a) * speed * (0.6 + Math.random()),
         rx: Math.random() * 6, ry: Math.random() * 6, vr: 1 + Math.random() * 2,
-        life: 0, max: 0.7 + Math.random() * 0.5, size: 0.6 + Math.random() * 0.9, grow: 1.6,
+        life: 0, max: 0.7 + Math.random() * 0.5, size: (0.6 + Math.random() * 0.9) * scale, grow: 1.6,
       });
     }
   }

@@ -91,7 +91,6 @@ const hud = new Hud(uiRoot, {
     store.clear();
     sim = new Sim(GAME_DATA, { seed: 1 + Math.floor(Math.random() * 1e6) });
     view.setSim(sim);
-    hud.showHint(true);
     save();
   },
   stats: () => {
@@ -127,7 +126,8 @@ let autoplay = autoplayParam;
 const pilot = new Autopilot();
 if (autoplay) hud.hideHint();
 let audioUnlocked = false;
-let touchedOnce = sim.state.time > 20;
+// The walk hint only shows at the very start of a brand-new game, until the first movement.
+let touchedOnce = readPref('hintDone', false) || sim.state.time > 3 || sim.state.quest.index > 0;
 if (touchedOnce) hud.hideHint();
 stick.onTouch = () => {
   if (!audioUnlocked) {
@@ -135,11 +135,13 @@ stick.onTouch = () => {
     audio.unlock();
   }
   view.rig.skipPan();
-  if (!touchedOnce) {
-    touchedOnce = true;
-    hud.hideHint();
-  }
 };
+function markMoved(): void {
+  if (touchedOnce) return;
+  touchedOnce = true;
+  writePref('hintDone', true);
+  hud.hideHint();
+}
 // Extra unlock paths (some browsers only count click/touchend as activation).
 for (const ev of ['touchend', 'click', 'keydown'] as const) {
   window.addEventListener(ev, () => audio.unlock(), { passive: true });
@@ -274,6 +276,7 @@ function loop(now: number): void {
   if (!autoplay) {
     const v = settingsOpen ? { x: 0, z: 0 } : stick.vector();
     sim.setMove(v.x, v.z);
+    if (!touchedOnce && Math.hypot(v.x, v.z) > 0.2) markMoved();
   }
 
   acc += dt * timeScale;

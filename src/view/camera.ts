@@ -14,6 +14,7 @@ export class CameraRig {
   private shakeAmp = 0;
   /** Extra zoom-out (0..1) e.g. for big moments. */
   private punch = 0;
+  private bias = -1.2;
 
   constructor(aspect: number) {
     this.camera = new THREE.PerspectiveCamera(42, aspect, 0.5, 160);
@@ -61,8 +62,11 @@ export class CameraRig {
 
   update(dt: number, px: number, pz: number, vx: number, vz: number, stackLen: number): void {
     // Look-ahead in the direction of travel; keep the player a little below centre.
+    // In the yard, lean the view towards the counters so the hungry crowd stays on screen.
+    const bias = Math.max(-1.2, Math.min(2.4, (pz - 7) * 0.45));
+    this.bias += (bias - this.bias) * Math.min(1, dt * 2);
     const ax = px + vx * 0.32;
-    const az = pz + vz * 0.32 - 1.2;
+    const az = pz + vz * 0.32 + this.bias;
     let tx = ax;
     let tz = az;
     if (this.pan) {
