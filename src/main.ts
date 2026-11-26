@@ -125,6 +125,7 @@ autoQ.enabled = qualityMode === 'auto';
 const stick = new Joystick(uiRoot);
 let autoplay = autoplayParam;
 const pilot = new Autopilot();
+if (autoplay) hud.hideHint();
 let audioUnlocked = false;
 let touchedOnce = sim.state.time > 20;
 if (touchedOnce) hud.hideHint();
@@ -228,6 +229,7 @@ const cheat = {
   },
   autoplay: (on = true) => {
     autoplay = on;
+    if (on) hud.hideHint();
   },
   /** Fast-forward the sim headlessly (bot plays), then snap the view. */
   fastForward: (seconds: number) => {

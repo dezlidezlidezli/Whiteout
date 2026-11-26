@@ -95,18 +95,18 @@ export class View {
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: quality >= 1, powerPreference: 'high-performance', stencil: false });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.08;
+    this.renderer.toneMappingExposure = 1.0;
     this.renderer.shadowMap.enabled = quality >= 1;
-    this.renderer.shadowMap.type = quality >= 2 ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
-    const fogC = new THREE.Color(0x22324f);
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    const fogC = new THREE.Color(0x1c2945);
     this.scene.background = fogC;
-    this.scene.fog = new THREE.Fog(fogC, 30, 74);
+    this.scene.fog = new THREE.Fog(fogC, 26, 66);
 
     this.rig = new CameraRig(1);
     // Cold blue dusk + warm fires.
-    this.hemi = new THREE.HemisphereLight(0xa9c2ec, 0x3b3046, 1.25);
+    this.hemi = new THREE.HemisphereLight(0x9cb4e6, 0x3a2f4a, 1.0);
     this.scene.add(this.hemi);
-    this.sun = new THREE.DirectionalLight(0xd6e2ff, 1.9);
+    this.sun = new THREE.DirectionalLight(0xc4d4ff, 1.45);
     this.sun.castShadow = quality >= 1;
     const sm = quality >= 2 ? 2048 : 1024;
     this.sun.shadow.mapSize.set(sm, sm);
@@ -175,7 +175,6 @@ export class View {
     this.quality = q;
     this.renderer.shadowMap.enabled = q >= 1;
     this.sun.castShadow = q >= 1;
-    this.renderer.shadowMap.type = q >= 2 ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
     this.renderer.shadowMap.needsUpdate = true;
     this.snow.points.visible = true;
     this.resize();
@@ -394,7 +393,7 @@ export class View {
           }
           this.sfx('iceCrack');
           window.setTimeout(() => this.sfx('unlock'), 400);
-          this.rig.startPan(a.focus.x, a.focus.z, 3.2);
+          window.setTimeout(() => this.rig.startPan(a.focus.x, a.focus.z, 3.2), 1300);
           this.rig.shake(0.5, 0.6);
           this.hooks.toast(`${a.name} is open!`, 'area');
           break;

@@ -165,6 +165,7 @@ export class Hud {
     // Cosy meter (once logs exist).
     const hasFuel = sim.data.stations.some((d) => d.type === 'node' && d.item === 'log' && sim.isUsable(d.id));
     this.cosy.style.display = hasFuel ? '' : 'none';
+    this.root.classList.toggle('fk-has-cosy', hasFuel);
     if (hasFuel) {
       const fr = sim.fuelFraction();
       this.cosyBar.style.width = `${Math.round(fr * 100)}%`;

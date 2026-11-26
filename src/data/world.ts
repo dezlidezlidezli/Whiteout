@@ -286,6 +286,8 @@ function forest(): DecorDef[] {
       const px = x + (r() - 0.5) * 2;
       const pz = z + (r() - 0.5) * 2;
       if (nearPlay(px, pz, 1.2)) continue;
+      // Keep the camera side (south of the play space) clear so trees never hide the action.
+      if (nearPlay(px, pz - 9, 0) && pz > -8) continue;
       // Thin out far away to save triangles, keep a dense belt near the play space.
       const near = nearPlay(px, pz, 7);
       if (!near && r() < 0.55) continue;

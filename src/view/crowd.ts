@@ -134,7 +134,9 @@ export class Crowd {
     // Villagers wander the warm camp.
     const warm = sim.warmRadius();
     const minR = 2.3;
-    const maxR = Math.max(minR + 1, Math.min(warm - 0.6, 8.2));
+    const maxR = Math.max(minR + 1, Math.min(warm - 0.6, 8.6));
+    const spots = this.data.camp.tentSpots;
+    const tents = spots.slice(0, Math.min(s.tents, spots.length));
     for (const v of this.villagers) {
       const dx = v.tx - v.x;
       const dz = v.tz - v.z;
@@ -144,15 +146,28 @@ export class Crowd {
         const st = Math.min(d, v.speed * dt);
         v.x += (dx / d) * st;
         v.z += (dz / d) * st;
+        // Slide around tents.
+        for (const t of tents) {
+          const ex = v.x - t.x;
+          const ez = v.z - t.z;
+          const el = Math.hypot(ex, ez);
+          if (el < 1.15 && el > 1e-4) {
+            v.x = t.x + (ex / el) * 1.15;
+            v.z = t.z + (ez / el) * 1.15;
+          }
+        }
         v.yaw = lerpAngle(v.yaw, Math.atan2(dx, dz), Math.min(1, dt * 6));
         moving = true;
       } else {
         v.wait -= dt;
         if (v.wait <= 0) {
-          const a = Math.random() * Math.PI * 2;
-          const r = minR + Math.random() * (maxR - minR);
-          v.tx = Math.cos(a) * r;
-          v.tz = Math.sin(a) * r;
+          for (let k = 0; k < 4; k++) {
+            const a = Math.random() * Math.PI * 2;
+            const r = minR + Math.random() * (maxR - minR);
+            v.tx = Math.cos(a) * r;
+            v.tz = Math.sin(a) * r;
+            if (!blocked(v.tx, v.tz, tents)) break;
+          }
           v.wait = 2 + Math.random() * 6;
           v.sit = Math.random() < 0.3;
         } else {
@@ -190,6 +205,11 @@ export class Crowd {
     _m.compose(_v, _q, _s);
     im.setMatrixAt(i, _m);
   }
+}
+
+function blocked(x: number, z: number, tents: { x: number; z: number }[]): boolean {
+  for (const t of tents) if (Math.hypot(x - t.x, z - t.z) < 1.3) return true;
+  return false;
 }
 
 export function lerpAngle(a: number, b: number, t: number): number {
