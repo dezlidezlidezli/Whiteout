@@ -15,6 +15,8 @@ export interface BotResult {
   sim: Sim;
   /** Longest gap between two consecutive unlock milestones (pads/quests), seconds. */
   longestGap: number;
+  /** Human-readable timing report. */
+  report: string;
   /** End times per area. */
   area1End: number;
   area2End: number;
@@ -52,12 +54,12 @@ export function runBot(opts: { seed?: number; maxMinutes?: number; verbose?: boo
     longestGap = Math.max(longestGap, m.t - last);
     last = m.t;
   }
-  if (opts.verbose) {
-    for (const m of milestones) console.log(`${fmt(m.t)}  ${m.what}`);
-    console.log(`Area 1 (Kettle Yard) done at ${fmt(area1End)}, Area 2 (Pinewood) done at ${fmt(area2End)} ` +
-      `(area 2 took ${fmt(area2End - area1End)}); longest gap ${longestGap.toFixed(0)} s; pop ${sim.state.population}`);
-  }
-  return { milestones, finished, time: sim.state.time, sim, longestGap, area1End, area2End };
+  const lines = milestones.filter((m) => !m.what.startsWith('quest')).map((m) => `${fmt(m.t)}  ${m.what}`);
+  lines.push(`Area 1 (Kettle Yard) done at ${fmt(area1End)}, Area 2 (Pinewood) done at ${fmt(area2End)} ` +
+    `(area 2 took ${fmt(area2End - area1End)}); longest gap ${longestGap.toFixed(0)} s; pop ${sim.state.population}`);
+  const report = lines.join('\n');
+  if (opts.verbose) for (const m of milestones) console.log(`${fmt(m.t)}  ${m.what}`);
+  return { milestones, finished, time: sim.state.time, sim, longestGap, area1End, area2End, report };
 }
 
 export function fmt(t: number): string {

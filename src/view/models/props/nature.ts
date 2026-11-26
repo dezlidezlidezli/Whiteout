@@ -60,8 +60,8 @@ export function rock(seed = 0): PropSpec {
   const b = new Builder();
   const r = rng(seed + 31);
   const s = 0.5 + r() * 0.7;
-  b.add(dodec(s), r() > 0.5 ? P.stone : P.stoneWarm, { p: [0, s * 0.45, 0], s: [1.2, 0.75, 1], r: [0, r() * 3, 0], jitter: s * 0.12, seed, top: P.snow, topY: 0.72, shade: 0.06 });
-  if (r() > 0.4) b.add(dodec(s * 0.45), P.stoneDark, { p: [s * 0.9, s * 0.2, s * 0.3], jitter: s * 0.06, seed: seed + 1, top: P.snow, topY: 0.7 });
+  b.add(dodec(s), r() > 0.5 ? P.stoneDark : 0x7f7a74, { p: [0, s * 0.45, 0], s: [1.2, 0.75, 1], r: [0, r() * 3, 0], jitter: s * 0.12, seed, top: P.snow, topY: 0.8, shade: 0.08 });
+  if (r() > 0.4) b.add(dodec(s * 0.45), P.stoneDark, { p: [s * 0.9, s * 0.2, s * 0.3], jitter: s * 0.06, seed: seed + 1, top: P.snow, topY: 0.9 });
   return { layers: [{ name: 'body', b }], userData: { radius: s * 1.1 } };
 }
 
@@ -72,39 +72,46 @@ export function snowDrift(seed = 0): PropSpec {
   return { layers: [{ name: 'body', b }], userData: { radius: 1.5, walkable: true } };
 }
 
-/** 4 m wide ice barrier segment along X (x in -2..2), tiles side by side. */
+/** 4 m wide, ~3.4 m tall, ~1.5 m deep ice barrier along X (x in -2..2); tiles side by side. */
 export function frostWall(seed = 0): PropSpec {
   const ice = new Builder(), b = new Builder();
   const r = rng(seed * 11 + 5);
   const cols = [P.ice, P.iceTeal, P.frost, P.iceDeep, P.ice];
-  // back row: tall leaning crystal slabs
-  const n = 7;
+  const col = () => cols[Math.floor(r() * cols.length)];
+  // back row: tall chunky slabs with broken, slanted tops
+  const n = 5;
   for (let i = 0; i < n; i++) {
-    const x = -1.75 + (3.5 * i) / (n - 1) + (r() - 0.5) * 0.2;
-    const h = 2.2 + r() * 1.3;
-    const w = 0.5 + r() * 0.25;
-    ice.add(cone(w, h, 4), cols[Math.floor(r() * cols.length)], {
-      p: [x, h / 2 - 0.1, -0.2 + (r() - 0.5) * 0.25], r: [(r() - 0.5) * 0.3, r() * 3, (r() - 0.5) * 0.35], s: [1, 1, 0.7], jitter: 0.06, seed: seed + i,
+    const x = -1.6 + (3.2 * i) / (n - 1) + (r() - 0.5) * 0.2;
+    const h = 2.7 + r() * 0.8;
+    const rb = 0.62 + r() * 0.15;
+    ice.add(cyl(rb * 0.35, rb, h, 5), col(), {
+      p: [x, h / 2 - 0.1, -0.3 + (r() - 0.5) * 0.2], r: [(r() - 0.5) * 0.15, r() * 3, (r() - 0.5) * 0.2], s: [1, 1, 0.8], jitter: 0.09, seed: seed + i,
+      top: P.frost, topY: 0.5,
+    });
+    ice.add(cone(rb * 0.4, 0.7 + r() * 0.5, 4), P.iceTeal, { p: [x + (r() - 0.5) * 0.3, h + 0.15, -0.3], r: [(r() - 0.5) * 0.4, r() * 3, (r() - 0.5) * 0.4], jitter: 0.04, seed: seed + 9 + i });
+  }
+  // front row: shorter slabs leaning outwards
+  for (let i = 0; i < 4; i++) {
+    const x = -1.5 + i * 1.0 + (r() - 0.5) * 0.25;
+    const h = 1.5 + r() * 0.8;
+    ice.add(cyl(0.2, 0.55 + r() * 0.12, h, 5), col(), {
+      p: [x, h / 2 - 0.05, 0.4 + (r() - 0.5) * 0.15], r: [0.18 + (r() - 0.5) * 0.15, r() * 3, (r() - 0.5) * 0.3], s: [1, 1, 0.85], jitter: 0.07, seed: seed + 20 + i,
+      top: P.frost, topY: 0.5,
     });
   }
-  // front row: shorter shards
-  for (let i = 0; i < 6; i++) {
-    const x = -1.6 + i * 0.64 + (r() - 0.5) * 0.2;
-    const h = 1.1 + r() * 0.9;
-    ice.add(cone(0.38 + r() * 0.15, h, 4), cols[Math.floor(r() * cols.length)], {
-      p: [x, h / 2 - 0.05, 0.3 + (r() - 0.5) * 0.2], r: [0.15 + (r() - 0.5) * 0.3, r() * 3, (r() - 0.5) * 0.5], s: [1, 1, 0.8], jitter: 0.05, seed: seed + 20 + i,
-    });
+  // solid base blocks
+  for (let i = 0; i < 4; i++) {
+    const x = -1.5 + i + (r() - 0.5) * 0.15;
+    ice.add(dodec(0.62), cols[i % 3], { p: [x, 0.4, 0], s: [1.0, 0.85, 1.15], r: [0, r() * 3, 0], jitter: 0.07, seed: seed + 40 + i });
   }
-  // chunky base blocks so the wall reads as solid
-  for (let i = 0; i < 5; i++) {
-    const x = -1.6 + i * 0.8 + (r() - 0.5) * 0.15;
-    ice.add(dodec(0.55 + r() * 0.15), cols[i % 3], { p: [x, 0.38, (r() - 0.5) * 0.3], s: [1.1, 0.9, 0.85], r: [0, r() * 3, 0], jitter: 0.06, seed: seed + 40 + i });
+  // snow piled at the base on both sides
+  for (let i = 0; i < 2; i++) {
+    snowMound(b, 1.25, 0.45, 0.6, [-1.0 + i * 2, 0, 0.8], seed + 60 + i);
+    snowMound(b, 1.2, 0.38, 0.55, [-0.8 + i * 2, 0, -0.85], seed + 70 + i);
   }
-  // snow banked against the base
-  for (let i = 0; i < 4; i++) snowMound(b, 0.75, 0.32, 0.55, [-1.5 + i, 0, (i % 2 ? 0.55 : -0.55)], seed + 60 + i);
   return {
     layers: [{ name: 'ice', b: ice, mat: 'ice', shadow: true }, { name: 'snow', b }],
-    userData: { size: [4, 1.4], width: 4, height: 3.4, tileWidth: 4 },
+    userData: { size: [4, 1.6], width: 4, depth: 1.6, height: 3.5, tileWidth: 4 },
   };
 }
 

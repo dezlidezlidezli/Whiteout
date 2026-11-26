@@ -33,6 +33,9 @@ export interface PartOpts {
   top?: number;
   /** normal.y threshold for `top` (default 0.6) */
   topY?: number;
+  /** colour for faces pointing +Z (faces, fronts) */
+  front?: number;
+  frontZ?: number;
   /** colour for faces pointing down */
   bottom?: number;
   /** random vertex displacement in metres (coincident vertices move together) */
@@ -98,6 +101,7 @@ export class Builder {
       _c2.copy(base);
       if (o.top !== undefined && _n.y > topY) _c2.set(o.top);
       else if (o.bottom !== undefined && _n.y < -topY) _c2.set(o.bottom);
+      else if (o.front !== undefined && _n.z > (o.frontZ ?? 0.6)) _c2.set(o.front);
       if (shadeR) _c2.multiplyScalar(1 + (shadeR() - 0.5) * 2 * (o.shade ?? 0));
       for (let k = 0; k < 3; k++) {
         this.pos.push(p[(t + k) * 3], p[(t + k) * 3 + 1], p[(t + k) * 3 + 2]);

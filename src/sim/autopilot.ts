@@ -1,7 +1,7 @@
 // Autopilot "brain": plays the game through the public sim API only (guide(), state, setMove()).
 // Used by the headless bot test and by ?autoplay=1 in the browser.
 
-import { steer } from './collision';
+import { inRects, steer } from './collision';
 import type { Sim } from './sim';
 
 export class Autopilot {
@@ -10,6 +10,8 @@ export class Autopilot {
   private lastX = 0;
   private lastZ = 0;
   private sideT = 0;
+  private plainT = 0;
+  private stuckN = 0;
 
   /** Call once per sim step before sim.step(). */
   update(sim: Sim, dt: number): void {
@@ -34,7 +36,15 @@ export class Autopilot {
       if (d.id === t.id || d.type === 'node' || !sim.isUsable(d.id)) continue;
       avoid.push({ kind: 'circle', x: d.x, z: d.z, r: Math.max(0.5, d.reach - 0.45) });
     }
-    const dir = steer(p, w.x, w.z, sim.data.balance.playerRadius, avoid, this.sideT > 0 ? -this.side : this.side);
+    const r = sim.data.balance.playerRadius;
+    let dir = steer(p, w.x, w.z, r, avoid, this.sideT > 0 ? -this.side : this.side);
+    // Avoidance must not push us into the edge of the walkable space, and is dropped while unsticking.
+    const rects = sim.walkRects();
+    if (this.plainT > 0 || !inRects(p.x + dir.x * 0.7, p.z + dir.z * 0.7, r, rects)) {
+      const l = Math.hypot(w.x - p.x, w.z - p.z) || 1;
+      dir = { x: (w.x - p.x) / l, z: (w.z - p.z) / l };
+    }
+    if (this.plainT > 0) this.plainT -= dt;
     // Ease off when nearly there so we don't orbit the target.
     const k = Math.min(1, d / 0.6);
     sim.setMove(dir.x * k, dir.z * k);
@@ -44,6 +54,8 @@ export class Autopilot {
       if (Math.hypot(p.x - this.lastX, p.z - this.lastZ) < 0.5) {
         this.sideT = 1.0;
         this.side = -this.side;
+        this.stuckN++;
+        if (this.stuckN % 2 === 0) this.plainT = 1.0;
       }
       this.stuckT = 0;
       this.lastX = p.x;

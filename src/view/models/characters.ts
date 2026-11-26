@@ -139,8 +139,8 @@ function headGeo(role: string, st: Style): THREE.BufferGeometry {
     b.add(sphere(R, 10, 8), P.skin, { p: [0, cy, 0] });
     // face: big friendly eyes with a highlight, rosy cheeks, button nose, little smile
     for (const sx of [-1, 1]) {
-      b.add(sphere(0.042, 6, 5), P.eye, { p: [sx * 0.1, cy + 0.0, R - 0.025], s: [0.9, 1.25, 0.6] });
-      b.add(sphere(0.013, 4, 3), 0xffffff, { p: [sx * 0.1 + 0.012, cy + 0.025, R + 0.0] });
+      b.add(sphere(0.048, 6, 5), P.eye, { p: [sx * 0.1, cy + 0.01, R - 0.025], s: [0.9, 1.25, 0.6] });
+      b.add(sphere(0.015, 4, 3), 0xffffff, { p: [sx * 0.1 + 0.014, cy + 0.04, R + 0.0] });
       b.add(sphere(0.055, 6, 4), P.blush, { p: [sx * 0.165, cy - 0.075, R - 0.07], s: [1, 0.6, 0.5] });
     }
     b.add(sphere(0.045, 6, 4), P.nose, { p: [0, cy - 0.045, R + 0.0], s: [1.1, 0.85, 0.9] });
@@ -154,8 +154,9 @@ function headGeo(role: string, st: Style): THREE.BufferGeometry {
     }
     const h = new Builder();
     hat(h, st, 0, R);
-    const tilt = st.hat === 'headscarf' || st.hat === 'earmuffs' ? 0 : -0.16;
-    b.merge(h, { p: [0, cy + 0.07, -0.015], r: [tilt, 0, 0] });
+    const tilt = st.hat === 'headscarf' || st.hat === 'earmuffs' ? -0.1 : -0.32;
+    const sc = st.hat === 'souwester' || st.hat === 'helmet' ? 0.95 : 0.9;
+    b.merge(h, { p: [0, cy + 0.09, -0.04], r: [tilt, 0, 0], s: sc });
     return b;
   });
 }
@@ -277,8 +278,8 @@ function buildHumanoid(role: Exclude<CharacterRole, 'dog'>, opts: ModelOpts): Ch
   head.add(mesh(headGeo(role, st), 'headMesh'));
   if (st.hat === 'helmet') {
     const lamp = mesh(cached('lamp', () => new Builder().add(cyl(0.05, 0.05, 0.02, 8), P.minerLamp, { r: [Math.PI / 2, 0, 0] })), 'lamp', mats().glow);
-    lamp.position.set(0, 0.525, 0.29);
-    lamp.rotation.x = -0.16;
+    lamp.position.set(0, 0.55, 0.22);
+    lamp.rotation.x = -0.32;
     head.add(lamp);
   }
   const sx = 0.31 * st.stout;

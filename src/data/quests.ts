@@ -35,6 +35,7 @@ export const QUESTS: QuestDef[] = [
   { id: 'q_cabin1', text: 'Raise a cabin', goal: { type: 'pad', pad: 'pad_cabin1' }, reward: 25,
     hint: 'Cabins draw more Icebound to your camp' },
   { id: 'q_pack3', text: 'Craft a sturdy pack', goal: { type: 'pad', pad: 'pad_pack3' }, reward: 25 },
+  { id: 'q_axe', text: 'Sharpen your axe', goal: { type: 'pad', pad: 'pad_axe' }, reward: 25 },
   { id: 'q_pots', text: 'Forge copper pots', goal: { type: 'pad', pad: 'pad_pots' }, reward: 30 },
   { id: 'q_pop45', text: 'Welcome 45 villagers', goal: { type: 'pop', n: 45 }, guide: { type: 'earn' }, reward: 30 },
   { id: 'q_lumberjack', text: 'Hire a lumberjack', goal: { type: 'pad', pad: 'pad_lumberjack' }, reward: 35 },

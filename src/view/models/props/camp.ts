@@ -38,10 +38,16 @@ export function kettle(): PropSpec {
   lid.add(cyl(0.035, 0.03, 0.08, 6), P.woodDark, { p: [0, 0.16, 0] });
   lid.add(sphere(0.06, 6, 4), P.woodDark, { p: [0, 0.22, 0] });
   // fire tongues peeking out around the belly
-  for (let i = 0; i < 3; i++) {
-    const a = (i / 3) * Math.PI * 2 + 0.9;
-    flame(fl, 0.45, 0.17, 10 + i, [Math.cos(a) * 0.45, 0, Math.sin(a) * 0.45], 3);
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + 0.6;
+    flame(fl, 0.62, 0.2, 10 + i, [Math.cos(a) * 0.5, 0, Math.sin(a) * 0.5], 3);
   }
+  // copper ladle hooked on the rim + a little bowl shelf beside the fire
+  b.add(box(0.04, 0.5, 0.03), P.woodDark, { p: [-0.2, 1.22, 0.26], r: [0.5, 0, 0.2] });
+  b.add(sphere(0.08, 6, 4), P.copper, { p: [-0.25, 1.44, 0.4], s: [1, 0.6, 1] });
+  b.add(bevel(0.5, 0.06, 0.4, 0.02), P.woodLight, { p: [0.15, 0.5, 1.0] });
+  for (const sx of [-1, 1]) b.add(box(0.06, 0.5, 0.06), P.woodDark, { p: [0.15 + sx * 0.2, 0.25, 1.0] });
+  for (let i = 0; i < 3; i++) b.add(lathe([[0, 0], [0.11, 0], [0.15, 0.07], [0, 0.07]], 7), P.bowl, { p: [0.15, 0.53 + i * 0.065, 1.0] });
   return {
     layers: [
       { name: 'body', b },
@@ -49,8 +55,8 @@ export function kettle(): PropSpec {
       { name: 'coals', b: em, mat: 'ember', shadow: false },
       { name: 'flame', b: fl, mat: 'glow', pos: [0, 0.05, 0] },
     ],
-    markers: { steamPoint: [1.05, 1.1, 0], lidSteamPoint: [0, 1.3, 0], light: [0, 0.4, 0], itemAnchor: [0, 1.3, 0] },
-    userData: { radius: 0.85, size: [1.6, 1.4], lightPos: [0, 0.4, 0], lightColor: P.flame, lightIntensity: 1.2, lightDistance: 5 },
+    markers: { steamPoint: [0, 1.35, 0], spoutSteamPoint: [1.05, 1.1, 0], light: [0, 0.4, 0], itemAnchor: [0, 1.3, 0] },
+    userData: { radius: 0.9, size: [1.8, 1.6], lightPos: [0, 0.4, 0], lightColor: P.flame, lightIntensity: 1.2, lightDistance: 5 },
   };
 }
 
@@ -232,7 +238,7 @@ export function hearth(level: number): PropSpec {
     for (let i = 0; i < 5; i++) {
       const row = i < 3 ? 0 : 1;
       const x = -1.85 + (row ? (i - 3) * 0.26 + 0.13 : i * 0.26);
-      logBetween(b, [x, 0.36 + row * 0.22, -0.2], [x, 0.36 + row * 0.22, 0.6], 0.12);
+      logBetween(b, [x, 0.36 + row * 0.22, -0.2], [x, 0.36 + row * 0.22, 0.6], 0.12, P.bark, P.woodPale, 5);
     }
     radius = platR;
   }
@@ -261,13 +267,6 @@ export function hearth(level: number): PropSpec {
       b.add(box(0.55, 1.1, 0.03), sx < 0 ? P.coatRust : P.mustard, { p: [x, 1.8, -0.97] });
       b.add(prism([[-0.275, 0], [0.275, 0], [0, -0.2]], 0.03), sx < 0 ? P.coatRust : P.mustard, { p: [x, 1.25, -0.97] });
       b.add(prism([[0, 0.12], [0.09, 0], [0, -0.12], [-0.09, 0]], 0.02), P.cream, { p: [x, 1.9, -0.95] });
-    }
-    // steps at the front
-    b.add(bevel(1.6, 0.12, 0.5, 0.03), P.stone, { p: [0, 0.06, 2.75] });
-    // stone benches on two sides
-    for (const a of [Math.PI * 0.25, Math.PI * 0.75]) {
-      const R = 3.3;
-      b.add(bevel(1.4, 0.35, 0.45, 0.06), P.stoneWarm, { p: [Math.cos(a) * R, 0.18, Math.sin(a) * R], r: [0, -a + Math.PI / 2, 0] });
     }
     // lantern posts
     for (const sx of [-1, 1]) {

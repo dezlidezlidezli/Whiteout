@@ -98,7 +98,7 @@ export function steer(p: P2, tx: number, tz: number, r: number, solids: readonly
     // Do not avoid the obstacle we are heading to.
     const tdx = tx - s.x;
     const tdz = tz - s.z;
-    if (tdx * tdx + tdz * tdz < (sr + 1.6) * (sr + 1.6)) continue;
+    if (tdx * tdx + tdz * tdz < (sr + 0.4) * (sr + 0.4)) continue;
     const w = (1 - along / (look + sr)) * (clear - Math.abs(perp)) / clear;
     const dirSign = perp === 0 ? side : -Math.sign(perp);
     ax += -dz * dirSign * w * 2.2;
@@ -109,6 +109,14 @@ export function steer(p: P2, tx: number, tz: number, r: number, solids: readonly
   const l = Math.hypot(ox, oz) || 1;
   ox /= l;
   oz /= l;
+  // Never steer backwards: blend towards the goal when avoidance fights it.
+  if (ox * dx + oz * dz < 0.15) {
+    ox = ox * 0.5 + dx * 0.5;
+    oz = oz * 0.5 + dz * 0.5;
+    const l2 = Math.hypot(ox, oz) || 1;
+    ox /= l2;
+    oz /= l2;
+  }
   return { x: ox, z: oz };
 }
 
@@ -143,7 +151,7 @@ function nearestRect(x: number, z: number, rects: readonly Rect[]): number {
  */
 export function navNext(rects: readonly Rect[], fx: number, fz: number, tx: number, tz: number): P2 {
   if (rects.length === 0) return { x: tx, z: tz };
-  let from = rectsAt(fx, fz, rects, 0.05);
+  let from = rectsAt(fx, fz, rects, -0.3);
   if (from.length === 0) from = [nearestRect(fx, fz, rects)];
   let to = rectsAt(tx, tz, rects, 0.6);
   if (to.length === 0) to = [nearestRect(tx, tz, rects)];

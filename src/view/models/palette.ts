@@ -82,7 +82,7 @@ export const PALETTE = {
   bowl: 0xe9dcc2,
   smoked: 0xb0702e,
   smokedDark: 0x6e3f1c,
-  ore: 0x5a5560,
+  ore: 0x635c6a,
   oreRust: 0xb4542e,
   ingot: 0x9fb0c4,
   pie: 0xe0a44a,
@@ -92,7 +92,10 @@ export const PALETTE = {
   // --- crowd ---
   frozenCoat: 0xc8e2f4,
   frozenSkin: 0xd8ecf8,
-  frozenDark: 0x8fb3d3,
+  frozenDark: 0x7d9fc2,
+  frozenFace: 0x7f9ab8,
+  frozenArm: 0xa6c4e0,
+  frozenHat: 0x9fc0de,
 } as const;
 
 export type PaletteKey = keyof typeof PALETTE;

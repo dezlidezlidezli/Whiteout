@@ -12,7 +12,7 @@ export function fishBody(b: Builder, body: number, back: number, belly: number, 
   const y = o.y ?? 0.065;
   if (o.lod) {
     b.add(sphere(0.2, 6, 4), body, { p: [0.02, y, 0], s: [1.25, 0.34, 0.58], top: back, topY: 0.85 });
-    b.add(prism([[0, 0], [0.17, 0.13], [0.12, 0], [0.17, -0.13]], 0.03), fin, { p: [-0.2, y, 0], r: [Math.PI / 2, 0, Math.PI] });
+    b.add(prism([[0, 0], [0.12, 0.09], [0.09, 0], [0.12, -0.09]], 0.05), fin, { p: [-0.2, y, 0], r: [Math.PI / 2, 0, Math.PI] });
     b.add(box(0.03, 0.02, 0.03), 0x1a1a22, { p: [0.21, y + 0.06, -0.02] });
     return;
   }
@@ -21,16 +21,15 @@ export function fishBody(b: Builder, body: number, back: number, belly: number, 
   b.add(sphere(0.2, 8, 4), back, { p: [0.0, y + 0.005, -0.05], s: [1.05, 0.3, 0.33] });
   b.add(sphere(0.2, 8, 4), belly, { p: [0.04, y - 0.004, 0.06], s: [0.95, 0.3, 0.3] });
   // tail (flat, in XZ)
-  b.add(prism([[0, 0], [0.17, 0.13], [0.12, 0], [0.17, -0.13]], 0.03), fin, { p: [-0.2, y, 0], r: [Math.PI / 2, 0, Math.PI] });
-  // dorsal + belly fins
-  b.add(prism([[-0.1, 0], [0.08, 0], [-0.07, 0.07]], 0.025), fin, { p: [-0.02, y, -0.1], r: [-Math.PI / 2, 0, 0] });
-  b.add(prism([[-0.05, 0], [0.04, 0], [-0.05, 0.05]], 0.025), fin, { p: [-0.06, y, 0.1], r: [Math.PI / 2, 0, 0] });
+  b.add(prism([[0, 0], [0.12, 0.09], [0.09, 0], [0.12, -0.09]], 0.05), fin, { p: [-0.2, y, 0], r: [Math.PI / 2, 0, Math.PI] });
+  // dorsal fin (small, tucked)
+  b.add(prism([[-0.08, 0], [0.06, 0], [-0.06, 0.035]], 0.03), fin, { p: [-0.02, y, -0.1], r: [-Math.PI / 2, 0, 0] });
   // gill line + eye on the upward side
   b.add(box(0.015, 0.02, 0.15), back, { p: [0.15, y + 0.06, 0], r: [0, 0, 0.3] });
   b.add(sphere(0.03, 6, 4), 0xffffff, { p: [0.21, y + 0.05, -0.02], s: [1, 0.5, 1] });
   b.add(sphere(0.017, 5, 3), 0x1a1a22, { p: [0.215, y + 0.064, -0.02] });
   if (o.stripes !== undefined) {
-    for (const x of [-0.1, 0.03, 0.15]) b.add(box(0.03, 0.15, 0.25), o.stripes, { p: [x, y, 0] });
+    for (const x of [-0.1, 0.03, 0.15]) b.add(box(0.03, 0.14, 0.2), o.stripes, { p: [x, y, 0] });
   }
 }
 
@@ -47,7 +46,7 @@ function make(kind: ItemKind): ItemMeshDef {
     case 'smokedFish':
       // golden-brown smoked fish with twine ties, on a flat stick
       fishBody(b, P.smoked, P.smokedDark, 0xd89a4a, P.smokedDark, { stripes: P.rope });
-      b.add(box(0.66, 0.025, 0.05), P.woodDark, { p: [-0.02, 0.015, 0] });
+      b.add(box(0.5, 0.025, 0.05), P.woodDark, { p: [0.0, 0.015, 0] });
       stackHeight = 0.14;
       break;
     case 'stew': {
@@ -82,10 +81,11 @@ function make(kind: ItemKind): ItemMeshDef {
       radius = 0.32;
       break;
     case 'ore':
-      b.add(dodec(0.17), P.ore, { p: [0, 0.12, 0], s: [1.3, 0.75, 1.1], jitter: 0.025, seed: 11, shade: 0.12 });
+      b.add(dodec(0.17), P.ore, { p: [0, 0.12, 0], s: [1.3, 0.75, 1.1], jitter: 0.025, seed: 11, shade: 0.18, top: 0x8a8290, topY: 0.75 });
       for (const [x, y, z, r] of [[0.08, 0.2, 0.06, 0.05], [-0.12, 0.17, -0.04, 0.045], [0.02, 0.22, -0.09, 0.04], [-0.05, 0.12, 0.14, 0.04]] as const)
-        b.add(octa(r), P.oreRust, { p: [x, y, z], jitter: 0.008, seed: 3 });
-      b.add(octa(0.035), P.steel, { p: [0.12, 0.13, -0.08] });
+        b.add(octa(r * 1.15), P.oreRust, { p: [x, y, z], jitter: 0.008, seed: 3, top: 0xe0884a, topY: 0.4 });
+      b.add(octa(0.045), 0xdfe8f2, { p: [0.12, 0.15, -0.08] });
+      b.add(octa(0.04), 0xdfe8f2, { p: [-0.13, 0.12, 0.1] });
       stackHeight = 0.2;
       radius = 0.24;
       break;

@@ -4,7 +4,7 @@ export const ITEM_KINDS: ItemKind[] = ['fish', 'stew', 'log', 'plank', 'smokedFi
 
 export const ITEMS: Record<ItemKind, ItemDef> = {
   fish: { kind: 'fish', name: 'Fish', price: 0, color: '#7fb4d8' },
-  stew: { kind: 'stew', name: 'Hot stew', price: 2, color: '#e0873a' },
+  stew: { kind: 'stew', name: 'Hot stew', price: 3, color: '#e0873a' },
   log: { kind: 'log', name: 'Log', price: 0, color: '#9a6b3f' },
   plank: { kind: 'plank', name: 'Plank', price: 0, color: '#d9a866' },
   smokedFish: { kind: 'smokedFish', name: 'Smoked fish', price: 5, color: '#c8743a' },

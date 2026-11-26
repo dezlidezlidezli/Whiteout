@@ -10,11 +10,11 @@ it('debug', () => {
     bot.update(sim, STEP); sim.step(STEP); sim.drainEvents();
     if (sim.state.quest.index !== lastQ) { lastQ = sim.state.quest.index; lastT = sim.state.time; }
     const stall = sim.state.time - lastT;
-    if (stall > 100 && sim.state.tick % 30 === 0) {
-      const p = sim.state.player;
-      out.push([sim.state.time.toFixed(1), 'q' + lastQ, p.x.toFixed(1), p.z.toFixed(1), 'emb', sim.state.embers, JSON.stringify(sim.guide()), p.stack.join(','), JSON.stringify(sim.getMove()), p.onPad].join(' '));
-      if (stall > 130) break;
+    if (stall > 240 && sim.state.tick % 30 === 0) {
+      const p = sim.state.player; const g = sim.guide();
+      out.push(`${sim.state.time.toFixed(1)} q=${lastQ} ${p.x.toFixed(1)},${p.z.toFixed(1)} g=${g?.id}@${g?.x.toFixed(1)},${g?.z.toFixed(1)} emb=${sim.state.embers} mv=${sim.getMove().x.toFixed(2)},${sim.getMove().z.toFixed(2)} stack=${p.stack.join(',')} unload=${sim.state.guideUnload} memo=${sim.state.guideMemo} work=${p.working}`);
+      if (stall > 260) break;
     }
   }
-  require('fs').writeFileSync('/tmp/claude-0/-home-user-Whiteout/63908f3c-30c8-5472-9ceb-e9951c67ef65/scratchpad/dbg.txt', out.join('\n'));
+  (globalThis as any).process.getBuiltinModule('fs').writeFileSync('/tmp/claude-0/-home-user-Whiteout/63908f3c-30c8-5472-9ceb-e9951c67ef65/scratchpad/dbg.txt', out.join('\n'));
 });

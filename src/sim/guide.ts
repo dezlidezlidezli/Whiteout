@@ -25,8 +25,14 @@ export function computeGuide(sim: Sim): GuideTarget | null {
   const g = q.guide ?? (q.goal.type === 'pad' ? undefined : { type: 'earn' as const });
   const junk = unloadJunk(sim, wantedItems(sim, q.goal.type === 'pad' && !q.guide ? { pad: q.goal.pad } : g));
   if (junk) return junk;
-  if (q.goal.type === 'pad' && !q.guide) return padGuide(sim, q.goal.pad);
-  if (!g) return null;
+  const t = q.goal.type === 'pad' && !q.guide ? padGuide(sim, q.goal.pad) : g ? baseGuide(sim, g) : null;
+  if (t) return t;
+  // Nothing useful to do with what we hold: hand anything in anywhere.
+  if (s.player.stack.length > 0) return unloadJunk(sim, new Set(), true);
+  return null;
+}
+
+function baseGuide(sim: Sim, g: import('../data/types').QuestGuide): GuideTarget | null {
   switch (g.type) {
     case 'station': {
       const d = sim.stationDefs.get(g.id);
@@ -48,7 +54,7 @@ export function computeGuide(sim: Sim): GuideTarget | null {
 }
 
 /** Item kinds useful for the current goal (incl. upstream ingredients). null = anything goes. */
-function wantedItems(sim: Sim, g: NonNullable<ReturnType<typeof guideOf>> | { pad: string }): Set<ItemKind> | null {
+function wantedItems(sim: Sim, g: import('../data/types').QuestGuide | { pad: string } | undefined): Set<ItemKind> | null {
   const out = new Set<ItemKind>();
   const addUp = (it: ItemKind, depth: number) => {
     if (out.has(it) || depth > 4) return;
@@ -59,12 +65,15 @@ function wantedItems(sim: Sim, g: NonNullable<ReturnType<typeof guideOf>> | { pa
       }
     }
   };
+  if (!g) return earnItems(sim, addUp, out);
   if ('pad' in g) {
     const def = sim.padDefs.get(g.pad);
-    const mats = def?.materials ?? {};
-    if (Object.keys(mats).length === 0) return null;
-    for (const k in mats) addUp(k as ItemKind, 0);
-    return out;
+    const rem = def ? sim.padRemaining(def.id).mats : {};
+    if (Object.keys(rem).length > 0) {
+      for (const k in rem) addUp(k as ItemKind, 0);
+      return out;
+    }
+    return earnItems(sim, addUp, out);
   }
   switch (g.type) {
     case 'deliver':
@@ -75,19 +84,21 @@ function wantedItems(sim: Sim, g: NonNullable<ReturnType<typeof guideOf>> | { pa
       for (const d of sim.data.stations) if (d.type === 'node' && d.tag === g.tag) addUp(d.item, 0);
       return out;
     default:
-      return null;
+      return earnItems(sim, addUp, out);
   }
 }
 
-function guideOf(q: { guide?: import('../data/types').QuestGuide }) {
-  return q.guide;
+function earnItems(sim: Sim, addUp: (it: ItemKind, d: number) => void, out: Set<ItemKind>): Set<ItemKind> {
+  for (const d of sim.data.stations) if (d.type === 'counter' && sim.isUsable(d.id)) addUp(d.item, 0);
+  if (sim.isUsable('hearth')) out.add('log');
+  return out;
 }
 
 /** When the stack is full of things the goal can't use, go hand them in somewhere first. */
-function unloadJunk(sim: Sim, wanted: Set<ItemKind> | null): GuideTarget | null {
+function unloadJunk(sim: Sim, wanted: Set<ItemKind> | null, force = false): GuideTarget | null {
   const s = sim.state;
   const p = s.player;
-  if (!wanted || (!full(sim) && !s.guideUnload)) {
+  if (!wanted || (!full(sim) && !s.guideUnload && !force)) {
     s.guideUnload = false;
     return null;
   }
@@ -115,7 +126,7 @@ function unloadJunk(sim: Sim, wanted: Set<ItemKind> | null): GuideTarget | null 
 }
 
 function stTarget(d: StationDef): Dest {
-  return { x: d.x, z: d.z, id: d.id, kind: d.type === 'node' ? 'node' : 'station', reach: d.reach * 0.75 };
+  return { x: d.x, z: d.z, id: d.id, kind: d.type === 'node' ? 'node' : 'station', reach: Math.max(d.reach * 0.6, d.reach - 0.4) };
 }
 
 function dist(sim: Sim, x: number, z: number): number {
@@ -308,7 +319,7 @@ function earn(sim: Sim): GuideTarget | null {
     const hd = sim.stationDefs.get('hearth')!;
     if (carrying(sim, 'log') > 0) return deliver(sim, 'log', stTarget(hd));
     const logSource = sim.data.stations.some((d) => d.type === 'node' && d.item === 'log' && sim.isUsable(d.id));
-    if (logSource && sim.fuelFraction() < 0.2 && !s.player.stack.some((it) => it !== 'log')) {
+    if (logSource && sim.fuelFraction() < 0.25 && !s.player.stack.some((it) => it !== 'log')) {
       return deliver(sim, 'log', stTarget(hd));
     }
   }
