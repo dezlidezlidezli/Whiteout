@@ -1,0 +1,51 @@
+import type { QuestDef } from './types';
+
+// Linear quest chain. The first few double as the tutorial (no text walls).
+// Stat goals are counted from the moment the quest starts.
+export const QUESTS: QuestDef[] = [
+  // ---- Kettle Yard ----
+  { id: 'q_fish', text: 'Grab fish from the crate', goal: { type: 'stat', stat: 'pickup.fish', n: 3 },
+    guide: { type: 'station', id: 'crateA' }, reward: 0 },
+  { id: 'q_cook', text: 'Cook stew in the kettle', goal: { type: 'stat', stat: 'craft.stew', n: 3 },
+    guide: { type: 'produce', item: 'stew' }, reward: 0 },
+  { id: 'q_serve3', text: 'Serve hot stew to the Icebound', goal: { type: 'stat', stat: 'served', n: 3 },
+    guide: { type: 'deliver', item: 'stew', to: ['counterA', 'counterB'] }, reward: 6 },
+  { id: 'q_pack1', text: 'Get a bigger pack', goal: { type: 'pad', pad: 'pad_pack1' }, reward: 4 },
+  { id: 'q_kettleB', text: 'Light a second kettle', goal: { type: 'pad', pad: 'pad_kettleB' }, reward: 6 },
+  { id: 'q_serve12', text: 'Serve 12 bowls', goal: { type: 'stat', stat: 'served', n: 12 },
+    guide: { type: 'deliver', item: 'stew', to: ['counterA', 'counterB'] }, reward: 10 },
+  { id: 'q_counterB', text: 'Open a second counter', goal: { type: 'pad', pad: 'pad_counterB' }, reward: 10 },
+  { id: 'q_pop10', text: 'Welcome 10 villagers to camp', goal: { type: 'pop', n: 10 }, guide: { type: 'earn' }, reward: 12 },
+  { id: 'q_porter', text: 'Hire a porter', goal: { type: 'pad', pad: 'pad_porter' }, reward: 15 },
+  { id: 'q_beltA', text: 'Build a stew conveyor', goal: { type: 'pad', pad: 'pad_beltA' }, reward: 20 },
+  { id: 'q_crateB', text: 'Add another fish crate', goal: { type: 'pad', pad: 'pad_crateB' }, reward: 15 },
+  { id: 'q_pack2', text: 'Get an even bigger pack', goal: { type: 'pad', pad: 'pad_pack2' }, reward: 20 },
+  { id: 'q_pop25', text: 'Welcome 25 villagers', goal: { type: 'pop', n: 25 }, guide: { type: 'earn' }, reward: 20 },
+  { id: 'q_cook_hire', text: 'Hire a cook', goal: { type: 'pad', pad: 'pad_cook' }, reward: 25 },
+  { id: 'q_hearth2', text: 'Raise the Hearth', goal: { type: 'pad', pad: 'pad_hearth2' }, reward: 30,
+    hint: 'A bigger fire melts the frost wall' },
+  // ---- Pinewood ----
+  { id: 'q_chop', text: 'Chop pines in Pinewood', goal: { type: 'stat', stat: 'harvest.log', n: 5 },
+    guide: { type: 'harvest', tag: 'pine' }, reward: 10 },
+  { id: 'q_fuel', text: 'Feed logs to the Hearth', goal: { type: 'stat', stat: 'fuel', n: 5 },
+    guide: { type: 'deliver', item: 'log', to: ['hearth'] }, reward: 20, hint: 'A fed Hearth makes camp Cosy: double embers!' },
+  { id: 'q_sawmill', text: 'Build the sawmill', goal: { type: 'pad', pad: 'pad_sawmill' }, reward: 20 },
+  { id: 'q_planks', text: 'Saw 8 planks', goal: { type: 'stat', stat: 'craft.plank', n: 8 },
+    guide: { type: 'produce', item: 'plank' }, reward: 20 },
+  { id: 'q_cabin1', text: 'Raise a cabin', goal: { type: 'pad', pad: 'pad_cabin1' }, reward: 25,
+    hint: 'Cabins draw more Icebound to your camp' },
+  { id: 'q_pack3', text: 'Craft a sturdy pack', goal: { type: 'pad', pad: 'pad_pack3' }, reward: 25 },
+  { id: 'q_pots', text: 'Forge copper pots', goal: { type: 'pad', pad: 'pad_pots' }, reward: 30 },
+  { id: 'q_pop45', text: 'Welcome 45 villagers', goal: { type: 'pop', n: 45 }, guide: { type: 'earn' }, reward: 30 },
+  { id: 'q_lumberjack', text: 'Hire a lumberjack', goal: { type: 'pad', pad: 'pad_lumberjack' }, reward: 35 },
+  { id: 'q_boots', text: 'Stitch warm boots', goal: { type: 'pad', pad: 'pad_boots' }, reward: 35 },
+  { id: 'q_cabin2', text: 'Raise a second cabin', goal: { type: 'pad', pad: 'pad_cabin2' }, reward: 40 },
+  { id: 'q_woodbelt', text: 'Build a log conveyor', goal: { type: 'pad', pad: 'pad_woodbelt' }, reward: 40 },
+  { id: 'q_pop70', text: 'Welcome 70 villagers', goal: { type: 'pop', n: 70 }, guide: { type: 'earn' }, reward: 40 },
+  { id: 'q_stoker', text: 'Hire a stoker', goal: { type: 'pad', pad: 'pad_stoker' }, reward: 45 },
+  { id: 'q_cabin3', text: 'Raise a third cabin', goal: { type: 'pad', pad: 'pad_cabin3' }, reward: 50 },
+  { id: 'q_hearth3', text: 'Raise the Hearth again', goal: { type: 'pad', pad: 'pad_hearth3' }, reward: 60,
+    hint: 'The Frozen Lake lies beyond the eastern frost' },
+  // ---- End of the current content ----
+  { id: 'q_more', text: 'The Frozen Lake thaws soon…', goal: { type: 'never' }, guide: { type: 'none' }, reward: 0 },
+];

@@ -1,5 +1,5 @@
 // AUDIO CONTRACT — the signatures below are fixed; other code imports only from this file.
-// Stub implementation (no-op). The audio agent replaces the internals with procedural WebAudio.
+// Fully procedural WebAudio implementation lives in sibling files (engine/sfx/music/ambience/live).
 
 export type SfxName =
   | 'pickup' // item hops onto the carry stack (pass rising pitch as the stack grows)
@@ -48,19 +48,17 @@ export interface AudioApi {
   resume(): void;
 }
 
-let volumes = { sfx: 0.8, music: 0.5 };
+import { createLiveAudio } from './live';
+import { ladderPitch as ladder } from './sfx';
 
-export const audio: AudioApi = {
-  unlock() {},
-  sfx() {},
-  music() {},
-  ambience() {},
-  setVolumes(v) {
-    volumes = { ...volumes, ...v };
-  },
-  getVolumes() {
-    return { ...volumes };
-  },
-  suspend() {},
-  resume() {},
-};
+/** The game's audio singleton. Lazy: nothing is created until unlock() runs in a user gesture. */
+export const audio: AudioApi = createLiveAudio();
+
+/**
+ * Optional helper: pitch multiplier for the n-th item of a streak (stack height for `pickup`,
+ * combo count for `ember`). Climbs a major pentatonic two octaves, then cycles the top octave.
+ * Usage: audio.sfx('pickup', { pitch: ladderPitch(stack.length - 1) }).
+ */
+export function ladderPitch(n: number): number {
+  return ladder(n);
+}

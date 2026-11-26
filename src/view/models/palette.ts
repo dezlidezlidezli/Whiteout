@@ -1,0 +1,96 @@
+// Single source of colour truth for models, effects and UI accents.
+// All values are sRGB hex. Tweak here and every model follows.
+
+export const PALETTE = {
+  // --- world: cold ---
+  snow: 0xeef4fb,
+  snowShade: 0xc9d8ec,
+  snowBlue: 0xaec4e4,
+  thawedGround: 0x8a9a5b,
+  ice: 0x9fd4f5,
+  iceDeep: 0x4f9fcf,
+  iceTeal: 0x7fd8d4,
+  frost: 0xcfe9ff,
+  water: 0x1d3f5c,
+  night: 0x0e1626,
+
+  // --- warmth ---
+  ember: 0xffb347,
+  emberHot: 0xff6a2b,
+  emberCore: 0xffe08a,
+  flame: 0xff9a2e,
+  flameCore: 0xffe7a0,
+  windowGlow: 0xffc46b,
+  coal: 0x3a2a24,
+
+  // --- materials ---
+  wood: 0x9a6b3f,
+  woodDark: 0x6b4528,
+  woodLight: 0xc4925c,
+  woodPale: 0xe2c08c,
+  bark: 0x5e3f28,
+  stone: 0x9097a3,
+  stoneDark: 0x676e7c,
+  stoneWarm: 0xa89c8c,
+  copper: 0xd07a3c,
+  copperLight: 0xf0a868,
+  copperDark: 0x8f4a22,
+  iron: 0x4a4f5a,
+  steel: 0xb0bccb,
+  pine: 0x2f6b55,
+  pineDark: 0x1f4d40,
+  pineLight: 0x46906b,
+  canvas: 0xdcc9a0,
+  canvasDark: 0xb89f72,
+  rope: 0xd8bf8a,
+
+  // --- people ---
+  skin: 0xf2c6a2,
+  skinDark: 0xc98e68,
+  blush: 0xec8c80,
+  eye: 0x2a2026,
+  hair: 0x5a3a28,
+  boot: 0x4a3326,
+  mitten: 0x8f3a24,
+  coatRust: 0xd0582a,
+  coatRustDark: 0x9e3c1a,
+  scarfCream: 0xf3e6c8,
+  hatMustard: 0xe0a83a,
+  cream: 0xf3e6c8,
+  mustard: 0xd9a53a,
+  // helper accents (one each)
+  porter: 0x3f72a8,
+  cook: 0xcc4f66,
+  lumberjack: 0x3d7a46,
+  fisher: 0xf2c230,
+  miner: 0x5b6474,
+  minerLamp: 0xffd36b,
+  villager: 0x8a5a86,
+  dogFur: 0x7d8796,
+  dogBelly: 0xf0f0ec,
+  harness: 0xc8402e,
+
+  // --- food & items ---
+  fish: 0x8fb6cf,
+  fishDark: 0x4f7896,
+  fishBelly: 0xe6eef2,
+  stew: 0xc8652c,
+  carrot: 0xf08a2c,
+  herb: 0x6aa84f,
+  bowl: 0xe9dcc2,
+  smoked: 0xb0702e,
+  smokedDark: 0x6e3f1c,
+  ore: 0x5a5560,
+  oreRust: 0xb4542e,
+  ingot: 0xc2ccd8,
+  pie: 0xe0a44a,
+  berry: 0xc0334a,
+  plate: 0xf0e8da,
+
+  // --- crowd ---
+  frozenCoat: 0xc8e2f4,
+  frozenSkin: 0xd8ecf8,
+  frozenDark: 0x8fb3d3,
+} as const;
+
+export type PaletteKey = keyof typeof PALETTE;

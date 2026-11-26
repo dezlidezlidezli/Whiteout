@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Frostkettle Soundboard</title>
+    <style>
+      :root { color-scheme: dark; --bg: #0e1626; --card: #18233a; --fg: #e8eefc; --muted: #8fa0c2; --warm: #ffb45e; --cold: #7fd3ff; }
+      html, body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.4 system-ui, -apple-system, sans-serif; }
+      body { padding: max(16px, env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom)); -webkit-tap-highlight-color: transparent; }
+      h1 { font-size: 20px; margin: 0 0 4px; }
+      h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 20px 0 8px; }
+      #status { color: var(--muted); font-size: 13px; min-height: 1.4em; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 8px; }
+      button { appearance: none; border: 0; border-radius: 12px; background: var(--card); color: var(--fg); font: inherit; padding: 12px 6px; touch-action: manipulation; }
+      button:active { background: #24365a; }
+      button.warm { color: var(--warm); }
+      button.cold { color: var(--cold); }
+      button.on { outline: 2px solid var(--warm); }
+      label { display: grid; grid-template-columns: 70px 1fr 40px; align-items: center; gap: 10px; margin: 8px 0; }
+      input[type=range] { width: 100%; }
+    </style>
+  </head>
+  <body>
+    <h1>Frostkettle soundboard</h1>
+    <div id="status">Tap anything to start audio.</div>
+    <h2>Sound effects</h2>
+    <div class="grid" id="sfx"></div>
+    <h2>Streaks</h2>
+    <div class="grid" id="streaks"></div>
+    <h2>Music</h2>
+    <div class="grid" id="moods"></div>
+    <h2>Ambience &amp; volume</h2>
+    <div id="sliders"></div>
+    <script type="module" src="./src/audiotest/main.ts"></script>
+  </body>
+</html>
