@@ -90,12 +90,13 @@ export const PALETTE = {
   plate: 0xf0e8da,
 
   // --- crowd ---
-  frozenCoat: 0xc8e2f4,
+  frozenCoat: 0xa9bcd8,
   frozenSkin: 0xd8ecf8,
   frozenDark: 0x7d9fc2,
   frozenFace: 0x7f9ab8,
-  frozenArm: 0xa6c4e0,
-  frozenHat: 0x9fc0de,
+  frozenArm: 0xb8cce4,
+  frozenArmDark: 0x92b2d2,
+  frozenHat: 0x8fa6cc,
 } as const;
 
 export type PaletteKey = keyof typeof PALETTE;

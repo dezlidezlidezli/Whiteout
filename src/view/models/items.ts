@@ -91,9 +91,16 @@ function make(kind: ItemKind): ItemMeshDef {
       break;
     case 'ingot':
       // classic trapezoid bar
-      b.add(trapezoid(0.48, 0.38, 0.22, 0.14, 0.1), P.ingot, { top: 0xe4ecf4, shade: 0.06, seed: 2 });
-      b.add(box(0.38, 0.006, 0.012), 0x8f9aa8, { p: [0, 0.101, 0.05] });
-      b.add(box(0.12, 0.005, 0.05), 0x8f9aa8, { p: [0, 0.101, 0] }); // stamp
+      // chamfered trapezoid bar: side profile extruded with a small bevel
+      {
+        const sh = new THREE.Shape();
+        sh.moveTo(-0.22, 0.012); sh.lineTo(0.22, 0.012); sh.lineTo(0.17, 0.088); sh.lineTo(-0.17, 0.088); sh.lineTo(-0.22, 0.012);
+        const g = new THREE.ExtrudeGeometry(sh, { depth: 0.16, bevelEnabled: true, bevelThickness: 0.018, bevelSize: 0.012, bevelSegments: 1 });
+        g.translate(0, 0, -0.08); g.deleteAttribute('uv');
+        b.add(g, P.ingot, { top: 0xe4ecf4, topY: 0.8, shade: 0.06, seed: 2 });
+      }
+      b.add(prism([[0, 0.05], [0.035, 0], [0, -0.05], [-0.035, 0]], 0.006), P.copper, { p: [0, 0.103, 0], r: [-Math.PI / 2, 0, 0] }); // ember stamp
+      for (const x of [-0.1, 0.1]) b.add(box(0.012, 0.004, 0.12), 0x7f8b9c, { p: [x, 0.102, 0] });
       stackHeight = 0.1;
       radius = 0.26;
       break;

@@ -116,9 +116,13 @@ function torsoGeo(role: string, st: Style): THREE.BufferGeometry {
       b.add(box(0.1, 0.025, 0.05), st.hatColor, { p: [0.19, 0.38, 0.31 * w], r: [-0.3, 0.3, 0.35] });
     }
     if (st.apron) {
-      b.add(bevel(0.42, 0.5, 0.04, 0.015), P.cream, { p: [0, 0.08, 0.31 * w], r: [-0.06, 0, 0] });
-      b.add(bevel(0.28, 0.2, 0.04, 0.015), P.cream, { p: [0, 0.4, 0.3 * w], r: [-0.2, 0, 0] });
-      b.add(box(0.2, 0.09, 0.05), P.cook, { p: [0, 0.0, 0.34 * w] }); // pocket
+      // skirt wraps around the front of the coat, bib follows the chest curve
+      b.add(new THREE.CylinderGeometry(0.345, 0.37, 0.46, 8, 1, true, -0.85, 1.7), P.cream, { p: [0, 0.1, 0], s: [w, 1, w * 0.94], shade: 0.03, seed: 6 });
+      b.add(new THREE.CylinderGeometry(0.29, 0.335, 0.24, 6, 1, true, -0.5, 1.0), P.cream, { p: [0, 0.42, 0], s: [w, 1, w * 0.94] });
+      b.add(new THREE.CylinderGeometry(0.375, 0.375, 0.035, 8, 1, true, -0.85, 1.7), P.cook, { p: [0, -0.12, 0], s: [w, 1, w * 0.94] }); // hem trim
+      b.add(bevel(0.16, 0.08, 0.03, 0.01), P.cook, { p: [0.08, 0.05, 0.36 * w], r: [-0.05, 0.25, 0] }); // pocket
+      for (const sx of [-1, 1]) b.add(box(0.035, 0.3, 0.03), P.cream, { p: [sx * 0.12, 0.5, 0.08], r: [-0.9, 0, 0] }); // straps
+      for (const sx of [-1, 1]) b.add(sphere(0.05, 5, 4), P.cream, { p: [sx * 0.05, 0.05, -0.34 * w], s: [1.3, 0.8, 0.6] }); // tie bow
     }
     if (st.backpack) {
       b.add(bevel(0.46, 0.55, 0.26, 0.06), 0x7a5232, { p: [0, 0.32, -0.38], shade: 0.05, seed: 5 });
@@ -331,20 +335,21 @@ function buildDog(opts: ModelOpts): CharacterRig {
     b.add(cyl(0.03, 0.03, 0.03, 6), P.copper, { p: [0, 0.31, -0.3] });
     return b;
   }), 'bodyMesh'));
-  const head = group('head', 0, 0.3, 0.34);
+  const head = group('head', 0, 0.28, 0.36);
   body.add(head);
   head.add(mesh(cached('dog:head', () => {
     const b = new Builder();
-    b.add(bevel(0.28, 0.25, 0.26, 0.08), P.dogFur, { p: [0, 0.1, 0.06] });
-    b.add(bevel(0.2, 0.12, 0.18, 0.04), P.dogBelly, { p: [0, 0.03, 0.22] }); // muzzle
-    b.add(sphere(0.035, 5, 4), P.eye, { p: [0, 0.08, 0.32] }); // nose
-    b.add(bevel(0.18, 0.06, 0.04, 0.02), P.dogBelly, { p: [0, 0.18, 0.18] }); // mask
+    b.add(sphere(0.2, 8, 6), P.dogFur, { p: [0, 0.14, 0.06], s: [1.05, 0.95, 1], front: P.dogBelly, frontZ: 0.55 });
+    b.add(sphere(0.12, 7, 5), P.dogBelly, { p: [0, 0.06, 0.25], s: [1, 0.75, 1.15] }); // muzzle
+    b.add(sphere(0.045, 6, 4), P.eye, { p: [0, 0.1, 0.38], s: [1.2, 0.9, 1] }); // nose
     for (const sx of [-1, 1]) {
-      b.add(cone(0.065, 0.15, 4), P.dogFur, { p: [sx * 0.09, 0.28, 0.02], r: [0, Math.PI / 4, sx * -0.2] });
-      b.add(box(0.04, 0.045, 0.02), P.eye, { p: [sx * 0.07, 0.15, 0.19] });
-      b.add(sphere(0.025, 4, 3), 0x8a5a3a, { p: [sx * 0.08, 0.2, 0.17] }); // eyebrow
+      b.add(cone(0.085, 0.2, 4), P.dogFur, { p: [sx * 0.12, 0.34, 0.0], r: [-0.1, Math.PI / 4, sx * -0.25] });
+      b.add(cone(0.045, 0.12, 4), 0xe8b0a8, { p: [sx * 0.118, 0.325, 0.025], r: [-0.1, Math.PI / 4, sx * -0.25] });
+      b.add(sphere(0.035, 6, 5), P.eye, { p: [sx * 0.085, 0.2, 0.22], s: [1, 1.15, 0.6] });
+      b.add(sphere(0.011, 4, 3), 0xffffff, { p: [sx * 0.085 + 0.01, 0.215, 0.24] });
+      b.add(sphere(0.04, 5, 3), P.dogBelly, { p: [sx * 0.09, 0.26, 0.18], s: [1.2, 0.5, 0.6] }); // brow spot
     }
-    b.add(box(0.06, 0.02, 0.06), 0xe86a7a, { p: [0, -0.03, 0.27] }); // tongue
+    b.add(box(0.07, 0.02, 0.08), 0xe86a7a, { p: [0, -0.01, 0.32], r: [0.3, 0, 0] }); // tongue
     return b;
   }), 'headMesh'));
   const tail = group('tail', 0, 0.2, -0.36);

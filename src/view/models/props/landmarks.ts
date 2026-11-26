@@ -1,4 +1,5 @@
 // Beacon, camp furniture and small decor props.
+import * as THREE from 'three';
 import { Builder, bevel, box, cone, cyl, ico, lathe, prism, rng, sphere, torus } from '../geo';
 import { PALETTE as P } from '../palette';
 import { coals, flame, logBetween, snowMound, type PropSpec } from './common';
@@ -125,9 +126,14 @@ export function gate(): PropSpec {
     b.add(bevel(0.32, 3.0, 0.32, 0.05), P.woodDark, { p: [sx * W / 2, 1.5, 0] });
     b.add(bevel(0.5, 0.3, 0.5, 0.06), P.stone, { p: [sx * W / 2, 0.15, 0] });
     b.add(box(0.36, 0.1, 0.36), P.snow, { p: [sx * W / 2, 3.04, 0] });
-    // open door halves
-    b.add(bevel(1.3, 1.5, 0.08, 0.02), P.wood, { p: [sx * (W / 2 - 0.1), 0.95, 0.7], r: [0, sx * Math.PI / 2 * 0.9, 0], shade: 0.04, seed: sx + 4 });
-    b.add(box(0.06, 0.12, 0.3), P.iron, { p: [sx * (W / 2 - 0.05), 1.4, 0.15] });
+    // plank door halves, hinged at the posts and swung open outwards
+    const len = W / 2 - 0.2;
+    const d = new Builder();
+    for (let k = 0; k < 4; k++) d.add(bevel(len / 4 - 0.02, 1.5 - (k % 2) * 0.08, 0.06, 0.015), k % 2 ? P.wood : P.woodLight, { p: [len / 8 + (k * len) / 4, 0.85, 0], shade: 0.04, seed: k });
+    for (const y of [0.35, 1.3]) d.add(box(len, 0.1, 0.05), P.woodDark, { p: [len / 2, y, 0.05] });
+    d.add(box(Math.hypot(len, 0.95), 0.09, 0.05), P.woodDark, { p: [len / 2, 0.82, 0.05], r: [0, 0, Math.atan2(0.95, len) * -sx] });
+    for (const y of [0.35, 1.3]) d.add(box(0.2, 0.06, 0.07), P.iron, { p: [0.08, y, 0.06] });
+    b.merge(d, { p: [sx * (W / 2 - 0.12), 0, 0.05], r: [0, sx < 0 ? -1.15 : Math.PI + 1.15, 0] });
     // lanterns
     b.add(box(0.2, 0.26, 0.2), P.iron, { p: [sx * (W / 2 + 0.3), 2.2, 0.2] });
     glow.add(box(0.14, 0.18, 0.14), P.windowGlow, { p: [sx * (W / 2 + 0.3), 2.2, 0.2] });
@@ -143,18 +149,40 @@ export function gate(): PropSpec {
 // ---------------------------------------------------------------- fire & light
 export function brazier(): PropSpec {
   const b = new Builder(), fl = new Builder(), em = new Builder();
+  const bowlY = 0.78;
+  // sturdy splayed legs with curled feet and a ring brace
   for (let i = 0; i < 3; i++) {
-    const a = (i / 3) * Math.PI * 2;
-    b.add(box(0.06, 1.0, 0.06), P.iron, { p: [Math.cos(a) * 0.25, 0.48, Math.sin(a) * 0.25], r: [Math.sin(a) * 0.25, 0, -Math.cos(a) * 0.25] });
+    const a = (i / 3) * Math.PI * 2 + Math.PI / 6;
+    const c = Math.cos(a), s = Math.sin(a);
+    b.add(bevel(0.08, 0.9, 0.08, 0.02), P.iron, { p: [c * 0.3, 0.42, s * 0.3], r: [s * 0.22, -a, -c * 0.22] });
+    b.add(torus(0.07, 0.025, 3, 6, Math.PI), P.iron, { p: [c * 0.41, 0.06, s * 0.41], r: [0, -a + Math.PI / 2, 0] });
   }
-  b.add(lathe([[0, 0], [0.15, 0], [0.38, 0.2], [0.42, 0.3], [0, 0.22]], 8), P.iron, { p: [0, 0.85, 0], top: P.coal, topY: 0.8 });
-  b.add(cyl(0.42, 0.42, 0.05, 8, true), P.copper, { p: [0, 1.13, 0] });
-  coals(em, 0.28, 6, 2, 1.1);
-  flame(fl, 0.75, 0.25, 5);
+  b.add(torus(0.3, 0.025, 3, 12), P.iron, { p: [0, 0.32, 0], r: [Math.PI / 2, 0, 0] });
+  b.add(torus(0.24, 0.02, 3, 12), P.copper, { p: [0, 0.6, 0], r: [Math.PI / 2, 0, 0] });
+  // forged bowl: outer wall, rolled rim, inner wall (real depth)
+  b.add(lathe([[0, 0], [0.16, 0.0], [0.34, 0.1], [0.46, 0.26], [0.52, 0.38], [0.5, 0.42], [0.44, 0.33], [0.32, 0.2], [0.0, 0.16]], 12), P.iron,
+    { p: [0, bowlY, 0], shade: 0.06, seed: 2 });
+  b.add(torus(0.51, 0.035, 4, 14), P.copper, { p: [0, bowlY + 0.4, 0], r: [Math.PI / 2, 0, 0] });
+  b.add(cyl(0.34, 0.36, 0.06, 12, true), P.copperDark, { p: [0, bowlY + 0.14, 0] }); // decorative band
+  for (let i = 0; i < 6; i++) {
+    const a = (i / 6) * Math.PI * 2;
+    b.add(box(0.04, 0.06, 0.04), P.copperLight, { p: [Math.cos(a) * 0.37, bowlY + 0.14, Math.sin(a) * 0.37], r: [0, -a, 0] });
+  }
+  // heaped glowing coals + charred log stubs
+  em.add(sphere(0.38, 9, 4), P.emberHot, { p: [0, bowlY + 0.3, 0], s: [1, 0.3, 1], jitter: 0.02, seed: 4, top: P.ember, topY: 0.85 });
+  coals(em, 0.3, 9, 2, bowlY + 0.38);
+  logBetween(b, [-0.3, bowlY + 0.33, 0.12], [0.1, bowlY + 0.55, 0.0], 0.05, P.coal, P.ember, 5);
+  logBetween(b, [0.28, bowlY + 0.33, 0.15], [-0.05, bowlY + 0.55, -0.05], 0.05, P.coal, P.ember, 5);
+  logBetween(b, [0.0, bowlY + 0.33, -0.32], [0.0, bowlY + 0.55, 0.05], 0.05, P.coal, P.ember, 5);
+  // full multi-tongue flame
+  flame(fl, 0.95, 0.32, 5, [0, 0, 0], 7);
+  flame(fl, 0.55, 0.16, 11, [0.18, 0, 0.1], 4);
+  flame(fl, 0.5, 0.15, 12, [-0.16, 0, -0.12], 4);
+  const fy = bowlY + 0.36;
   return {
-    layers: [{ name: 'body', b }, { name: 'coals', b: em, mat: 'ember', shadow: false }, { name: 'flame', b: fl, mat: 'glow', pos: [0, 1.08, 0] }],
-    markers: { light: [0, 1.5, 0] },
-    userData: { radius: 0.45, lightPos: [0, 1.5, 0], lightColor: P.flame, lightIntensity: 1, lightDistance: 5 },
+    layers: [{ name: 'body', b }, { name: 'coals', b: em, mat: 'ember', shadow: false }, { name: 'flame', b: fl, mat: 'glow', pos: [0, fy, 0] }],
+    markers: { light: [0, fy + 0.5, 0] },
+    userData: { radius: 0.55, lightPos: [0, fy + 0.5, 0], lightColor: P.flame, lightIntensity: 1, lightDistance: 5 },
   };
 }
 
@@ -206,15 +234,30 @@ export function sled(): PropSpec {
 export function crate(seed = 0): PropSpec {
   const b = new Builder();
   const one = (x: number, y: number, z: number, s: number, ry: number) => {
-    b.add(box(s - 0.04, s - 0.04, s - 0.04), P.wood, { p: [x, y + s / 2, z], r: [0, ry, 0], shade: 0.05, seed: Math.round(y * 10) });
-    for (const e of [-1, 1]) {
-      b.add(box(s, 0.08, s + 0.01), P.woodDark, { p: [x, y + s / 2 + e * (s / 2 - 0.04), z], r: [0, ry, 0] });
+    const c = new Builder();
+    c.add(box(s - 0.06, s - 0.06, s - 0.06), P.woodDark, { p: [0, s / 2, 0] });
+    // side slats (3 per face) on all four sides
+    for (let f = 0; f < 4; f++) {
+      const a = (f * Math.PI) / 2;
+      for (let k = 0; k < 3; k++) {
+        const yy = s * (0.2 + k * 0.3);
+        c.add(bevel(s - 0.1, s * 0.26, 0.04, 0.012), k % 2 ? P.woodLight : P.wood, {
+          p: [Math.sin(a) * (s / 2 - 0.02), yy, Math.cos(a) * (s / 2 - 0.02)], r: [0, a, 0], shade: 0.05, seed: f * 3 + k,
+        });
+      }
     }
-    b.add(box(s - 0.06, 0.08, s + 0.02), P.woodDark, { p: [x, y + s / 2, z], r: [0, ry, Math.PI / 4] });
-    b.add(box(s - 0.12, 0.05, s - 0.12), P.snow, { p: [x, y + s + 0.02, z], r: [0, ry, 0] });
+    // corner posts
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) c.add(bevel(0.08, s, 0.08, 0.015), P.woodDark, { p: [sx * (s / 2 - 0.02), s / 2, sz * (s / 2 - 0.02)] });
+    // lid planks with a snow pad
+    for (let k = 0; k < 3; k++) c.add(bevel(s - 0.02, 0.05, s / 3 - 0.02, 0.012), k % 2 ? P.wood : P.woodLight, { p: [0, s + 0.01, -s / 3 + (k * s) / 3] });
+    c.add(sphere(s * 0.35, 7, 4), P.snow, { p: [0.03, s + 0.04, 0.02], s: [1.2, 0.22, 1.1], jitter: 0.01, seed: 3 });
+    // stencilled ember mark on the front + rope handle
+    c.add(prism([[0, 0.08], [0.06, 0], [0, -0.08], [-0.06, 0]], 0.01), P.coatRust, { p: [0, s * 0.5, s / 2 + 0.005] });
+    c.add(torus(0.07, 0.015, 3, 6, Math.PI), P.rope, { p: [s / 2 + 0.01, s * 0.7, 0], r: [0, Math.PI / 2, 0] });
+    b.merge(c, { p: [x, y, z], r: [0, ry, 0] });
   };
   one(0, 0, 0, 0.8, 0);
-  if (seed % 3 === 1) one(0.05, 0.8, 0.0, 0.6, 0.4);
+  if (seed % 3 === 1) one(0.05, 0.85, 0.0, 0.6, 0.4);
   if (seed % 3 === 2) one(0.85, 0, 0.15, 0.65, -0.3);
   return { layers: [{ name: 'body', b }], userData: { radius: seed % 3 === 2 ? 0.9 : 0.55 } };
 }
@@ -284,14 +327,25 @@ function roofSmall(b: Builder, w: number, d: number, y: number) {
 
 export function bench(): PropSpec {
   const b = new Builder();
+  // stump legs
   for (const sx of [-1, 1]) {
-    b.add(cyl(0.18, 0.2, 0.4, 7), P.bark, { p: [sx * 0.6, 0.2, 0] });
-    b.add(cyl(0.15, 0.15, 0.02, 7), P.woodPale, { p: [sx * 0.6, 0.405, 0] });
+    b.add(cyl(0.17, 0.2, 0.38, 8), P.bark, { p: [sx * 0.62, 0.19, 0], shade: 0.08, seed: sx + 2 });
+    b.add(cyl(0.15, 0.15, 0.02, 8), P.woodPale, { p: [sx * 0.62, 0.385, 0] });
   }
-  b.add(cyl(0.2, 0.2, 1.7, 7, false), P.bark, { p: [0, 0.48, 0], r: [0, 0, Math.PI / 2], s: [1, 1, 0.75], top: P.woodPale, topY: 0.9 });
-  for (const sx of [-1, 1]) b.add(cyl(0.18, 0.18, 0.02, 7), P.woodPale, { p: [sx * 0.86, 0.48, 0], r: [0, 0, Math.PI / 2], s: [1, 1, 0.75] });
-  b.add(box(0.5, 0.04, 0.2), P.snow, { p: [0.45, 0.61, -0.02] });
-  return { layers: [{ name: 'body', b }], userData: { size: [1.8, 0.5], radius: 0.95, seatHeight: 0.6 } };
+  // split-log seat: bark underside, flat pale top
+  const seat = new THREE.CylinderGeometry(0.22, 0.22, 1.8, 10, 1, false, 0, Math.PI);
+  b.add(seat, P.bark, { p: [0, 0.42, 0], r: [0, 0, Math.PI / 2], s: [1, 1, 0.8], shade: 0.06, seed: 4 });
+  b.add(box(1.8, 0.03, 0.34), P.woodLight, { p: [0, 0.43, 0], shade: 0.04, seed: 5 });
+  for (const sx of [-1, 1]) b.add(box(0.02, 0.12, 0.3), P.woodPale, { p: [sx * 0.9, 0.36, 0] });
+  // backrest rail on two posts
+  for (const sx of [-1, 1]) b.add(bevel(0.08, 0.55, 0.08, 0.02), P.woodDark, { p: [sx * 0.7, 0.68, -0.2], r: [-0.12, 0, 0] });
+  b.add(cyl(0.07, 0.07, 1.7, 7), P.bark, { p: [0, 0.92, -0.24], r: [0, 0, Math.PI / 2] });
+  // folded blanket + snow
+  b.add(bevel(0.45, 0.07, 0.3, 0.02), P.coatRust, { p: [-0.45, 0.48, 0.0], r: [0, 0.15, 0] });
+  b.add(box(0.46, 0.02, 0.06), P.cream, { p: [-0.45, 0.5, 0.06], r: [0, 0.15, 0] });
+  b.add(sphere(0.18, 6, 4), P.snow, { p: [0.5, 0.45, 0.0], s: [1.5, 0.3, 0.9] });
+  b.add(box(1.5, 0.05, 0.1), P.snow, { p: [0, 0.98, -0.24] });
+  return { layers: [{ name: 'body', b }], userData: { size: [1.8, 0.6], radius: 0.95, seatHeight: 0.45 } };
 }
 
 export function woodPile(): PropSpec {

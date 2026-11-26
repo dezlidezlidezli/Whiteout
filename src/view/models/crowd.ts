@@ -36,28 +36,28 @@ function thawed(): THREE.BufferGeometry {
   return b.build();
 }
 
-/** A villager frozen mid-shiver: hugging itself, hat on, face dim under the frost. */
+/** A villager frozen mid-shiver, hugging themselves, feet locked in a block of ice.
+ *  Under the frost the coat keeps a muted hint of colour; frost whitens upward faces. */
 function frozen(): THREE.BufferGeometry {
   const b = new Builder();
-  const lean = 0.18;
-  // frosted coat (tintable for slight variety)
-  b.add(lathe([[0.26, 0.1], [0.29, 0.3], [0.31, 0.52], [0.2, 0.66], [0.07, 0.7]], 8), P.frozenCoat, { mask: 1, r: [lean, 0, 0], shade: 0.06, seed: 4 });
-  // arms crossed over the chest (hugging itself)
-  b.add(cyl(0.075, 0.08, 0.5, 4), P.frozenArm, { mask: 1, p: [0.02, 0.52, 0.26], r: [0.2, 0, Math.PI / 2 - 0.3] });
-  b.add(cyl(0.075, 0.08, 0.5, 4), P.frozenArm, { mask: 1, p: [-0.02, 0.42, 0.28], r: [-0.1, 0, Math.PI / 2 + 0.3] });
-  // boots
-  b.add(box(0.38, 0.12, 0.22), P.frozenDark, { mask: 0, p: [0, 0.06, 0.02] });
-  // bowed head: dim, bluish face showing through the frost
-  b.add(sphere(0.23, 6, 5), P.frozenSkin, { mask: 0, p: [0, 0.9, 0.1], front: P.frozenFace, frontZ: 0.2 });
-  for (const sx of [-1, 1]) b.add(box(0.08, 0.03, 0.03), P.frozenDark, { mask: 0, p: [sx * 0.085, 0.9, 0.325], r: [0.2, 0, sx * 0.2] });
-  // knitted hat with bobble, rimed with frost
-  b.add(lathe([[0.24, 0], [0.2, 0.11], [0.0, 0.2]], 8), P.frozenHat, { mask: 1, p: [0, 1.0, 0.02], r: [-0.55, 0, 0] });
-  b.add(octa(0.07), P.frost, { mask: 0, p: [0, 1.17, -0.1] });
-  // icicles from the hat brim, elbows and hem
-  const ic: [number, number, number, number][] = [[0.17, 1.0, 0.16, 0.16], [-0.15, 1.0, 0.17, 0.12], [0.3, 0.48, 0.24, 0.16], [-0.3, 0.42, 0.25, 0.14]];
+  const lean = 0.16;
+  const frostTop = { top: P.frost, topY: 0.82 };
+  // hunched coat: broad shoulders, narrower hem
+  b.add(lathe([[0.24, 0.12], [0.28, 0.3], [0.31, 0.5], [0.22, 0.65], [0.08, 0.7]], 8), P.frozenCoat, { mask: 1, r: [lean, 0, 0], ...frostTop, shade: 0.05, seed: 4 });
+  // arms wrapped tightly across the chest, hands tucked under the armpits
+  b.add(cyl(0.08, 0.085, 0.52, 4), P.frozenArm, { mask: 1, p: [0.01, 0.53, 0.25], r: [0.25, 0, Math.PI / 2 - 0.22], ...frostTop });
+  b.add(cyl(0.08, 0.085, 0.52, 4), P.frozenArmDark, { mask: 1, p: [-0.01, 0.44, 0.27], r: [-0.05, 0, Math.PI / 2 + 0.22], ...frostTop });
+  // head tucked down into the collar, face in frosty shadow, eyes squeezed shut
+  b.add(sphere(0.23, 6, 5), P.frozenSkin, { mask: 0, p: [0, 0.89, 0.1], front: P.frozenFace, frontZ: 0.25, top: P.frost, topY: 0.8 });
+  for (const sx of [-1, 1]) b.add(box(0.08, 0.025, 0.03), P.frozenDark, { mask: 0, p: [sx * 0.085, 0.89, 0.32], r: [0.2, 0, sx * 0.25] });
+  // knitted hat (still a hint of colour) with frosted bobble
+  b.add(lathe([[0.245, 0], [0.205, 0.11], [0.0, 0.2]], 8), P.frozenHat, { mask: 1, p: [0, 1.0, 0.02], r: [-0.5, 0, 0], ...frostTop });
+  b.add(octa(0.075), P.frost, { mask: 0, p: [0, 1.17, -0.1] });
+  // feet locked in a jagged ice block
+  b.add(cyl(0.3, 0.38, 0.34, 6), P.ice, { mask: 0, p: [0, 0.17, 0.02], jitter: 0.05, seed: 3, top: P.frost, topY: 0.7 });
+  // icicles from hat brim and elbows
+  const ic: [number, number, number, number][] = [[0.17, 0.99, 0.17, 0.16], [-0.16, 0.99, 0.18, 0.13], [0.33, 0.5, 0.2, 0.17], [-0.33, 0.44, 0.22, 0.15]];
   for (const [x, y, z, h] of ic) b.add(cone(0.035, h, 3), P.iceTeal, { mask: 0, p: [x, y - h / 2, z], r: [Math.PI, 0, 0] });
-  // ice crystals on the shoulders
-  b.add(octa(0.11), P.ice, { mask: 0, p: [0.22, 0.68, -0.08], s: [0.6, 1.5, 0.6], r: [0, 0, -0.5] });
   return b.build();
 }
 

@@ -135,10 +135,25 @@ export function fishCrate(): PropSpec {
 export function storageTable(): PropSpec {
   const b = new Builder();
   const W = 1.6, D = 0.9, H = 0.8;
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.add(bevel(0.1, H, 0.1, 0.02), P.woodDark, { p: [sx * (W / 2 - 0.1), H / 2, sz * (D / 2 - 0.1)] });
-  b.add(box(W - 0.2, 0.06, 0.06), P.woodDark, { p: [0, 0.25, D / 2 - 0.1] });
-  b.add(box(W - 0.2, 0.06, 0.06), P.woodDark, { p: [0, 0.25, -D / 2 + 0.1] });
-  for (let i = 0; i < 4; i++) b.add(box(W, 0.07, D / 4 - 0.015), i % 2 ? P.woodLight : P.woodPale, { p: [0, H, -D / 2 + D / 8 + (i * D) / 4], shade: 0.03, seed: i });
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    b.add(bevel(0.11, H - 0.05, 0.11, 0.025), P.woodDark, { p: [sx * (W / 2 - 0.1), (H - 0.05) / 2, sz * (D / 2 - 0.1)], r: [sz * 0.04, 0, -sx * 0.04] });
+  }
+  // stretchers + lower shelf
+  for (const sz of [-1, 1]) b.add(bevel(W - 0.2, 0.07, 0.06, 0.015), P.woodDark, { p: [0, 0.25, sz * (D / 2 - 0.1)] });
+  for (const sx of [-1, 1]) b.add(bevel(0.06, 0.07, D - 0.2, 0.015), P.woodDark, { p: [sx * (W / 2 - 0.1), 0.25, 0] });
+  for (let i = 0; i < 3; i++) b.add(box(W - 0.3, 0.03, (D - 0.25) / 3 - 0.02), P.wood, { p: [0, 0.3, -D / 2 + 0.17 + ((i + 0.5) * (D - 0.25)) / 3] });
+  // apron boards under the top
+  for (const sz of [-1, 1]) b.add(box(W - 0.25, 0.1, 0.04), P.wood, { p: [0, H - 0.1, sz * (D / 2 - 0.08)] });
+  // top planks with a gap and nail heads
+  for (let i = 0; i < 4; i++) {
+    b.add(bevel(W + 0.06, 0.06, D / 4 - 0.025, 0.015), i % 2 ? P.woodLight : P.woodPale, { p: [0, H, -D / 2 + D / 8 + (i * D) / 4], shade: 0.04, seed: i });
+    for (const sx of [-1, 1]) b.add(box(0.025, 0.01, 0.025), P.iron, { p: [sx * (W / 2 - 0.1), H + 0.033, -D / 2 + D / 8 + (i * D) / 4] });
+  }
+  // a coil of rope and a mallet on the lower shelf, snow on one corner
+  b.add(torus(0.12, 0.035, 4, 8), P.rope, { p: [-0.4, 0.35, 0.05], r: [Math.PI / 2, 0, 0] });
+  b.add(cyl(0.02, 0.02, 0.35, 4), P.woodLight, { p: [0.35, 0.34, 0.05], r: [0, 0.4, Math.PI / 2] });
+  b.add(bevel(0.18, 0.1, 0.1, 0.02), P.woodDark, { p: [0.2, 0.37, 0.12], r: [0, 0.4, 0] });
+  b.add(sphere(0.16, 6, 4), P.snow, { p: [W / 2 - 0.2, H + 0.03, -D / 2 + 0.15], s: [1.3, 0.25, 1] });
   return { layers: [{ name: 'body', b }], markers: { itemAnchor: [0, H + 0.04, 0] }, userData: { size: [W, D], radius: 0.92, itemAnchor: [0, H + 0.04, 0] } };
 }
 
@@ -243,18 +258,29 @@ export function hearth(level: number): PropSpec {
     radius = platR;
   }
   if (L === 5) {
-    // tall tapering chimney rising from the back wall
-    const tiers = [[2.3, 0.8, 1.0], [1.9, 0.7, 1.1], [1.6, 0.64, 1.2], [1.35, 0.58, 1.1]];
-    let y = 0.22 + 2.3 + 0.1;
-    for (let i = 0; i < tiers.length; i++) {
-      const [w, d, h] = tiers[i];
-      b.add(bevel(w, h, d, 0.06), i % 2 ? P.stone : P.stoneWarm, { p: [0, y + h / 2, -1.45], shade: 0.05, seed: 40 + i });
-      b.add(bevel(w + 0.1, 0.08, d + 0.1, 0.03), P.stoneDark, { p: [0, y + h, -1.45] });
-      y += h;
+    // tall, gently tapering masonry chimney: frustum body, stone courses and corner quoins
+    const cy0 = 0.22 + 2.3 + 0.1, CH = 4.1, w0 = 1.9, w1 = 1.1, d0 = 1.0, d1 = 0.72, cz = -1.45;
+    const wAt = (t: number) => w0 + (w1 - w0) * t, dAt = (t: number) => d0 + (d1 - d0) * t;
+    b.add(cyl((w1 / 2) * Math.SQRT2, (w0 / 2) * Math.SQRT2, CH, 4), P.stoneWarm, {
+      p: [0, cy0 + CH / 2, cz], r: [0, Math.PI / 4, 0], s: [1, 1, d0 / w0], jitter: 0.025, seed: 41, shade: 0.06,
+    });
+    const courses = 5;
+    for (let i = 0; i <= courses; i++) {
+      const t = i / courses, y = cy0 + t * CH;
+      b.add(bevel(wAt(t) + 0.12, 0.1, dAt(t) + 0.12, 0.03), i % 2 ? P.stoneDark : P.stone, { p: [0, y, cz] });
+      if (i === courses) break;
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+        const tq = t + 0.5 / courses, alt = (i % 2 === 0) === (sx > 0);
+        b.add(bevel(alt ? 0.32 : 0.2, CH / courses - 0.16, alt ? 0.2 : 0.32, 0.03), (i + (sx > 0 ? 1 : 0)) % 2 ? P.stone : 0x9aa0ab, {
+          p: [sx * (wAt(tq) / 2 - 0.06), cy0 + tq * CH, cz + sz * (dAt(tq) / 2 - 0.06)], shade: 0.05, seed: i * 4 + sx + sz,
+        });
+      }
     }
+    const y = cy0 + CH + 0.05;
     // copper cap
-    b.add(cyl(0.42, 0.5, 0.3, 8), P.copper, { p: [0, y + 0.15, -1.45], top: P.copperLight, topY: 0.5 });
-    b.add(cone(0.6, 0.35, 8), P.copperDark, { p: [0, y + 0.6, -1.45] });
+    b.add(cyl(0.48, 0.52, 0.3, 8), P.copper, { p: [0, y + 0.15, -1.45], top: P.copperLight, topY: 0.5 });
+    b.add(cone(0.7, 0.4, 8), P.copperDark, { p: [0, y + 0.62, -1.45] });
+    b.add(sphere(0.08, 6, 4), P.copperLight, { p: [0, y + 0.86, -1.45] });
     b.add(cyl(0.36, 0.36, 0.06, 8), P.coal, { p: [0, y + 0.3, -1.45] });
     for (const sx of [-1, 1]) b.add(box(0.06, 0.35, 0.06), P.copperDark, { p: [sx * 0.3, y + 0.42, -1.45] });
     // glowing ember emblem on the chimney breast
