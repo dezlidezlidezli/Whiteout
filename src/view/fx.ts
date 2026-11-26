@@ -5,24 +5,35 @@ import { PALETTE } from './models';
 
 // ------------------------------------------------------------------ snowfall (GPU-animated points)
 
+export type SnowLevel = 0 | 1 | 2;
+
+/**
+ * World-space snowfall in a 36 m box that wraps around the (smoothed) camera focus. GPU-animated,
+ * one draw call. Flakes stay below ~8 m so none ever balloon in front of the camera; they fade at
+ * the wrap edges (no popping) and get quieter while the player walks.
+ */
 export class Snowfall {
   readonly points: THREE.Points;
   private mat: THREE.ShaderMaterial;
+  private geo: THREE.BufferGeometry;
+  private max: number;
+  private fade = 1;
 
-  constructor(parent: THREE.Object3D, count: number) {
-    const geo = new THREE.BufferGeometry();
-    const pos = new Float32Array(count * 3);
-    const rnd = new Float32Array(count);
+  constructor(parent: THREE.Object3D, max = 900) {
+    this.max = max;
+    this.geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(max * 3);
+    const rnd = new Float32Array(max);
     let s = 12345;
     const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-    for (let i = 0; i < count; i++) {
-      pos[i * 3] = r() * 40 - 20;
-      pos[i * 3 + 1] = r() * 16;
-      pos[i * 3 + 2] = r() * 40 - 20;
+    for (let i = 0; i < max; i++) {
+      pos[i * 3] = r() * 36 - 18;
+      pos[i * 3 + 1] = r() * 8;
+      pos[i * 3 + 2] = r() * 36 - 18;
       rnd[i] = r();
     }
-    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    geo.setAttribute('aRnd', new THREE.BufferAttribute(rnd, 1));
+    this.geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    this.geo.setAttribute('aRnd', new THREE.BufferAttribute(rnd, 1));
     this.mat = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
@@ -30,8 +41,9 @@ export class Snowfall {
         uTime: { value: 0 },
         uOrigin: { value: new THREE.Vector3() },
         uSize: { value: 1 },
-        uWind: { value: 0.5 },
-        uColor: { value: new THREE.Color(0xf4f8ff) },
+        uWind: { value: 0.3 },
+        uAlpha: { value: 1 },
+        uColor: { value: new THREE.Color(0xf2f6ff) },
       },
       vertexShader: /* glsl */ `
         attribute float aRnd;
@@ -39,38 +51,49 @@ export class Snowfall {
         varying float vA;
         void main() {
           vec3 p = position;
-          float fall = 0.9 + aRnd * 0.9;
-          p.y = mod(p.y - uTime * fall, 16.0);
-          p.x += sin(uTime * (0.6 + aRnd) + aRnd * 30.0) * 0.6 + uTime * uWind * 1.4;
-          p.z += cos(uTime * (0.5 + aRnd) + aRnd * 17.0) * 0.4 + uTime * uWind * 0.6;
-          // Wrap around the camera target so the box follows the player.
-          p.x = mod(p.x - uOrigin.x + 20.0, 40.0) - 20.0 + uOrigin.x;
-          p.z = mod(p.z - uOrigin.z + 20.0, 40.0) - 20.0 + uOrigin.z;
+          float fall = 0.55 + aRnd * 0.6;
+          p.y = mod(p.y - uTime * fall, 8.0) + 0.2;
+          p.x += sin(uTime * (0.35 + aRnd * 0.4) + aRnd * 30.0) * 0.45 + uTime * uWind;
+          p.z += cos(uTime * (0.3 + aRnd * 0.4) + aRnd * 17.0) * 0.3 + uTime * uWind * 0.4;
+          // World-anchored, wrapping around the focus: flakes slide past as the camera pans.
+          vec2 rel = mod(p.xz - uOrigin.xz + 18.0, 36.0) - 18.0;
+          p.xz = rel + uOrigin.xz;
           vec4 mv = modelViewMatrix * vec4(p, 1.0);
           gl_Position = projectionMatrix * mv;
-          gl_PointSize = uSize * (2.0 + aRnd * 3.0) * (30.0 / -mv.z);
-          vA = 0.55 + aRnd * 0.45;
+          gl_PointSize = min(uSize * (1.0 + aRnd * 1.4) * (16.0 / -mv.z), uSize * 3.5);
+          float edge = 1.0 - smoothstep(13.0, 18.0, max(abs(rel.x), abs(rel.y)));
+          vA = (0.28 + aRnd * 0.32) * edge;
         }`,
       fragmentShader: /* glsl */ `
-        uniform vec3 uColor; varying float vA;
+        uniform vec3 uColor; uniform float uAlpha; varying float vA;
         void main() {
-          vec2 c = gl_PointCoord - 0.5;
-          float d = length(c);
+          float d = length(gl_PointCoord - 0.5);
           if (d > 0.5) discard;
-          gl_FragColor = vec4(uColor, smoothstep(0.5, 0.1, d) * vA * 0.85);
+          gl_FragColor = vec4(uColor, smoothstep(0.5, 0.0, d) * vA * uAlpha);
         }`,
     });
-    this.points = new THREE.Points(geo, this.mat);
+    this.points = new THREE.Points(this.geo, this.mat);
     this.points.frustumCulled = false;
     this.points.renderOrder = 10;
     parent.add(this.points);
+    this.setLevel(1);
   }
 
-  update(time: number, origin: THREE.Vector3, pixelRatio: number, wind: number): void {
-    this.mat.uniforms.uTime.value = time;
-    this.mat.uniforms.uOrigin.value.copy(origin);
-    this.mat.uniforms.uSize.value = pixelRatio;
-    this.mat.uniforms.uWind.value = wind;
+  setLevel(level: SnowLevel): void {
+    const n = [0, Math.round(this.max * 0.4), this.max][level];
+    this.geo.setDrawRange(0, n);
+    this.points.visible = n > 0;
+  }
+
+  update(time: number, dt: number, origin: THREE.Vector3, pixelRatio: number, wind: number, playerSpeed: number): void {
+    const want = 1 - Math.min(1, playerSpeed / 5) * 0.45;
+    this.fade += (want - this.fade) * (1 - Math.exp(-dt * 2));
+    const u = this.mat.uniforms;
+    u.uTime.value = time;
+    u.uOrigin.value.copy(origin);
+    u.uSize.value = pixelRatio;
+    u.uWind.value = wind;
+    u.uAlpha.value = this.fade;
   }
 }
 

@@ -192,7 +192,7 @@ export function pathStrip(points: XZ[], o: PathStripOpts = {}): THREE.Object3D {
   const r = rng((o.seed ?? 0) + 3);
   const hw = w / 2;
   if (type === 'trampled') {
-    const cols = [P.snow, 0xc3cfe0, 0xaebcd2, 0xa4b3cb, 0xaebcd2, 0xc3cfe0, P.snow];
+    const cols = [P.snow, 0xb9c6da, 0x9fafc8, 0x93a4bf, 0x9fafc8, 0xb9c6da, P.snow];
     const prof: [number, number][] = [[-hw - 0.35, 0.004], [-hw, 0.025], [-hw * 0.4, 0.02], [0, 0.018], [hw * 0.4, 0.02], [hw, 0.025], [hw + 0.35, 0.004]];
     b.add(sweep(path, prof, { color: (k, s) => lin(cols[k]).multiplyScalar(0.97 + 0.06 * Math.sin(s.d * 2.3 + k)) }), 0xffffff, { vcol: true });
   } else if (type === 'planks') {

@@ -10,6 +10,8 @@ export interface SettingsApi {
   setVolumes(v: { sfx?: number; music?: number }): void;
   getQuality(): 'auto' | 0 | 1 | 2;
   setQuality(q: 'auto' | 0 | 1 | 2): void;
+  getSnow(): 0 | 1 | 2;
+  setSnow(level: 0 | 1 | 2): void;
   exportCode(): string;
   importCode(code: string): string | null;
   reset(): void;
@@ -267,7 +269,7 @@ class SettingsSheet {
 
     this.sheet.appendChild(h('h3', '', 'Graphics'));
     const seg = h('div', 'fk-seg');
-    const opts: ['auto' | 0 | 1 | 2, string][] = [['auto', 'Auto'], [0, 'Low'], [1, 'Medium'], [2, 'High']];
+    const opts: ['auto' | 0 | 1 | 2, string][] = [['auto', 'Auto'], [0, 'Smooth'], [1, 'Balanced'], [2, 'Pretty']];
     const btns: HTMLButtonElement[] = [];
     for (const [q, name] of opts) {
       const b = h('button', '', name);
@@ -280,9 +282,26 @@ class SettingsSheet {
       btns.push(b);
       seg.appendChild(b);
     }
-    const ql = h('label', '', '<span>Quality</span>');
+    const ql = h('label', '', '<span>Graphics</span>');
     ql.appendChild(seg);
     this.sheet.appendChild(ql);
+    const sseg = h('div', 'fk-seg');
+    const sopts: [0 | 1 | 2, string][] = [[0, 'Off'], [1, 'Light'], [2, 'Full']];
+    const sbtns: HTMLButtonElement[] = [];
+    for (const [lv, name] of sopts) {
+      const b = h('button', '', name);
+      b.classList.toggle('fk-sel', api.getSnow() === lv);
+      b.addEventListener('click', () => {
+        api.tap();
+        api.setSnow(lv);
+        sbtns.forEach((x, i) => x.classList.toggle('fk-sel', sopts[i][0] === lv));
+      });
+      sbtns.push(b);
+      sseg.appendChild(b);
+    }
+    const sl = h('label', '', '<span>Snowfall</span>');
+    sl.appendChild(sseg);
+    this.sheet.appendChild(sl);
 
     this.sheet.appendChild(h('h3', '', 'Save code'));
     const ta = h('textarea');

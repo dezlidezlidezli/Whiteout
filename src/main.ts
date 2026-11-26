@@ -60,6 +60,8 @@ const qualityPref = readPref<'auto' | QualityLevel>('quality', 'auto');
 let qualityMode: 'auto' | QualityLevel = qualityPref;
 const startQuality: QualityLevel = qualityMode === 'auto' ? detectQuality() : qualityMode;
 
+let snowLevel = readPref<0 | 1 | 2>('snow', 1);
+
 // ---- audio prefs
 const vols = readPref<{ sfx: number; music: number } | null>('volumes', null);
 if (vols) audio.setVolumes(vols);
@@ -78,6 +80,12 @@ const hud = new Hud(uiRoot, {
     writePref('quality', q);
     autoQ.enabled = q === 'auto';
     view.setQuality(q === 'auto' ? detectQuality() : q);
+  },
+  getSnow: () => snowLevel,
+  setSnow: (lv) => {
+    snowLevel = lv;
+    writePref('snow', lv);
+    view.setSnow(lv);
   },
   exportCode: () => encodeSaveCode(sim.serialize()),
   importCode: (code) => {
@@ -123,6 +131,7 @@ function newGame(): void {
   save();
 }
 
+view.setSnow(snowLevel);
 const autoQ = new AutoQuality(() => view.lowerResolution());
 autoQ.enabled = qualityMode === 'auto';
 
@@ -214,6 +223,7 @@ installLifecycle(canvas, {
     });
     (window.__fk as FkDebug).view = view;
     if (title) view.setTitle(true, true);
+    view.setSnow(snowLevel);
     lost = false;
   },
 });

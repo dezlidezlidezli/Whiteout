@@ -165,7 +165,7 @@ export class View {
       this.sfx('arrive', { volume: 0.5, pitch: 0.9 + Math.random() * 0.2 }, 0.12, { x, z });
     };
     this.fx = new Effects(this.scene);
-    this.snow = new Snowfall(this.scene, [450, 1000, 1700][quality]);
+    this.snow = new Snowfall(this.scene, 900);
     this.sparks = new Sparks(this.scene, quality >= 1 ? 80 : 30);
     this.prints = new Footprints(this.scene);
     this.arrow = new GuideArrow(this.scene);
@@ -260,6 +260,10 @@ export class View {
     this.sun.target.position.copy(_w);
     this.sun.position.copy(_w).addScaledVector(dir, -25);
     this.sun.target.updateMatrixWorld();
+  }
+
+  setSnow(level: 0 | 1 | 2): void {
+    this.snow.setLevel(level);
   }
 
   /** Auto-quality: lower the render resolution a notch (cheap, no recompiles). */
@@ -667,7 +671,7 @@ export class View {
     this.placeSun(f.x, f.z - 2);
     const distHearth = Math.hypot(px - this.data.camp.hearth.x, pz - this.data.camp.hearth.z);
     const wind = Math.max(0, Math.min(1, (distHearth - this.radius + 2) / 14));
-    this.snow.update(t, f, this.renderer.getPixelRatio(), 0.35 + wind * 0.6);
+    this.snow.update(t, dt, f, this.renderer.getPixelRatio(), 0.15 + wind * 0.35, Math.hypot(p.vx, p.vz));
     this.sparks.points.position.set(this.data.camp.hearth.x, 0, this.data.camp.hearth.z);
     this.sparks.update(t, this.renderer.getPixelRatio(), 0.8 + s.hearth.level * 0.25 + (sim.cosy ? 0.5 : 0));
     this.prints.update(dt, px, pz, p.facing, distHearth > this.radius + 0.5);

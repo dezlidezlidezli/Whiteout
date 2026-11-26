@@ -107,16 +107,23 @@ const gateAt = 4 * wz + 3 * wx - 3 * cornerLoss; // centre of the front edge
     scene.add(createPathStrip([[0, wz - 0.3], [0, wz + 4], [-3, wz + 8], [-3, wz + 18]], { type: 'trampled', width: 2.4, radius: 3 }));
     for (const [x, z, ry, s] of [[-4.2, wz + 1.6, 0, 0], [4.4, wz + 1.6, 0, 1], [wx + 1.6, 2, Math.PI / 2, 2], [wx + 1.6, -4, Math.PI / 2, 0], [-wx - 1.6, -1, Math.PI / 2, 1], [-wx - 1.6, 5, Math.PI / 2, 2]] as const)
       add('snowBank', x, z, ry, { seed: s });
-    add('bush', -2.0, wz + 1.6, 0, { seed: 0 });
+    add('bush', -2.2, wz + 1.7, 0, { seed: 0 });
     add('bush', 2.6, wz + 2.6, 0, { seed: 1 });
-    add('sapling', 5.2, wz + 4.0, 0, { seed: 0 });
-    add('sapling', -6.2, wz + 3.5, 0, { seed: 2 });
-    add('supplySled', 2.8, wz + 5.0, 0.5, { seed: 1 });
-    add('snowyBoulderCluster', -7.5, wz + 7, 0, { seed: 1 });
-    add('fallenLog', 5.5, wz + 8.5, 0.6, { seed: 0 });
-    add('iceShards', -wx - 2.2, -6, 0, { seed: 1 });
-    for (const [x, z, s] of [[-9.5, -3, 1], [9.6, -6, 2], [9.2, 6, 3], [-9.4, 7, 4], [-8.6, wz + 4, 5], [8.5, wz + 9, 6]] as const) add('pineSnowy', x, z, 0, { seed: s });
-    add('watchTower', wx + 2.6, wz + 1.0, -0.3, { seed: 0 });
+    add('bush', -5.6, wz + 9.5, 0, { seed: 2 });
+    add('sapling', 5.0, wz + 4.4, 0, { seed: 0 });
+    add('sapling', -5.6, wz + 3.2, 0, { seed: 2 });
+    add('sapling', 1.8, wz + 11.5, 0, { seed: 1 });
+    add('supplySled', 2.9, wz + 6.0, 0.5, { seed: 1 });
+    add('snowyBoulderCluster', -5.8, wz + 6.5, 0, { seed: 1 });
+    add('fallenLog', 4.6, wz + 9.5, 0.6, { seed: 0 });
+    add('iceShards', -6.5, wz + 12.5, 0, { seed: 1 });
+    add('footpathStones', -1.2, wz + 13.5, 0.2, { seed: 0 });
+    add('signpost', -1.4, wz + 7.5, 0.3);
+    add('lampPost', 1.6, wz + 4.0, 0, { seed: 1 });
+    add('bannerLine', 0, -wz - 1.6, 0, { seed: 2 });
+    for (const [x, z, s] of [[-7.6, -wz - 2.2, 1], [-3.5, -wz - 3.2, 2], [2.4, -wz - 2.6, 3], [7.4, -wz - 3.4, 4], [-8.0, wz + 13, 5], [7.6, wz + 14.5, 6], [-7.8, 3, 7], [8.2, -2.5, 0]] as const) add('pineSnowy', x, z, 0, { seed: s });
+    add('watchTower', 6.2, wz + 6.8, -0.3, { seed: 0 });
+    add('campfireRing', -4.2, wz + 16, 0);
 
     // ---- instanced scatter outside the walls
     const rnd = (() => { let a = 12345; return () => { a = (a * 1103515245 + 12345) >>> 0; return a / 4294967296; }; })();
@@ -135,14 +142,14 @@ const gateAt = 4 * wz + 3 * wx - 3 * cornerLoss; // centre of the front edge
       scene.add(im);
     };
     const outside = (): [number, number] | null => {
-      const x = (rnd() - 0.5) * 34, z = (rnd() - 0.5) * 40 + 4;
+      const x = (rnd() - 0.5) * 20, z = (rnd() - 0.5) * 44 + 4;
       return Math.abs(x) < wx + 0.8 && Math.abs(z) < wz + 0.8 ? null : [x, z];
     };
-    scatter('tuft', 70, outside);
+    scatter('tuft', 110, outside);
     scatter('pebble', 50, outside);
-    scatter('snowClump', 60, outside);
+    scatter('snowClump', 90, outside);
     scatter('twig', 25, outside);
-    scatter('footprint', 26, () => { const t = rnd(); return [(-3) * Math.max(0, (t - 0.3) / 0.7) + (rnd() - 0.5) * 1.2, wz + 0.5 + t * 16]; });
+    scatter('footprint', 40, () => { const t = rnd(); return [(-3) * Math.max(0, (t - 0.3) / 0.7) + (rnd() - 0.5) * 1.2, wz + 0.5 + t * 16]; });
     scatter('woodChip', 40, () => [-0.6 + (rnd() - 0.5) * 3, -wz + 1.8 + rnd() * 1.6]);
   }
 
