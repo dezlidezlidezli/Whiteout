@@ -46,6 +46,14 @@ export class Sim {
   private solidCache: Solid[] | null = null;
   private rectCache: Rect[] | null = null;
   private padTickT = 0;
+  private allCache: Solid[] | null = null;
+  private allCacheBase: Solid[] | null = null;
+  private allCacheVer = -1;
+  /** Bumped whenever a node falls or regrows (invalidates allSolids). */
+  private nodeVer = 0;
+  private reachBuf: StationDef[] = [];
+  private reachDist: number[] = [];
+  private reachTick = -1;
 
   constructor(data: GameData, opts: { seed?: number; save?: string } = {}) {
     this.data = data;
@@ -142,6 +150,8 @@ export class Sim {
     this.state = st;
     this.solidCache = null;
     this.rectCache = null;
+    this.allCache = null;
+    this.reachTick = -1;
     this.refreshPads(false);
   }
 
@@ -218,7 +228,12 @@ export class Sim {
   /** Solids including currently standing trees. */
   allSolids(): Solid[] {
     const base = this.solids();
+    // Cached until the static solids or any tree's standing state changes (no per-step garbage).
+    if (this.allCache && this.allCacheBase === base && this.allCacheVer === this.nodeVer) return this.allCache;
     const out = base.slice();
+    this.allCache = out;
+    this.allCacheBase = base;
+    this.allCacheVer = this.nodeVer;
     for (const d of this.data.stations) {
       if (d.type !== 'node' || !d.solid || !('r' in d.solid)) continue;
       const st = this.state.stations[d.id] as NodeState;
@@ -482,6 +497,7 @@ export class Sim {
     st.hits++;
     if (st.hits >= def.hits) {
       st.alive = false;
+      this.nodeVer++;
       st.hits = 0;
       st.work = 0;
       st.regrow = def.regrow;
@@ -490,8 +506,14 @@ export class Sim {
   }
 
   private stationsInReach(): StationDef[] {
+    // Reused buffers, computed once per step (drop and pick share it): no per-step garbage.
+    if (this.reachTick === this.state.tick) return this.reachBuf;
+    this.reachTick = this.state.tick;
     const p = this.state.player;
-    const out: { d: StationDef; dist: number }[] = [];
+    const out = this.reachBuf;
+    const ds = this.reachDist;
+    out.length = 0;
+    ds.length = 0;
     for (const d of this.data.stations) {
       if (d.type === 'node') {
         const st = this.state.stations[d.id] as NodeState;
@@ -500,10 +522,19 @@ export class Sim {
       const dist = Math.hypot(d.x - p.x, d.z - p.z);
       if (dist > d.reach) continue;
       if (!this.isUsable(d.id)) continue;
-      out.push({ d, dist });
+      // Insertion sort by distance (only a handful of entries).
+      let i = out.length;
+      out.push(d);
+      ds.push(dist);
+      while (i > 0 && ds[i - 1] > dist) {
+        out[i] = out[i - 1];
+        ds[i] = ds[i - 1];
+        i--;
+      }
+      out[i] = d;
+      ds[i] = dist;
     }
-    out.sort((a, b) => a.dist - b.dist);
-    return out.map((o) => o.d);
+    return out;
   }
 
   private playerDrop(): boolean {
@@ -737,6 +768,7 @@ export class Sim {
           ns.regrow -= dt;
           if (ns.regrow <= 0) {
             ns.alive = true;
+            this.nodeVer++;
             ns.hits = 0;
             this.emit({ type: 'nodeRegrow', node: d.id });
           }
