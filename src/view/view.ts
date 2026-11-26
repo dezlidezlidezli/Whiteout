@@ -262,6 +262,34 @@ export class View {
     this.sun.target.updateMatrixWorld();
   }
 
+  /**
+   * Compile every shader the game can show before play starts (during the splash): reveal all
+   * hidden objects, fire one of each effect off-screen, render once, then restore.
+   */
+  warmup(): void {
+    const hidden: THREE.Object3D[] = [];
+    this.scene.traverse((o) => {
+      if (!o.visible) {
+        hidden.push(o);
+        o.visible = true;
+      }
+    });
+    const far = 400;
+    this.fx.ring(far, far, 1, 0xffffff, 0.05);
+    this.fx.shatter(far, 0, far, 1);
+    this.fx.puff(far, 0, far, 1);
+    this.fx.glint(far, 0, far, 1);
+    this.fx.vapour('steam', far, 0, far);
+    this.fx.vapour('smoke', far, 0, far);
+    this.fx.update(0.001);
+    try {
+      this.renderer.compile(this.scene, this.rig.camera);
+      this.renderer.render(this.scene, this.rig.camera);
+    } finally {
+      for (const o of hidden) o.visible = false;
+    }
+  }
+
   setSnow(level: 0 | 1 | 2): void {
     this.snow.setLevel(level);
   }

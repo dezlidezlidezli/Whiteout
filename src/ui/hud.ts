@@ -52,6 +52,8 @@ export class Hud {
   private toasts: HTMLDivElement;
   private floaters: HTMLDivElement;
   private hint: HTMLDivElement;
+  /** Five taps on the population pill. */
+  onSecretTap: () => void = () => {};
   private shownEmbers = 0;
   private targetEmbers = 0;
   private lastPop = -1;
@@ -87,6 +89,20 @@ export class Hud {
     this.popPill = h('div', 'fk-pill fk-pop', `<span class="fk-ico">${ICON_PEOPLE}</span>`);
     this.popEl = h('span', '', '0');
     this.popPill.appendChild(this.popEl);
+    // Hidden diagnostics toggle: five quick taps on the population pill.
+    this.popPill.setAttribute('data-ui', '');
+    this.popPill.style.pointerEvents = 'auto';
+    let taps = 0;
+    let tapT = 0;
+    this.popPill.addEventListener('pointerdown', () => {
+      const now = performance.now();
+      taps = now - tapT < 600 ? taps + 1 : 1;
+      tapT = now;
+      if (taps >= 5) {
+        taps = 0;
+        this.onSecretTap();
+      }
+    });
     const gear = h('button', 'fk-btn', ICON_GEAR);
     gear.setAttribute('data-ui', '');
     gear.setAttribute('aria-label', 'Settings');

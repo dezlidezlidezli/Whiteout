@@ -132,6 +132,7 @@ function newGame(): void {
 }
 
 view.setSnow(snowLevel);
+view.warmup();
 const autoQ = new AutoQuality(() => view.lowerResolution());
 autoQ.enabled = qualityMode === 'auto';
 
@@ -182,7 +183,13 @@ if (showTitle) {
     },
   });
 }
-const debug = params.get('debug') === '1' ? new DebugOverlay(uiRoot) : null;
+let debug: DebugOverlay | null = null;
+function toggleDebug(): void {
+  if (debug) debug.toggle();
+  else debug = new DebugOverlay(uiRoot, frameStats, () => `tier ${view.quality} dpr ${view.dpr.toFixed(2)} ${canvas.width}x${canvas.height} refresh ${(1 / refresh).toFixed(0)}Hz`);
+}
+if (params.get('debug') === '1') toggleDebug();
+hud.onSecretTap = toggleDebug;
 // Extra unlock paths (some browsers only count click/touchend as activation).
 for (const ev of ['touchend', 'click', 'keydown'] as const) {
   window.addEventListener(ev, () => audio.unlock(), { passive: true });
@@ -224,6 +231,7 @@ installLifecycle(canvas, {
     (window.__fk as FkDebug).view = view;
     if (title) view.setTitle(true, true);
     view.setSnow(snowLevel);
+    view.warmup();
     lost = false;
   },
 });
