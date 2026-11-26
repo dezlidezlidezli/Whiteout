@@ -310,6 +310,9 @@ const cheat = {
   },
   /** Frame-time summary over the last n frames (perf tests / debug). */
   perf: (n = 600) => frameStats.summary(n),
+  perfReset: () => {
+    frameStats.count = 0;
+  },
   /** Deterministic JS profile: n iterations of (1 sim step + view frame + hud), timings in ms. */
   bench: (n = 300, render = false) => {
     view.skipRender = !render;
@@ -383,13 +386,14 @@ function loop(now: number): void {
   const dtMs = dt * 1000;
   acc += dt * timeScale;
   let steps = 0;
-  while (acc >= STEP && steps < MAX_STEPS) {
+  const maxSteps = Math.ceil(MAX_STEPS * Math.max(1, timeScale)); // debug timescale may run faster
+  while (acc >= STEP && steps < maxSteps) {
     if (autoplay) pilot.update(sim, STEP);
     sim.step(STEP);
     acc -= STEP;
     steps++;
   }
-  if (steps >= MAX_STEPS && acc >= STEP) acc = acc % STEP; // drop the backlog instead of fast-forwarding
+  if (steps >= maxSteps && acc >= STEP) acc = acc % STEP; // drop the backlog instead of fast-forwarding
   const events = sim.drainEvents();
   if (events.length) {
     view.handleEvents(events);

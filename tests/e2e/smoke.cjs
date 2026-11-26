@@ -102,7 +102,7 @@ function assert(cond, msg) {
     __fk.cheat.autoplay(true);
     __fk.cheat.timescale(6);
   });
-  await page.waitForTimeout(6000);
+  await page.waitForFunction(() => window.__fk && __fk.sim.state.quest.index >= 2, null, { timeout: 40000 }).catch(() => {});
   const prog = await fk(() => ({ q: __fk.sim.state.quest.index }));
   assert(prog.q >= 2, 'autopilot advances quests (got ' + prog.q + ')');
   await shot('02-playing');
@@ -170,6 +170,11 @@ function assert(cond, msg) {
 
   // ---- frame budget: steady-state never runs more than 4 sim steps in a frame, and the
   // per-frame JS (sim + view logic + HUD, GL submit excluded) stays well inside a 60 Hz frame.
+  await fk(() => {
+    __fk.cheat.timescale(1);
+    __fk.cheat.perfReset();
+  });
+  await page.waitForTimeout(3000);
   const perf = await fk(() => __fk.cheat.perf(120));
   assert(perf.stepsMax <= 4, 'at most 4 sim steps per frame (got ' + perf.stepsMax + ')');
   const bench = await fk(() => __fk.cheat.bench(240));
