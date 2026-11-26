@@ -123,11 +123,7 @@ function newGame(): void {
   save();
 }
 
-const autoQ = new AutoQuality(() => {
-  if (view.quality <= 0) return false;
-  view.setQuality((view.quality - 1) as QualityLevel);
-  return true;
-});
+const autoQ = new AutoQuality(() => view.lowerResolution());
 autoQ.enabled = qualityMode === 'auto';
 
 // ---- input
@@ -202,7 +198,7 @@ installLifecycle(canvas, {
   },
   resume: () => {
     paused = false;
-    last = performance.now();
+    last = -1;
     audio.resume();
   },
   contextLost: () => {
@@ -296,6 +292,34 @@ const cheat = {
   },
   /** Frame-time summary over the last n frames (perf tests / debug). */
   perf: (n = 600) => frameStats.summary(n),
+  /** Deterministic JS profile: n iterations of (1 sim step + view frame + hud), timings in ms. */
+  bench: (n = 300, render = false) => {
+    view.skipRender = !render;
+    const a: number[] = [], b: number[] = [], c: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const t0 = performance.now();
+      if (autoplay) pilot.update(sim, STEP);
+      sim.step(STEP);
+      const ev = sim.drainEvents();
+      if (ev.length) view.handleEvents(ev);
+      const t1 = performance.now();
+      view.frame(1, STEP);
+      const t2 = performance.now();
+      hud.update(sim, STEP, (w) => view.project(projV.set(w.x, w.y, w.z)));
+      const t3 = performance.now();
+      a.push(t1 - t0);
+      b.push(t2 - t1);
+      c.push(t3 - t2);
+    }
+    const st = (x: number[]) => {
+      const y = x.slice().sort((p, q) => p - q);
+      const r = (v: number) => Math.round(v * 100) / 100;
+      return { avg: r(x.reduce((p, q) => p + q, 0) / x.length), p95: r(y[Math.floor(y.length * 0.95)]), max: r(y[y.length - 1]) };
+    };
+    view.skipRender = false;
+    const tot = a.map((v, i) => v + b[i] + c[i]);
+    return { sim: st(a), view: st(b), hud: st(c), total: st(tot) };
+  },
   /** Leave the title screen (tests). */
   begin: () => title?.finish(false),
 };
@@ -304,19 +328,28 @@ Object.defineProperty(window.__fk, 'sim', { get: () => sim });
 Object.defineProperty(window.__fk, 'view', { get: () => view, set: (v) => (view = v) });
 
 // ---- main loop
-let last = performance.now();
+let last = -1;
 let acc = 0;
 let firstFrame = true;
-const MAX_STEPS = 240;
+/** Never run more than this many sim steps in one frame: after a hitch we drop time rather than lurch. */
+const MAX_STEPS = 4;
+/** Estimated display refresh interval (s); rAF timestamps are snapped to multiples of it. */
+let refresh = 1 / 60;
 const projV = new THREE.Vector3();
 
 function loop(now: number): void {
   requestAnimationFrame(loop);
+  if (last < 0) last = now;
   let dt = (now - last) / 1000;
   last = now;
   if (paused || lost) return;
-  if (dt > 0.25) dt = 0.25;
-  autoQ.sample(dt);
+  // Frame pacing: learn the display interval (60/120 Hz, or 30 Hz in Low Power Mode) and snap
+  // noisy timestamps to whole multiples of it, so motion advances evenly every frame.
+  if (dt > 0.004 && dt < 0.05) refresh += (Math.min(dt, refresh * 1.5) - refresh) * 0.02;
+  const mult = Math.max(1, Math.round(dt / refresh));
+  if (Math.abs(dt - mult * refresh) < refresh * 0.3) dt = mult * refresh;
+  if (dt > 0.1) dt = 0.1;
+  autoQ.sample(dt, refresh);
   view.frameMs = autoQ.avgMs;
 
   // Input -> sim (autoplay yields to a real touch).
@@ -338,7 +371,7 @@ function loop(now: number): void {
     acc -= STEP;
     steps++;
   }
-  if (steps >= MAX_STEPS) acc = 0;
+  if (steps >= MAX_STEPS && acc >= STEP) acc = acc % STEP; // drop the backlog instead of fast-forwarding
   const events = sim.drainEvents();
   if (events.length) {
     view.handleEvents(events);

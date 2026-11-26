@@ -17,6 +17,10 @@ import {
 
 export const STEP = 1 / 60;
 const MAX_EVENTS = 4000;
+/** Room reported for player drops: effectively unlimited, so a drop is never refused. */
+const PLAYER_ROOM = 9999;
+/** Processor output buffers hold at least this much before the processor pauses. */
+const MIN_OUTPUT_CAP = 60;
 const PLAYER: Actor = { kind: 'player' };
 
 export interface QuestProgress {
@@ -331,11 +335,15 @@ export class Sim {
       case 'processor': {
         const need = this.data.recipes[d.recipe].inputs[item];
         if (!need) return 0;
+        // The player is never refused (no soft-locks); caps are soft targets for helpers/links.
+        if (!byHelper) return PLAYER_ROOM;
         return Math.max(0, d.inputCap - ((st as ProcState).inputs[item] ?? 0));
       }
       case 'counter':
+        if (d.item === item && !byHelper) return PLAYER_ROOM;
         return d.item === item ? Math.max(0, d.cap - (st as CounterState).stock) : 0;
       case 'deposit':
+        if (d.accepts.includes(item) && !byHelper) return PLAYER_ROOM;
         return d.accepts.includes(item) ? Math.max(0, d.cap - (st as DepositState).count) : 0;
       case 'pile':
         return byHelper && d.accepts && d.item === item ? Math.max(0, d.cap - (st as PileState).count) : 0;
@@ -530,17 +538,19 @@ export class Sim {
     }
     // Hand items back to their crate: standing still with a full pack (then keep going until done).
     const still = Math.hypot(this.moveX, this.moveZ) < 0.2;
+    // (Any pile or processor output holding that kind takes it back, uncapped.)
     for (const d of inReach) {
-      if (d.type !== 'pile') continue;
-      const ps = this.state.stations[d.id] as PileState;
-      if (ps.count >= d.cap) continue;
+      if (d.type !== 'pile' && d.type !== 'processor') continue;
+      const kind = d.type === 'pile' ? d.item : this.data.recipes[d.recipe].output;
       if (p.returning !== d.id && !(still && p.stack.length >= p.capacity && p.pickedFrom !== d.id)) continue;
-      const i = p.stack.lastIndexOf(d.item);
+      const i = p.stack.lastIndexOf(kind);
       if (i < 0) continue;
       p.stack.splice(i, 1);
-      ps.count++;
+      const rs = this.state.stations[d.id];
+      if (rs.kind === 'pile') rs.count++;
+      else if (rs.kind === 'processor') rs.output++;
       p.returning = d.id;
-      this.emit({ type: 'drop', item: d.item, to: { kind: 'station', id: d.id }, by: PLAYER, height: i });
+      this.emit({ type: 'drop', item: kind, to: { kind: 'station', id: d.id }, by: PLAYER, height: i });
       return true;
     }
     return false;
@@ -558,7 +568,7 @@ export class Sim {
       const moving = Math.hypot(p.vx, p.vz) > 1.6 && Math.hypot(this.moveX, this.moveZ) > 0.3;
       if (moving && top !== it) continue;
       this.take(d.id);
-      if (d.type === 'pile') p.pickedFrom = d.id;
+      if (d.type === 'pile' || d.type === 'processor') p.pickedFrom = d.id;
       p.stack.push(it);
       this.addStat(`pickup.${it}`, 1);
       const from: Place = d.type === 'node' ? { kind: 'ground', id: d.id } : { kind: 'station', id: d.id };
@@ -747,7 +757,7 @@ export class Sim {
       if (hd && hd.role === 'operate' && hd.station === d.id && h.phase === 'work') helperOp = true;
     }
     st.operated = helperOp || playerNear;
-    let can = st.output + r.outputCount <= d.outputCap;
+    let can = st.output + r.outputCount <= Math.max(d.outputCap, MIN_OUTPUT_CAP);
     for (const k in r.inputs) {
       const kk = k as ItemKind;
       if ((st.inputs[kk] ?? 0) < (r.inputs[kk] ?? 0)) can = false;

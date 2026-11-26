@@ -91,6 +91,8 @@ export class View {
   private music: 'calm' | 'cozy' | 'title' | null = null;
   /** Title screen showing: camera drifts, arrow hidden, title music. */
   title = false;
+  /** Profiling: run all view logic but skip the GL submit. */
+  skipRender = false;
   private lastPop = 0;
   frameMs = 16;
   /** Smoothed CPU time per frame (sim + view + render submit), ms. */
@@ -123,8 +125,8 @@ export class View {
     this.scene.add(this.hemi);
     this.sun = new THREE.DirectionalLight(0xc4d4ff, 1.45);
     this.sun.castShadow = quality >= 1;
-    const sm = quality >= 2 ? 2048 : 1024;
-    this.sun.shadow.mapSize.set(sm, sm);
+    const sm0 = quality >= 2 ? 2048 : 1024;
+    this.sun.shadow.mapSize.set(sm0, sm0);
     const sc = this.sun.shadow.camera;
     sc.left = -15;
     sc.right = 15;
@@ -192,29 +194,80 @@ export class View {
     this.rig.setTitle(on, instant);
   }
 
+  /** Auto-quality resolution scale (0.6..1). Changing it never recompiles anything. */
+  dprScale = 1;
+  private lastSize = '';
+
+  /** Effective device pixel ratio for the current tier and auto scale. */
+  get dpr(): number {
+    const cap = [1.5, 1.75, 2][this.quality];
+    return Math.max(1, Math.min(window.devicePixelRatio || 1, cap) * this.dprScale);
+  }
+
   resize(): void {
     const c = this.renderer.domElement;
     const w = c.clientWidth || window.innerWidth;
     const h = c.clientHeight || window.innerHeight;
-    const cap = [1, 1.5, 2][this.quality];
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, cap));
+    const key = `${w}x${h}@${this.dpr.toFixed(3)}`;
+    if (key === this.lastSize) return;
+    this.lastSize = key;
+    this.renderer.setPixelRatio(this.dpr);
     this.renderer.setSize(w, h, false);
     this.rig.resize(w / Math.max(1, h));
   }
 
+  /** Change tier: Smooth (0), Balanced (1), Pretty (2). Only an explicit user choice calls this. */
   setQuality(q: Quality): void {
     if (q === this.quality) return;
+    const hadShadows = this.quality >= 1;
     this.quality = q;
-    this.renderer.shadowMap.enabled = q >= 1;
-    this.sun.castShadow = q >= 1;
-    this.renderer.shadowMap.needsUpdate = true;
-    this.snow.points.visible = true;
+    const sm = q >= 2 ? 2048 : 1024;
+    if (this.sun.shadow.mapSize.x !== sm) {
+      this.sun.shadow.mapSize.set(sm, sm);
+      this.sun.shadow.map?.dispose();
+      this.sun.shadow.map = null as unknown as THREE.WebGLRenderTarget;
+    }
     this.resize();
-    // Materials need recompiling for shadow changes.
-    this.scene.traverse((o) => {
-      const m = (o as THREE.Mesh).material as THREE.Material | undefined;
-      if (m) m.needsUpdate = true;
-    });
+    if (hadShadows !== q >= 1) {
+      this.renderer.shadowMap.enabled = q >= 1;
+      this.sun.castShadow = q >= 1;
+      this.renderer.shadowMap.needsUpdate = true;
+      // Shadow on/off changes shader programs: recompile now, in one go.
+      this.scene.traverse((o) => {
+        const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+        if (Array.isArray(m)) m.forEach((x) => (x.needsUpdate = true));
+        else if (m) m.needsUpdate = true;
+      });
+    }
+  }
+
+  /**
+   * Follow the focus with the shadow camera, snapped to whole shadow-map texels in light space so
+   * shadow edges do not crawl or shimmer while the camera glides.
+   */
+  private placeSun(x: number, z: number): void {
+    const sc = this.sun.shadow.camera;
+    const texel = (sc.right - sc.left) / this.sun.shadow.mapSize.x;
+    // Light basis (fixed direction).
+    const dir = SUN_DIR;
+    const right = SUN_RIGHT;
+    const up = SUN_UP;
+    _v.set(x, 0, z);
+    const r = Math.round(_v.dot(right) / texel) * texel;
+    const u = Math.round(_v.dot(up) / texel) * texel;
+    const f = _v.dot(dir);
+    _w.copy(right).multiplyScalar(r).addScaledVector(up, u).addScaledVector(dir, f);
+    this.sun.target.position.copy(_w);
+    this.sun.position.copy(_w).addScaledVector(dir, -25);
+    this.sun.target.updateMatrixWorld();
+  }
+
+  /** Auto-quality: lower the render resolution a notch (cheap, no recompiles). */
+  lowerResolution(): boolean {
+    if (this.dprScale <= 0.62) return false;
+    this.dprScale = Math.max(0.6, this.dprScale - 0.15);
+    this.resize();
+    return true;
   }
 
   /** Project a world point to CSS pixels. */
@@ -611,8 +664,7 @@ export class View {
     // Camera, lights, weather.
     this.rig.update(dt, px, pz, p.vx, p.vz, p.stack.length);
     const f = this.rig.focus;
-    this.sun.position.set(f.x - 9, 22, f.z + 7);
-    this.sun.target.position.set(f.x, 0, f.z - 2);
+    this.placeSun(f.x, f.z - 2);
     const distHearth = Math.hypot(px - this.data.camp.hearth.x, pz - this.data.camp.hearth.z);
     const wind = Math.max(0, Math.min(1, (distHearth - this.radius + 2) / 14));
     this.snow.update(t, f, this.renderer.getPixelRatio(), 0.35 + wind * 0.6);
@@ -686,7 +738,7 @@ export class View {
     if (s.population !== this.lastPop) this.lastPop = s.population;
 
     this.sky.update(t, this.rig.camera.position);
-    this.renderer.render(this.scene, this.rig.camera);
+    if (!this.skipRender) this.renderer.render(this.scene, this.rig.camera);
   }
 
   private drawBuffers(t: number): void {
@@ -714,10 +766,10 @@ export class View {
         kinds.forEach((k, i) => {
           const n = (st.inputs[k] ?? 0) - (this.hidden.get(`st:${d.id}:${k}`) ?? 0);
           const off = (i - (kinds.length - 1) / 2) * 0.55;
-          items.grid(k, Math.max(0, n), _v.x + Math.cos(yaw) * off, 0.02, _v.z - Math.sin(yaw) * off, yaw, 5, kinds.length > 1 ? 1 : 2, 0.42);
+          items.grid(k, Math.max(0, n), _v.x + Math.cos(yaw) * off, 0.02, _v.z - Math.sin(yaw) * off, yaw, n > 12 ? 6 : 5, kinds.length > 1 ? 1 : n > 12 ? 3 : 2, 0.42);
         });
         this.world.itemSpot(d.id, r.output, _w, 'out');
-        items.grid(r.output, st.output, _w.x, 0.02, _w.z, yaw, 5, 2, 0.42);
+        items.grid(r.output, st.output, _w.x, 0.02, _w.z, yaw, st.output > 12 ? 6 : 5, st.output > 12 ? 3 : 2, 0.42);
       } else if (st.kind === 'counter' && d.type === 'counter') {
         const n = st.stock - (this.hidden.get(`st:${d.id}:${d.item}`) ?? 0);
         this.world.itemSpot(d.id, d.item, _v, 'in');
@@ -831,6 +883,10 @@ function makeFuelBubble(): THREE.Sprite {
   sp.visible = false;
   return sp;
 }
+
+const SUN_DIR = new THREE.Vector3(9, -22, -7).normalize();
+const SUN_RIGHT = new THREE.Vector3().crossVectors(SUN_DIR, new THREE.Vector3(0, 1, 0)).normalize();
+const SUN_UP = new THREE.Vector3().crossVectors(SUN_RIGHT, SUN_DIR).normalize();
 
 function pathPoint(path: { x: number; z: number }[], p: number, out: THREE.Vector3): THREE.Vector3 {
   let total = 0;

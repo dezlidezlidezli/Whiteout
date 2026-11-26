@@ -6,39 +6,41 @@ export function detectQuality(): QualityLevel {
   const ua = navigator.userAgent;
   const mobile = /iPhone|iPad|iPod|Android/i.test(ua) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(ua));
   const cores = navigator.hardwareConcurrency || 4;
-  const mem = (navigator as unknown as { deviceMemory?: number }).deviceMemory ?? 4;
   if (!mobile) return cores >= 4 ? 2 : 1;
-  // Recent iPhones handle "high" (we cap DPR at 2 anyway); older/low-memory devices start lower.
-  if (mem < 3 || cores < 4) return 1;
-  return 2;
+  // Phones: fill rate at DPR 3 is the limit, so start on Balanced (DPR 1.75, small shadow map).
+  return 1;
 }
 
-/** Watches frame times and steps quality down (never up automatically) when it stays poor. */
+/**
+ * Watches frame times and lowers the render resolution (never the tier, never upward) when frames
+ * stay slow. Hysteresis: needs 3 slow seconds in a row, then waits 8 s before judging again.
+ */
 export class AutoQuality {
   private acc = 0;
   private n = 0;
   private slowFor = 0;
-  private cooldown = 4;
+  private cooldown = 5;
   enabled = true;
   /** Rolling average frame time, ms. */
   avgMs = 16.7;
 
   constructor(private onLower: () => boolean) {}
 
-  sample(dtSec: number): void {
-    if (dtSec <= 0 || dtSec > 0.5) return; // tab switches etc.
+  /** `refreshSec` = the display interval main has learned (1/60, 1/120, 1/30 in Low Power Mode). */
+  sample(dtSec: number, refreshSec = 1 / 60): void {
+    if (dtSec <= 0 || dtSec > 0.5) return;
     this.acc += dtSec;
     this.n++;
     this.cooldown -= dtSec;
     if (this.acc < 1) return;
     this.avgMs = (this.acc / this.n) * 1000;
-    const slow = this.avgMs > 24;
     this.acc = 0;
     this.n = 0;
-    this.slowFor = slow ? this.slowFor + 1 : 0;
+    // Slow = clearly missing the display's own cadence (so 30 Hz Low Power Mode is not "slow").
+    this.slowFor = this.avgMs > Math.max(refreshSec, 1 / 60) * 1000 * 1.35 ? this.slowFor + 1 : 0;
     if (this.enabled && this.cooldown <= 0 && this.slowFor >= 3) {
       this.slowFor = 0;
-      this.cooldown = 6;
+      this.cooldown = 8;
       this.onLower();
     }
   }

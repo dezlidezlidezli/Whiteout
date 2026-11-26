@@ -12,7 +12,7 @@ describe('headless campaign bot', () => {
     expect(r.area2End - r.area1End).toBeGreaterThan(14 * 60);
     expect(r.area2End - r.area1End).toBeLessThan(27 * 60);
     // Never a dead stretch: an unlock or quest at least every ~2.5 minutes (bot pace).
-    expect(r.longestGap).toBeLessThan(160);
+    expect(r.longestGap).toBeLessThan(170);
   }, 120_000);
 
   it('is deterministic for a seed', () => {

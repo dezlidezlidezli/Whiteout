@@ -11,8 +11,12 @@ import * as THREE from 'three';
 import {
   PROP_NAMES, PALETTE, FROZEN_TINTS, animateCharacter, createCharacter, createProp, getCrowdMesh, getItemMesh,
   type CharacterAnimState, type CharacterRig, type CharacterRole, type ItemKind,
+  createConveyorPath, createFencePath, createWallPath, createPathStrip, createLanternStringPath, createFloor, getScatterMesh,
+  type ScatterKind, type FloorType, type XZ,
 } from '../view/models';
 import { triCount } from '../view/models/geo';
+import { buildYard } from './yard';
+import { runAnimTest } from './animtest';
 
 const q = new URLSearchParams(location.search);
 const sheet = q.get('sheet') ?? 'characters';
@@ -183,6 +187,68 @@ function buildEntries(): Entry[] {
       const o = new THREE.Mesh(d.geometry, d.material);
       E.push({ label: '', obj: o, radius: 0.36, center: new THREE.Vector3(0, 0.08, 0) });
     }
+  } else if (sheet === 'kit') {
+    const CLUTTER = ['crateStack', 'barrelCluster', 'sackPile', 'firewoodRack', 'dryingRack', 'supplySled', 'toolRack', 'washTub', 'basketPile', 'potShelf', 'signBoard', 'rugMat', 'snowBank', 'bush', 'sapling', 'fallenLog', 'iceShards', 'footpathStones', 'lampPost', 'bannerLine', 'woodenArch', 'watchTower', 'snowyBoulderCluster'];
+    for (const name of CLUTTER) {
+      const g = new THREE.Group();
+      for (let i = 0; i < 3; i++) { const w = createProp(name, { seed: i }); w.rotation.y = 0; w.scale.setScalar(1); g.add(w); }
+      // lay the three variants out side by side using their footprint
+      const R = Math.max(0.6, ...g.children.map((c) => Number(c.userData.radius ?? (c.userData.size?.[0] ?? 1.2) / 2)));
+      g.children.forEach((c, i) => { c.position.x = (i - 1) * R * 2.2; });
+      list0(E, { label: `${name} ×3`, sub: `~${Math.round(triCount(g) / 3)} tris${g.children[0].userData.decor ? ' · decor' : ''}`, obj: g });
+    }
+    for (const t of ['planks', 'cobble', 'packedEarth', 'ice', 'stone'] as FloorType[]) {
+      const f = createFloor(t, 5, 4, { seed: 1 });
+      E.push({ label: `floor · ${t}`, sub: `${triCount(f)} tris`, obj: f });
+    }
+    const S: XZ[] = [[-3, -2], [-3, 0], [0, 0], [0, 2], [3, 2]];
+    for (const t of ['trampled', 'planks', 'cobble', 'ice'] as const) {
+      const o = createPathStrip(S, { type: t, width: 1.6, radius: 1.5 });
+      E.push({ label: `path strip · ${t}`, sub: `${triCount(o)} tris`, obj: o });
+    }
+    const loop: XZ[] = [[-3, -2], [3, -2], [3, 2], [-3, 2], [-3, -2]];
+    E.push({ label: 'fence path', obj: createFencePath([[-3, -1], [0, -1], [2, 1], [2, 3]], { radius: 1.5 }) });
+    E.push({ label: 'wall path (palisade + gate gap)', obj: createWallPath(loop, { radius: 0.6, gaps: [{ at: 3, width: 2.4 }] }) });
+    E.push({ label: 'lantern string path', obj: createLanternStringPath([[-4, 0], [0, 0], [3, 3]]) });
+    const sc = new THREE.Group();
+    const kinds: ScatterKind[] = ['tuft', 'pebble', 'snowClump', 'twig', 'woodChip', 'footprint'];
+    kinds.forEach((k, i) => {
+      const d = getScatterMesh(k);
+      const im = new THREE.InstancedMesh(d.geometry, d.material, 12);
+      const m = new THREE.Matrix4();
+      for (let j = 0; j < 12; j++) { m.makeRotationY(j * 1.7); m.setPosition((i % 3) * 1.2 - 1.2 + Math.sin(j * 2.1) * 0.4, 0, Math.floor(i / 3) * 1.2 - 0.6 + Math.cos(j * 1.3) * 0.4); im.setMatrixAt(j, m); }
+      im.castShadow = true; im.receiveShadow = true;
+      sc.add(im);
+    });
+    E.push({ label: 'scatter: tuft pebble snowClump / twig woodChip footprint', obj: sc });
+  } else if (sheet === 'conveyor') {
+    const shapes: [string, XZ[]][] = [
+      ['straight', [[-3, 0], [3, 0]]],
+      ['L-shape', [[-3, -2], [1, -2], [1, 2.5]]],
+      ['S-shape', [[-3, -2], [-1, -2], [-1, 1], [2, 1], [2, 3]]],
+      ['U-turn', [[-1.5, -2.5], [-1.5, 2], [1.5, 2], [1.5, -2.5]]],
+    ];
+    for (const [label, pts] of shapes) {
+      const c = createConveyorPath(pts, { radius: 1.2 });
+      c.setOffset(0.1);
+      const g = new THREE.Group();
+      g.add(c.object);
+      const stew = getItemMesh('stew');
+      for (let d = 0.4; d < c.length; d += 0.9) {
+        const s = c.sample(d);
+        const m = new THREE.Mesh(stew.geometry, stew.material);
+        m.position.set(s.x, c.object.userData.beltY, s.z); m.rotation.y = s.yaw; m.castShadow = true;
+        g.add(m);
+      }
+      E.push({ label: `conveyor · ${label}`, sub: `${triCount(c.object)} tris · ${c.length.toFixed(1)} m`, obj: g });
+    }
+    // flush connection kettle -> counter
+    const g = new THREE.Group();
+    const k = createProp('kettle'); k.position.set(-3, 0, -2); g.add(k);
+    const ct = createProp('counter'); ct.position.set(2.5, 0, 2.2); g.add(ct);
+    const c = createConveyorPath([[-2.1, -2], [1.0, -2], [1.0, 1.0], [2.5, 1.0], [2.5, 1.75]], { radius: 1.0 });
+    g.add(c.object);
+    E.push({ label: 'kettle → counter (L + S)', obj: g });
   } else if (sheet === 'crowdgame') {
     // game-scale check: 60 queued Icebound facing away from the camera (yaw = PI), dusk light
     const viewTint = q.get('tint') === 'view';
@@ -216,6 +282,15 @@ function buildEntries(): Entry[] {
 }
 
 // ---------------------------------------------------------------- renderer & layout
+function list0(E: Entry[], e: Entry) { E.push(e); }
+if (sheet === 'yard') { buildYard(); throw new Error('yard mode'); }
+if (sheet === 'animtest') {
+  const res = runAnimTest();
+  (window as unknown as { __animtest: unknown; __ready: boolean }).__animtest = res;
+  (window as unknown as { __ready: boolean }).__ready = true;
+  document.body.innerHTML = `<pre style="color:#fff">${JSON.stringify(res, null, 1)}</pre>`;
+  throw new Error('animtest done');
+}
 const entries = buildEntries();
 const width = Number(q.get('width') ?? window.innerWidth);
 const cellW0 = Number(q.get('cell') ?? (focus ? width : 320));

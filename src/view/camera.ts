@@ -15,6 +15,8 @@ export class CameraRig {
   /** Extra zoom-out (0..1) e.g. for big moments. */
   private punch = 0;
   private bias = -1.2;
+  private vx = 0;
+  private vz = 0;
   /** 1 = title drift, 0 = gameplay; eases between. */
   private titleBlend = 0;
   private titleWant = 0;
@@ -79,9 +81,13 @@ export class CameraRig {
     // Look-ahead in the direction of travel; keep the player a little below centre.
     // In the yard, lean the view towards the counters so the hungry crowd stays on screen.
     const bias = Math.max(-1.2, Math.min(2.4, (pz - 7) * 0.45));
-    this.bias += (bias - this.bias) * Math.min(1, dt * 2);
-    const ax = px + vx * 0.32;
-    const az = pz + vz * 0.32 + this.bias;
+    this.bias += (bias - this.bias) * (1 - Math.exp(-dt * 2));
+    // Look-ahead from a smoothed velocity so starting/stopping never lurches the view.
+    const kv = 1 - Math.exp(-dt * 3);
+    this.vx += (vx - this.vx) * kv;
+    this.vz += (vz - this.vz) * kv;
+    const ax = px + this.vx * 0.32;
+    const az = pz + this.vz * 0.32 + this.bias;
     let tx = ax;
     let tz = az;
     if (this.pan) {

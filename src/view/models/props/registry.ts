@@ -8,6 +8,7 @@ import * as nature from './nature';
 import * as stations from './stations';
 import * as lm from './landmarks';
 import * as decor from './decor';
+import * as clutter from './clutter';
 
 type Factory = (level: number, seed: number) => PropSpec;
 /** Which option each prop varies by (for cache keys). */
@@ -57,10 +58,35 @@ const F: Record<string, { f: Factory; by?: 'level' | 'seed'; seeds?: number }> =
   campfireRing: { f: () => decor.campfireRing() },
   caravan: { f: () => decor.caravan() },
   aurora: { f: () => decor.aurora() },
+  crateStack: { f: (_l, s) => clutter.crateStack(s), by: 'seed', seeds: 3 },
+  barrelCluster: { f: (_l, s) => clutter.barrelCluster(s), by: 'seed', seeds: 3 },
+  sackPile: { f: (_l, s) => clutter.sackPile(s), by: 'seed', seeds: 3 },
+  firewoodRack: { f: (_l, s) => clutter.firewoodRack(s), by: 'seed', seeds: 3 },
+  dryingRack: { f: (_l, s) => clutter.dryingRack(s), by: 'seed', seeds: 3 },
+  supplySled: { f: (_l, s) => clutter.supplySled(s), by: 'seed', seeds: 3 },
+  toolRack: { f: (_l, s) => clutter.toolRack(s), by: 'seed', seeds: 3 },
+  washTub: { f: (_l, s) => clutter.washTub(s), by: 'seed', seeds: 3 },
+  basketPile: { f: (_l, s) => clutter.basketPile(s), by: 'seed', seeds: 3 },
+  potShelf: { f: (_l, s) => clutter.potShelf(s), by: 'seed', seeds: 3 },
+  signBoard: { f: (_l, s) => clutter.signBoard(s), by: 'seed', seeds: 3 },
+  rugMat: { f: (_l, s) => clutter.rugMat(s), by: 'seed', seeds: 3 },
+  snowBank: { f: (_l, s) => clutter.snowBank(s), by: 'seed', seeds: 3 },
+  bush: { f: (_l, s) => clutter.bush(s), by: 'seed', seeds: 3 },
+  sapling: { f: (_l, s) => clutter.sapling(s), by: 'seed', seeds: 3 },
+  fallenLog: { f: (_l, s) => clutter.fallenLog(s), by: 'seed', seeds: 3 },
+  iceShards: { f: (_l, s) => clutter.iceShards(s), by: 'seed', seeds: 3 },
+  footpathStones: { f: (_l, s) => clutter.footpathStones(s), by: 'seed', seeds: 3 },
+  lampPost: { f: (_l, s) => clutter.lampPost(s), by: 'seed', seeds: 3 },
+  bannerLine: { f: (_l, s) => clutter.bannerLine(s), by: 'seed', seeds: 3 },
+  woodenArch: { f: (_l, s) => clutter.woodenArch(s), by: 'seed', seeds: 3 },
+  watchTower: { f: (_l, s) => clutter.watchTower(s), by: 'seed', seeds: 3 },
+  snowyBoulderCluster: { f: (_l, s) => clutter.snowyBoulderCluster(s), by: 'seed', seeds: 3 },
 };
 
 export const PROP_NAMES = Object.keys(F);
-const NO_RANDOM_YAW = new Set(['frostWall', 'fence', 'tent', 'cabin', 'flagPole', 'marketStall']);
+const NO_RANDOM_YAW = new Set(['frostWall', 'fence', 'tent', 'cabin', 'flagPole', 'marketStall', 'snowBank', 'bannerLine', 'woodenArch', 'watchTower', 'firewoodRack', 'dryingRack', 'toolRack', 'potShelf', 'signBoard', 'lampPost', 'rugMat']);
+/** Purely decorative props: no collision expected. */
+const DECOR = new Set(['rugMat', 'snowBank', 'bush', 'sapling', 'iceShards', 'footpathStones', 'bannerLine', 'basketPile', 'signBoard', 'snowDrift', 'aurora', 'lanternString', 'flagPole']);
 
 function placeholder(): PropSpec {
   const b = new Builder().add(bevel(1, 1, 1, 0.12), 0xff44cc, { p: [0, 0.5, 0] });
@@ -89,6 +115,7 @@ export function buildProp(name: string, opts: ModelOpts = {}): THREE.Object3D {
   }
   const g = instantiate(name, def);
   g.userData.prop = name;
+  if (DECOR.has(name)) g.userData.decor = true;
   if (e?.by === 'seed') {
     // extra free variation from the full seed: yaw + slight scale
     const s = opts.seed ?? 0;

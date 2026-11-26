@@ -25,7 +25,9 @@ export type PropName =
   // endless-mode decor & extras
   | 'emberPile' // opts.level 1..4 (small -> large heap)
   | 'flagPole' | 'lanternString' | 'statue' | 'well' | 'sleighBell' | 'iceSculpture' | 'marketStall'
-  | 'campfireRing' | 'caravan' | 'aurora';
+  | 'campfireRing' | 'caravan' | 'aurora'
+  // density kit / yard clutter (opts.seed picks a variant)
+  | 'crateStack' | 'barrelCluster' | 'sackPile' | 'firewoodRack' | 'dryingRack' | 'supplySled' | 'toolRack' | 'washTub' | 'basketPile' | 'potShelf' | 'signBoard' | 'rugMat' | 'snowBank' | 'bush' | 'sapling' | 'fallenLog' | 'iceShards' | 'footpathStones' | 'lampPost' | 'bannerLine' | 'woodenArch' | 'watchTower' | 'snowyBoulderCluster';
 
 export interface ModelOpts {
   level?: number;
@@ -101,3 +103,34 @@ export { mats as getSharedMaterials } from './materials';
 export { PROP_NAMES } from './props/registry';
 /** Central character style table (colours/hat/tool per role). */
 export { CHARACTER_STYLES } from './characters';
+
+// ---------------------------------------------------------------- paths, floors, scatter (additive API)
+export type { XZ, PathSample, GroundPath, Station, SweepOpts } from './paths';
+export type { ConveyorPath, ConveyorPathOpts, FencePathOpts, WallPathOpts, PathStripOpts, StripType, LanternStringPathOpts } from './pathkit';
+export type { FloorType, FloorOpts, ScatterKind } from './floor';
+import { groundPath as _groundPath, sweep as _sweep, type XZ as _XZ, type GroundPath as _GroundPath, type SweepOpts as _SweepOpts } from './paths';
+import {
+  conveyorPath as _conveyorPath, fencePath as _fencePath, wallPath as _wallPath, pathStrip as _pathStrip, lanternStringPath as _lanternStringPath,
+  type ConveyorPath as _ConveyorPath, type ConveyorPathOpts as _ConveyorPathOpts, type FencePathOpts as _FencePathOpts,
+  type WallPathOpts as _WallPathOpts, type PathStripOpts as _PathStripOpts, type LanternStringPathOpts as _LanternStringPathOpts,
+} from './pathkit';
+import { floor as _floor, scatterMesh as _scatterMesh, type FloorType as _FloorType, type FloorOpts as _FloorOpts, type ScatterKind as _ScatterKind } from './floor';
+
+/** Polyline on the ground with arc-filleted corners: `length` and `sample(distance) -> { x, z, yaw }`. */
+export function createGroundPath(points: _XZ[], radius = 1.0): _GroundPath { return _groundPath(points, radius); }
+/** Sweep a [lateral, height] cross-section along a ground path (vertex-coloured, non-indexed geometry). */
+export function sweepPath(path: _GroundPath, profile: [number, number][], opts?: _SweepOpts): THREE.BufferGeometry { return _sweep(path, profile, opts); }
+/** One continuous conveyor through `points` (rounded corners). Items ride at object.userData.beltY using sample(d). */
+export function createConveyorPath(points: _XZ[], opts?: _ConveyorPathOpts): _ConveyorPath { return _conveyorPath(points, opts); }
+/** Post-and-rail fence following a path; posts at even spacing (also through curves). */
+export function createFencePath(points: _XZ[], opts?: _FencePathOpts): THREE.Object3D { return _fencePath(points, opts); }
+/** Log palisade (~1.6 m) with snow caps; `gaps: [{ at: distanceAlongPath, width }]` make gateways. */
+export function createWallPath(points: _XZ[], opts?: _WallPathOpts): THREE.Object3D { return _wallPath(points, opts); }
+/** Ground strip just above y = 0: trampled snow, plank boardwalk, cobbles or ice. */
+export function createPathStrip(points: _XZ[], opts?: _PathStripOpts): THREE.Object3D { return _pathStrip(points, opts); }
+/** Posts every ~4 m with sagging strings of warm lanterns (userData.lightPositions). */
+export function createLanternStringPath(points: _XZ[], opts?: _LanternStringPathOpts): THREE.Object3D { return _lanternStringPath(points, opts); }
+/** Warm yard floor slab with a kerb (one draw call), centred on the origin. */
+export function createFloor(type: _FloorType, width: number, depth: number, opts?: _FloorOpts): THREE.Object3D { return _floor(type, width, depth, opts); }
+/** Tiny ground scatter for InstancedMesh (same shape as getItemMesh). */
+export function getScatterMesh(kind: _ScatterKind): ItemMeshDef { return _scatterMesh(kind); }

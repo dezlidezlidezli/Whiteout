@@ -128,7 +128,7 @@ export class WorldView {
     this.stations.set('hearth', { def: hd, obj: new THREE.Group(), ghost: null, top: 1, appear: 1, shown: true, wobble: 0 });
     // A fixed pool of warm point lights that follows the nearest working fires (constant light
     // count = no shader recompiles; cheap on mobile).
-    const poolN = quality >= 1 ? 2 : 1;
+    const poolN = 1; // one warm light + the hearth: every lit fragment pays per light
     for (let i = 0; i < poolN; i++) {
       const l = new THREE.PointLight(0xffa860, 0, 6, 1.8);
       l.castShadow = false;

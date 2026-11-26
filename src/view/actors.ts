@@ -78,6 +78,7 @@ interface HelperView {
   yaw: number;
   top: THREE.Vector3;
   appear: number;
+  speed: number;
 }
 
 export class Actors {
@@ -85,6 +86,7 @@ export class Actors {
   readonly playerSpring = new StackSpring();
   readonly playerTop = new THREE.Vector3();
   private playerYaw = Math.PI;
+  private animSpeed = 0;
   private helpers = new Map<string, HelperView>();
   private parent: THREE.Object3D;
   private data: GameData;
@@ -111,7 +113,7 @@ export class Actors {
       const rig = createCharacter(role, { seed: id.length });
       rig.root.position.set(h.x, 0, h.z);
       this.parent.add(rig.root);
-      v = { rig, spring: new StackSpring(), yaw: h.facing, top: new THREE.Vector3(h.x, 1.5, h.z), appear: 0 };
+      v = { rig, spring: new StackSpring(), yaw: h.facing, top: new THREE.Vector3(h.x, 1.5, h.z), appear: 0, speed: 0 };
       this.helpers.set(id, v);
     }
     return v;
@@ -122,8 +124,11 @@ export class Actors {
     const p = s.player;
     const x = p.px + (p.x - p.px) * alpha;
     const z = p.pz + (p.z - p.pz) * alpha;
-    const speed = Math.hypot(p.vx, p.vz);
-    if (speed > 0.3) this.playerYaw = lerpAngle(this.playerYaw, p.facing, Math.min(1, dt * 14));
+    const rawSpeed = Math.hypot(p.vx, p.vz);
+    // Smoothed speed for animation so analog changes and start/stop never snap the walk cycle.
+    this.animSpeed += (rawSpeed - this.animSpeed) * (1 - Math.exp(-dt * 10));
+    const speed = this.animSpeed < 0.05 ? 0 : this.animSpeed;
+    if (rawSpeed > 0.3) this.playerYaw = lerpAngle(this.playerYaw, p.facing, 1 - Math.exp(-dt * 14));
     const r = this.player.root;
     r.position.set(x, 0, z);
     r.rotation.y = this.playerYaw;
@@ -139,14 +144,16 @@ export class Actors {
       const v = this.ensureHelper(id, h);
       const hx = h.px + (h.x - h.px) * alpha;
       const hz = h.pz + (h.z - h.pz) * alpha;
-      const hs = Math.hypot(h.x - h.px, h.z - h.pz) / (1 / 60);
-      v.yaw = lerpAngle(v.yaw, h.facing, Math.min(1, dt * 10));
+      const hsRaw = h.moving ? Math.hypot(h.x - h.px, h.z - h.pz) / (1 / 60) : 0;
+      v.speed += (hsRaw - v.speed) * (1 - Math.exp(-dt * 10));
+      const hs = v.speed < 0.05 ? 0 : v.speed;
+      v.yaw = lerpAngle(v.yaw, h.facing, 1 - Math.exp(-dt * 10));
       v.rig.root.position.set(hx, 0, hz);
       v.rig.root.rotation.y = v.yaw;
       v.appear = Math.min(1, v.appear + dt / 0.5);
       const sc = v.appear < 1 ? 0.2 + 0.8 * (1 + 2.2 * Math.pow(v.appear - 1, 3) + 1.2 * Math.pow(v.appear - 1, 2)) : 1;
       v.rig.root.scale.setScalar(sc);
-      animateCharacter(v.rig, { time: time + id.length, speed: h.moving ? hs : 0, carrying: h.stack.length > 0, action: h.action });
+      animateCharacter(v.rig, { time: time + id.length, speed: hs, carrying: h.stack.length > 0, action: h.action });
       v.rig.root.updateMatrixWorld(true);
       v.spring.update(dt, h.moving ? Math.sin(v.yaw) * hs : 0, h.moving ? Math.cos(v.yaw) * hs : 0, v.yaw, h.stack.length);
       drawStack(items, h.stack, this.hidden.get(`helper:${id}`) ?? 0, v.rig.carryAnchor, v.yaw, v.spring, time, v.top);

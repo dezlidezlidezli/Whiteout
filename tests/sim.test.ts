@@ -378,3 +378,74 @@ describe('save / load', () => {
 });
 
 void walkTo;
+
+describe('no soft-locks', () => {
+  /** Build the reported deadlock: pack full of fish, kettles full in and out, crate full. */
+  function deadlock(): Sim {
+    const sim = fresh();
+    sim.completePad('pad_pack1');
+    sim.completePad('pad_kettleB');
+    for (const id of ['kettleA', 'kettleB']) {
+      const st = sim.state.stations[id] as ProcState;
+      st.inputs.fish = 10;
+      st.output = 60;
+    }
+    (sim.state.stations.crateA as PileState).count = 14;
+    sim.state.player.stack = Array(sim.state.player.capacity).fill('fish');
+    return sim;
+  }
+
+  it('the player can always drop fish into a full kettle', () => {
+    const sim = deadlock();
+    const k = sim.stationDefs.get('kettleA')!;
+    tp(sim, k.x + 1.3, k.z);
+    stand(sim, 2);
+    expect(sim.state.player.stack.filter((i) => i === 'fish').length).toBe(0);
+    expect((sim.state.stations.kettleA as ProcState).inputs.fish).toBeGreaterThan(10);
+  });
+
+  it('a full pack of fish can always be handed back to a full crate', () => {
+    const sim = deadlock();
+    const c = sim.stationDefs.get('crateA')!;
+    tp(sim, c.x + 1.2, c.z);
+    stand(sim, 2);
+    expect(sim.state.player.stack.length).toBe(0);
+    expect((sim.state.stations.crateA as PileState).count).toBeGreaterThan(14);
+  });
+
+  it('the guide arrow points somewhere the fish can actually go', () => {
+    const sim = deadlock();
+    tp(sim, 0, 14);
+    const g = sim.guide()!;
+    expect(g).toBeTruthy();
+    expect(sim.room(g.id, 'fish') > 0 || sim.stationDefs.get(g.id)?.type === 'pile').toBe(true);
+  });
+
+  it('helpers still respect soft caps', () => {
+    const sim = deadlock();
+    expect(sim.room('kettleA', 'fish', true)).toBe(0);
+    expect(sim.room('kettleA', 'fish')).toBeGreaterThan(0);
+  });
+
+  it('property: random play in Area 1 always leaves a useful action', () => {
+    for (let seed = 1; seed <= 6; seed++) {
+      const sim = fresh(seed);
+      sim.completePad('pad_pack1');
+      sim.completePad('pad_kettleB');
+      sim.completePad('pad_counterB');
+      const ids = ['crateA', 'kettleA', 'kettleB', 'counterA', 'counterB'];
+      let r = seed * 7919;
+      const rnd = () => ((r = (r * 48271) % 2147483647) / 2147483647);
+      for (let k = 0; k < 120; k++) {
+        const d = sim.stationDefs.get(ids[Math.floor(rnd() * ids.length)])!;
+        tp(sim, d.x + (rnd() - 0.5) * 2.4, d.z + (d.type === 'counter' ? -1.3 : 1.3));
+        stand(sim, 0.2 + rnd() * 1.5);
+        const p = sim.state.player;
+        // Useful action: some carried item can be dropped somewhere, or something can be picked up.
+        const canDrop = p.stack.some((it) => sim.data.stations.some((s) => sim.isUsable(s.id) && sim.room(s.id, it) > 0));
+        const canPick = p.stack.length < p.capacity && sim.data.stations.some((s) => sim.isUsable(s.id) && !!sim.takeable(s.id));
+        expect(canDrop || canPick || p.stack.length === 0).toBe(true);
+      }
+    }
+  });
+});
