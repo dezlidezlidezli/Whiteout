@@ -156,7 +156,16 @@ export interface DepositDef extends StationBase {
   role: 'fuel' | 'store' | 'orders';
 }
 
-export type StationDef = PileDef | NodeDef | ProcessorDef | CounterDef | DepositDef;
+/**
+ * Spare shelf: holds any mix of item kinds without limit. Entering its zone carrying items sets them all down
+ * (at the normal cadence); entering empty-handed picks them back up (most recently shelved first). The mode is
+ * decided on entering and kept until the player leaves, so nothing ping-pongs. Helpers and links ignore shelves.
+ */
+export interface ShelfDef extends StationBase {
+  type: 'shelf';
+}
+
+export type StationDef = PileDef | NodeDef | ProcessorDef | CounterDef | DepositDef | ShelfDef;
 export type StationType = StationDef['type'];
 
 /** Purely visual/blocking placed prop (fences, decor, cabins). */
@@ -337,46 +346,6 @@ export interface Balance {
   padAccel: number;
 }
 
-// ---- Yard dressing (purely for the view, plus palisade collision) ----
-
-export type FloorType = 'planks' | 'cobble' | 'packedEarth' | 'ice' | 'stone';
-
-/** A floor patch drawn over the snow (later entries draw on top of earlier ones). */
-export interface FloorDef extends Rect {
-  id: string;
-  area: AreaId;
-  type: FloorType;
-}
-
-/** Enclosing palisade: an axis-aligned polyline (gaps = separate polylines). Solid for collision (0.3 m thick). */
-export interface PalisadeDef {
-  id: string;
-  area: AreaId;
-  points: Vec2[];
-}
-
-/** Trampled-snow track or boardwalk linking yards, the camp and frost-wall gateways. */
-export interface PathDef {
-  id: string;
-  kind: 'snow' | 'boardwalk';
-  width: number;
-  points: Vec2[];
-}
-
-/** Where purely decorative (non-colliding) clutter may be scattered. Never overlaps stations, pads, belts,
- * queues, helper homes or courier trails (checked by tests). */
-export interface ClutterZoneDef extends Rect {
-  id: string;
-  area: AreaId;
-}
-
-export interface DressingDef {
-  floors: FloorDef[];
-  walls: PalisadeDef[];
-  paths: PathDef[];
-  clutterZones: ClutterZoneDef[];
-}
-
 /** One kind of caravan order the notice board can post. */
 export interface OrderKindDef {
   item: ItemKind;
@@ -429,6 +398,6 @@ export interface GameData {
   playerStart: Vec2;
   endless: EndlessDef;
   finale: FinaleDef;
-  /** Floors, palisades, paths and clutter zones per area (view dressing; palisades also collide). */
-  dressing: DressingDef;
+  /** Floors, walls, paths, streams, clutter zones and landmarks per area (view dressing; walls also collide). */
+  dressing: import('./dressing').AreaDressing[];
 }

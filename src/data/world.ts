@@ -38,23 +38,25 @@ export const STATIONS: StationDef[] = [
     solid: { r: 1.25 }, reach: 2.5, accepts: ['log'], cap: 40, role: 'fuel',
   },
   // ---- Kettle Yard ----
+  // Frozen stream along the west palisade: fishing holes are the source of fish from the very start.
+  ...streamHoles(),
   {
-    id: 'crateA', type: 'pile', area: 'kettleYard', name: 'Fish crate', model: 'fishCrate', x: -4.4, z: 10.0,
-    solid: { r: 0.75 }, reach: 1.75, item: 'fish', cap: 14, start: 10, refill: 1.25,
+    // Plain storage: a one-off starter stock, never refills; the yard fisher fills it.
+    id: 'crateA', type: 'pile', area: 'kettleYard', name: 'Fish crate', model: 'fishCrate', x: -3.4, z: 13.2,
+    solid: { r: 0.75 }, reach: 1.75, item: 'fish', cap: 14, start: 6, refill: 0, accepts: true,
   },
+  { id: 'shelfYard', type: 'shelf', area: 'kettleYard', name: 'Spare shelf', model: 'storageTable', x: 5.7, z: 15.4, rot: 0,
+    solid: { hw: 0.6, hd: 0.4 }, reach: 1.3 },
   {
-    id: 'kettleA', type: 'processor', area: 'kettleYard', name: 'Kettle', model: 'kettle', x: -1.0, z: 10.0,
+    id: 'kettleA', type: 'processor', area: 'kettleYard', name: 'Kettle', model: 'kettle', x: -2.2, z: 10.0,
     solid: { r: 0.8 }, reach: 1.85, recipe: 'stew', inputCap: 10, outputCap: 10, operator: 'none', speedMod: 'cookSpeed',
   },
   {
-    id: 'kettleB', type: 'processor', area: 'kettleYard', name: 'Second kettle', model: 'kettle', x: 2.6, z: 10.0,
+    id: 'kettleB', type: 'processor', area: 'kettleYard', name: 'Second kettle', model: 'kettle', x: 1.6, z: 10.0,
     solid: { r: 0.8 }, reach: 1.85, recipe: 'stew', inputCap: 10, outputCap: 10, operator: 'boost', boost: 2, speedMod: 'cookSpeed',
     unlockedBy: 'pad_kettleB',
   },
-  {
-    id: 'crateB', type: 'pile', area: 'kettleYard', name: 'Fish crate', model: 'fishCrate', x: -4.4, z: 13.2,
-    solid: { r: 0.75 }, reach: 1.75, item: 'fish', cap: 14, start: 14, refill: 1.25, unlockedBy: 'pad_crateB',
-  },
+
   counter('counterA', -2.2, undefined, 'Counter', -1),
   counter('counterB', 3.0, 'pad_counterB', 'Second counter', 1),
   // ---- Pinewood ----
@@ -67,6 +69,8 @@ export const STATIONS: StationDef[] = [
     id: 'woodpile', type: 'pile', area: 'pinewood', name: 'Woodpile', model: 'woodPile', x: -11.4, z: -2.8,
     solid: { r: 0.9 }, reach: 1.9, item: 'log', cap: 30, start: 0, refill: 0, accepts: true, unlockedBy: 'pad_lumberjack',
   },
+  { id: 'shelfPine', type: 'shelf', area: 'pinewood', name: 'Spare shelf', model: 'storageTable', x: -10.8, z: 8.8, rot: 0,
+    solid: { hw: 0.6, hd: 0.4 }, reach: 1.3 },
   ...pines(),
 ];
 
@@ -101,6 +105,14 @@ function lrng(seed: number) {
   };
 }
 
+function streamHoles(): StationDef[] {
+  return [8.8, 11.6, 14.4].map((z, i): StationDef => ({
+    id: `streamHole${i}`, type: 'node', area: 'kettleYard', name: 'Fishing hole', model: 'iceHole', x: -5.6, z, rot: i * 1.7,
+    solid: { r: 0.5 }, reach: 1.45, tag: 'stream', item: 'fish', hitTime: 0.4, yieldPerHit: 2, hits: 2, regrow: 7,
+    groundCap: 6, speedMod: 'fishSpeed', unlockedBy: i === 2 ? 'pad_crateB' : undefined,
+  }));
+}
+
 function pines(): StationDef[] {
   const out: StationDef[] = [];
   const r = lrng(7);
@@ -124,7 +136,7 @@ function pines(): StationDef[] {
 export const LINKS: LinkDef[] = [
   {
     id: 'beltA', area: 'kettleYard', from: 'kettleA', to: 'counterA', item: 'stew', interval: 0.5, travel: 2.4,
-    path: [{ x: -1.0, z: 10.9 }, { x: -1.0, z: 12.6 }, { x: -2.2, z: 12.6 }, { x: -2.2, z: 15.1 }], unlockedBy: 'pad_beltA', maxOnBelt: 6,
+    path: [{ x: -2.2, z: 10.9 }, { x: -2.2, z: 15.1 }], unlockedBy: 'pad_beltA', maxOnBelt: 6,
   },
   {
     id: 'woodbelt', area: 'pinewood', from: 'woodpile', to: 'sawmill', item: 'log', interval: 0.8, travel: 5,
@@ -134,8 +146,12 @@ export const LINKS: LinkDef[] = [
 
 export const HELPERS: HelperDef[] = [
   {
-    id: 'porter', name: 'Porter', role: 'haul', model: 'porter', home: { x: -3.0, z: 7.8 }, capacity: 5, speed: 3.4,
-    from: ['crateA', 'crateB'], to: ['kettleA', 'kettleB'], item: 'fish', transferTime: 0.16,
+    id: 'porter', name: 'Porter', role: 'haul', model: 'porter', home: { x: -0.4, z: 7.6 }, capacity: 5, speed: 3.4,
+    from: ['crateA'], to: ['kettleA', 'kettleB'], item: 'fish', transferTime: 0.16,
+  },
+  {
+    id: 'yardFisher', name: 'Fisher', role: 'harvest', model: 'fisher', home: { x: -3.6, z: 7.0 }, capacity: 6,
+    speed: 3.4, nodeTag: 'stream', to: ['crateA'], transferTime: 0.12,
   },
   {
     id: 'cook', name: 'Cook', role: 'operate', model: 'cook', home: { x: 3.6, z: 8.4 }, capacity: 0, speed: 3,
@@ -153,21 +169,23 @@ export const HELPERS: HelperDef[] = [
 
 export const PADS: PadDef[] = [
   // ---- Kettle Yard ----
-  { id: 'pad_pack1', area: 'kettleYard', x: 0.6, z: 12.8, label: 'Bigger pack', cost: 20, requires: [],
+  { id: 'pad_pack1', area: 'kettleYard', x: 1.2, z: 12.4, label: 'Bigger pack', cost: 20, requires: [],
     effects: [{ type: 'capacity', add: 3 }], icon: { item: 'fish' } },
-  { id: 'pad_kettleB', area: 'kettleYard', x: 2.6, z: 10.0, label: 'Second kettle', cost: 45, requires: ['pad_pack1'],
+  { id: 'pad_kettleB', area: 'kettleYard', x: 1.6, z: 10.0, label: 'Second kettle', cost: 45, requires: ['pad_pack1'],
     effects: [{ type: 'unlock', id: 'kettleB' }], icon: { prop: 'kettle' } },
-  { id: 'pad_counterB', area: 'kettleYard', x: 3.0, z: 14.4, label: 'Second counter', cost: 80, requires: ['pad_kettleB'],
+  { id: 'pad_counterB', area: 'kettleYard', x: 3.2, z: 14.4, label: 'Second counter', cost: 80, requires: ['pad_kettleB'],
     effects: [{ type: 'unlock', id: 'counterB' }], icon: { prop: 'counter' } },
-  { id: 'pad_porter', area: 'kettleYard', x: -3.0, z: 7.6, label: 'Hire a porter', cost: 130, requires: ['pad_counterB'],
+  { id: 'pad_fisherYard', area: 'kettleYard', x: -4.0, z: 7.2, label: 'Hire a fisher', cost: 100, requires: ['pad_counterB'],
+    requiresPop: 6, effects: [{ type: 'hire', helper: 'yardFisher' }], icon: { character: 'fisher' } },
+  { id: 'pad_porter', area: 'kettleYard', x: 4.4, z: 7.6, label: 'Hire a porter', cost: 130, requires: ['pad_fisherYard'],
     requiresPop: 10, effects: [{ type: 'hire', helper: 'porter' }], icon: { character: 'porter' } },
-  { id: 'pad_crateB', area: 'kettleYard', x: -4.4, z: 13.2, label: 'Fish crate', cost: 110, requires: ['pad_porter'],
-    effects: [{ type: 'unlock', id: 'crateB' }], icon: { prop: 'fishCrate' } },
-  { id: 'pad_beltA', area: 'kettleYard', x: -1.6, z: 14.0, label: 'Stew conveyor', cost: 180, requires: ['pad_porter'],
+  { id: 'pad_crateB', area: 'kettleYard', x: -4.4, z: 15.2, label: 'Cut another fishing hole', cost: 110, requires: ['pad_porter'],
+    effects: [{ type: 'unlock', id: 'streamHole2' }], icon: { prop: 'iceHole' } },
+  { id: 'pad_beltA', area: 'kettleYard', x: -0.8, z: 13.6, label: 'Stew conveyor', cost: 180, requires: ['pad_porter'],
     effects: [{ type: 'unlock', id: 'beltA' }], icon: { prop: 'conveyor' } },
-  { id: 'pad_pack2', area: 'kettleYard', x: 0.6, z: 12.8, label: 'Bigger pack', cost: 170, requires: ['pad_beltA', 'pad_crateB'],
+  { id: 'pad_pack2', area: 'kettleYard', x: 1.2, z: 12.4, label: 'Bigger pack', cost: 170, requires: ['pad_beltA', 'pad_crateB'],
     effects: [{ type: 'capacity', add: 3 }], icon: { item: 'stew' } },
-  { id: 'pad_cook', area: 'kettleYard', x: 5.2, z: 11.4, label: 'Hire a cook', cost: 220, requires: ['pad_beltA'],
+  { id: 'pad_cook', area: 'kettleYard', x: 5.2, z: 10.6, label: 'Hire a cook', cost: 220, requires: ['pad_beltA'],
     requiresPop: 25, effects: [{ type: 'hire', helper: 'cook' }], icon: { character: 'cook' } },
   { id: 'pad_hearth2', area: 'camp', x: 0, z: 3.4, label: 'Raise the Hearth', cost: 480, requires: ['pad_pack2', 'pad_cook'],
     effects: [{ type: 'hearth', level: 2 }], icon: { prop: 'hearth', level: 2 } },
@@ -180,11 +198,11 @@ export const PADS: PadDef[] = [
     effects: [{ type: 'capacity', add: 4 }], icon: { item: 'log' } },
   { id: 'pad_axe', area: 'pinewood', x: -14.4, z: 8.6, label: 'Sharper axe', cost: 250, requires: ['pad_pack3'],
     effects: [{ type: 'mod', key: 'chopSpeed', mul: 1.6 }, { type: 'tool', tool: 'axe' }], icon: { prop: 'stump' } },
-  { id: 'pad_pots', area: 'kettleYard', x: 5.3, z: 13.8, label: 'Copper pots', cost: 390, materials: { plank: 10 }, requires: ['pad_cabin1'],
+  { id: 'pad_pots', area: 'kettleYard', x: 5.3, z: 12.6, label: 'Copper pots', cost: 390, materials: { plank: 10 }, requires: ['pad_cabin1'],
     effects: [{ type: 'mod', key: 'cookSpeed', mul: 1.6 }, { type: 'mod', key: 'pricePlus', add: 1 }, { type: 'tool', tool: 'kettle' }], icon: { prop: 'kettle', level: 2 } },
   { id: 'pad_lumberjack', area: 'pinewood', x: -11.4, z: -2.8, label: 'Hire a lumberjack', cost: 480, requires: ['pad_cabin1', 'pad_pack3'],
     requiresPop: 45, effects: [{ type: 'unlock', id: 'woodpile' }, { type: 'hire', helper: 'lumberjack' }], icon: { character: 'lumberjack' } },
-  { id: 'pad_boots', area: 'camp', x: 3.4, z: -2.2, label: 'Warm boots', cost: 380, requires: ['pad_pots'],
+  { id: 'pad_boots', area: 'camp', x: 2.6, z: -1.8, label: 'Warm boots', cost: 380, requires: ['pad_pots'],
     effects: [{ type: 'mod', key: 'moveSpeed', mul: 1.15 }], icon: { prop: 'sled' } },
   { id: 'pad_cabin2', area: 'camp', x: 6.3, z: -5.2, label: 'Cabin', cost: 460, materials: { plank: 14 }, requires: ['pad_lumberjack'],
     effects: [{ type: 'unlock', id: 'cabin2' }, { type: 'mod', key: 'spawnRate', add: 0.25 }], icon: { prop: 'cabin' } },
@@ -228,7 +246,7 @@ export const DECOR: DecorDef[] = [
   { id: 'lantern4', area: 'kettleYard', model: 'lantern', x: 6.2, z: 15.9 },
   { id: 'bench1', area: 'camp', model: 'bench', x: -2.6, z: 2.3, rot: 2.3 },
   { id: 'bench2', area: 'camp', model: 'bench', x: 2.6, z: 2.3, rot: -2.3 },
-  { id: 'barrel1', area: 'kettleYard', model: 'barrel', x: -6.0, z: 8.0, solid: { r: 0.4 } },
+  { id: 'barrel1', area: 'kettleYard', model: 'barrel', x: -5.0, z: 6.2, solid: { r: 0.4 } },
   { id: 'crate1', area: 'kettleYard', model: 'crate', x: -5.9, z: 15.5, solid: { r: 0.4 } },
   { id: 'snowman1', area: 'camp', model: 'snowman', x: 7.8, z: 6.4 }, // no collision: it stands in the yard–lake passage
   { id: 'brazier1', area: 'pinewood', model: 'brazier', x: -9.4, z: 9.6 },

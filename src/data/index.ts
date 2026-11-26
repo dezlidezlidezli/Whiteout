@@ -9,6 +9,8 @@ import { AREAS, CAMP, DECOR, HELPERS, LINKS, PADS, PLAYER_START, STATIONS, WALLS
 export * from './types';
 export { ITEM_KINDS, ITEMS, RECIPES } from './items';
 export { ORDER_BOARD } from './late';
+export { DRESSING, wallSolids } from './dressing';
+export type { AreaDressing, FloorType, XZ } from './dressing';
 
 /** The full campaign content bundle. Areas 3–5 and Open Season (./late.ts) are appended to the base arrays. */
 export const GAME_DATA: GameData = {

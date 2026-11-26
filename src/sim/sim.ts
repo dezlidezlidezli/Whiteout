@@ -6,6 +6,7 @@ import type {
 } from '../data/types';
 import { moveCircle, navNext, pushOut } from './collision';
 import { NavGrid } from './navgrid';
+import { wallSolids } from '../data/dressing';
 import type { Actor, Place, SimEvent } from './events';
 import { updateCustomers, updateHelpers, hireHelper } from './agents';
 import { computeGuide, type GuideTarget } from './guide';
@@ -236,14 +237,8 @@ export class Sim {
       if (d.unlockedBy && !this.state.unlocked[d.id]) continue;
       add(d.x, d.z, d.solid);
     }
-    // Yard palisades: one thin box per axis-aligned leg.
-    for (const w of this.data.dressing?.walls ?? []) {
-      for (let i = 1; i < w.points.length; i++) {
-        const a = w.points[i - 1];
-        const b = w.points[i];
-        out.push({ kind: 'box', x: (a.x + b.x) / 2, z: (a.z + b.z) / 2, hw: Math.abs(b.x - a.x) / 2 + 0.15, hd: Math.abs(b.z - a.z) / 2 + 0.15 });
-      }
-    }
+    // Yard palisades/fences (gaps cut out).
+    for (const w of wallSolids(this.data.dressing ?? [])) out.push({ kind: 'box', ...w });
     const tents = this.data.camp.tentSpots;
     for (let i = 0; i < Math.min(this.state.tents, tents.length); i++) {
       out.push({ kind: 'circle', x: tents[i].x, z: tents[i].z, r: 0.85 });
@@ -550,10 +545,24 @@ export class Sim {
       if (!rd || Math.hypot(rd.x - p.x, rd.z - p.z) > rd.reach + 0.3) p[key] = null;
     }
 
+    // Spare shelf: the mode is decided on entering its zone and kept until leaving.
+    let shelfId: string | null = null;
+    let shelfD = Infinity;
+    for (const d of this.data.stations) {
+      if (d.type !== 'shelf' || !this.isUsable(d.id)) continue;
+      const dd = Math.hypot(d.x - p.x, d.z - p.z);
+      if (dd <= d.reach && dd < shelfD) {
+        shelfD = dd;
+        shelfId = d.id;
+      }
+    }
+    if (!shelfId) p.shelf = null;
+    else if (!p.shelf || p.shelf.id !== shelfId) p.shelf = { id: shelfId, mode: p.stack.length > 0 ? 'drop' : 'pick' };
+
     // Item transfers at a fixed cadence.
     if (p.transferCd > 0) p.transferCd -= dt;
     if (p.transferCd <= 0) {
-      const acted = this.playerDrop() || this.playerPick();
+      const acted = this.playerShelf() || this.playerDrop() || this.playerPick();
       if (acted) p.transferCd += b.transferInterval / s.mods.transferRate;
       else p.transferCd = 0;
     }
@@ -598,6 +607,30 @@ export class Sim {
     }
     out.sort((a, b) => a.dist - b.dist);
     return out.map((o) => o.d);
+  }
+
+  /** One shelf transfer (set down the top item, or take back the most recently shelved one). */
+  private playerShelf(): boolean {
+    const p = this.state.player;
+    if (!p.shelf) return false;
+    const st = this.state.stations[p.shelf.id];
+    if (!st || st.kind !== 'shelf') return false;
+    const where: Place = { kind: 'station', id: p.shelf.id };
+    if (p.shelf.mode === 'drop') {
+      const it = p.stack.pop();
+      if (!it) return false;
+      st.items.push(it);
+      this.addStat('shelved', 1);
+      this.emit({ type: 'drop', item: it, to: where, by: PLAYER, height: p.stack.length });
+      return true;
+    }
+    if (p.stack.length >= p.capacity) return false;
+    const it = st.items.pop();
+    if (!it) return false;
+    p.stack.push(it);
+    this.addStat('carried', 1);
+    this.emit({ type: 'pickup', item: it, from: where, by: PLAYER, height: p.stack.length });
+    return true;
   }
 
   private playerDrop(): boolean {

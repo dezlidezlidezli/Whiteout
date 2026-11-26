@@ -69,7 +69,7 @@ const ICE_HOLES: StationDef[] = grid(
   (gx, gz, i) => ({
     id: `hole${i}`, type: 'node', area: 'frozenLake', name: 'Ice hole', model: 'iceHole',
     x: gx + ((i % 2) ? 0.2 : 0), z: gz, rot: i * 1.3, solid: { r: 0.55 }, reach: 1.5,
-    tag: 'iceHole', item: 'fish', hitTime: 0.5, yieldPerHit: 2, hits: 3, regrow: 12, groundCap: 8, speedMod: 'fishSpeed',
+    tag: 'iceHole', item: 'fish', hitTime: 0.5, yieldPerHit: 3, hits: 3, regrow: 12, groundCap: 8, speedMod: 'fishSpeed',
   }),
 );
 
@@ -93,6 +93,8 @@ const LAKE_STATIONS: StationDef[] = [
     id: 'logRack', type: 'pile', area: 'frozenLake', name: 'Log rack', model: 'woodPile', x: 10.0, z: 1.8,
     solid: { r: 0.7 }, reach: 1.8, item: 'log', cap: 40, start: 0, refill: 0, accepts: true, unlockedBy: 'pad_courier',
   },
+  { id: 'shelfLake', type: 'shelf', area: 'frozenLake', name: 'Spare shelf', model: 'storageTable', x: 8.4, z: 4.6, rot: Math.PI / 2,
+    solid: { hw: 0.4, hd: 0.6 }, reach: 1.3 },
   lateCounter({
     id: 'lakeCounterA', area: 'frozenLake', name: 'Lakeside counter', x: 12.8, z: 7.3, item: 'smokedFish', facing: 'south',
     unlockedBy: 'pad_lakeCounterA', queueLen: 44, exitPath: LAKE_EXIT_A, spawn: { x: 12.8, z: 30 }, wantMax: 2,
@@ -105,7 +107,7 @@ const LAKE_STATIONS: StationDef[] = [
 
 // ------------------------------------------------------------------ Ironridge (Area 4)
 
-const FEAST_EXIT_A: Vec2[] = [{ x: 9.8, z: -18.4 }, { x: 9.8, z: -8.4 }, { x: 6.0, z: -6.0 }];
+const FEAST_EXIT_A: Vec2[] = [{ x: 9.8, z: -18.8 }, { x: 9.8, z: -8.4 }, { x: 6.0, z: -6.0 }];
 const FEAST_EXIT_B: Vec2[] = [{ x: 9.8, z: -23.2 }, { x: 9.8, z: -8.4 }, { x: 6.0, z: -6.0 }];
 
 const ORE_VEINS: StationDef[] = grid(
@@ -117,10 +119,15 @@ const ORE_VEINS: StationDef[] = grid(
   }),
 );
 
+const PEAK_STATIONS: StationDef[] = [
+  { id: 'shelfPeak', type: 'shelf', area: 'beaconPeak', name: 'Spare shelf', model: 'storageTable', x: -5.0, z: -31.4, rot: Math.PI / 2,
+    solid: { hw: 0.4, hd: 0.6 }, reach: 1.3 },
+];
+
 const RIDGE_STATIONS: StationDef[] = [
   ...ORE_VEINS,
   {
-    id: 'oreBin', type: 'pile', area: 'ironridge', name: 'Ore bin', model: 'crate', x: -6.2, z: -15.6,
+    id: 'oreBin', type: 'pile', area: 'ironridge', name: 'Ore bin', model: 'crate', x: -7.8, z: -13.4,
     solid: { r: 0.7 }, reach: 1.8, item: 'ore', cap: 40, start: 0, refill: 0, accepts: true, unlockedBy: 'pad_miner',
   },
   {
@@ -136,9 +143,11 @@ const RIDGE_STATIONS: StationDef[] = [
     solid: { hw: 1.3, hd: 1.0 }, reach: 2.3, recipe: 'feast', inputCap: 12, outputCap: 16, operator: 'boost', boost: 2,
     speedMod: 'cookSpeed', unlockedBy: 'pad_greatKitchen',
   },
+  { id: 'shelfRidge', type: 'shelf', area: 'ironridge', name: 'Spare shelf', model: 'storageTable', x: -9.2, z: -21.0, rot: Math.PI / 2,
+    solid: { hw: 0.4, hd: 0.6 }, reach: 1.3 },
   lateCounter({
-    id: 'feastCounterA', area: 'ironridge', name: 'Feast counter', x: 8.3, z: -16.6, item: 'feast', facing: 'east',
-    unlockedBy: 'pad_feastCounterA', queueLen: 48, exitPath: FEAST_EXIT_A, spawn: { x: 34, z: -16.6 }, wantMax: 2,
+    id: 'feastCounterA', area: 'ironridge', name: 'Feast counter', x: 8.3, z: -17.0, item: 'feast', facing: 'east',
+    unlockedBy: 'pad_feastCounterA', queueLen: 48, exitPath: FEAST_EXIT_A, spawn: { x: 34, z: -17.0 }, wantMax: 2,
   }),
   lateCounter({
     id: 'feastCounterB', area: 'ironridge', name: 'Second feast counter', x: 8.3, z: -21.4, item: 'feast', facing: 'east',
@@ -159,7 +168,7 @@ const CAMP_STATIONS: StationDef[] = [
   },
 ];
 
-export const LATE_STATIONS: StationDef[] = [...LAKE_STATIONS, ...RIDGE_STATIONS, ...CAMP_STATIONS];
+export const LATE_STATIONS: StationDef[] = [...LAKE_STATIONS, ...RIDGE_STATIONS, ...PEAK_STATIONS, ...CAMP_STATIONS];
 
 // ------------------------------------------------------------------ links
 
@@ -174,11 +183,11 @@ export const LATE_LINKS: LinkDef[] = [
   },
   {
     id: 'oreBelt', area: 'ironridge', from: 'oreBin', to: 'forge', item: 'ore', interval: 0.5, travel: 2.2,
-    path: [{ x: -6.2, z: -14.9 }, { x: -6.2, z: -13.4 }, { x: -4.0, z: -13.4 }], unlockedBy: 'pad_oreBelt', maxOnBelt: 6,
+    path: [{ x: -7.1, z: -13.4 }, { x: -4.0, z: -13.4 }], unlockedBy: 'pad_oreBelt', maxOnBelt: 5,
   },
   {
     id: 'feastBelt', area: 'ironridge', from: 'greatKitchen', to: 'feastCounterA', item: 'feast', interval: 0.5, travel: 3.4,
-    path: [{ x: 4.4, z: -14.4 }, { x: 4.4, z: -16.6 }, { x: 7.8, z: -16.6 }], unlockedBy: 'pad_feastBelt', maxOnBelt: 8,
+    path: [{ x: 4.2, z: -14.4 }, { x: 4.2, z: -17.0 }, { x: 7.8, z: -17.0 }], unlockedBy: 'pad_feastBelt', maxOnBelt: 8,
   },
   {
     id: 'feastBeltB', area: 'ironridge', from: 'greatKitchen', to: 'feastCounterB', item: 'feast', interval: 0.5, travel: 4.5,
@@ -291,7 +300,7 @@ export const LATE_PADS: PadDef[] = [
     effects: [{ type: 'unlock', id: 'forge' }], icon: { prop: 'forge' } },
   { id: 'pad_pick', area: 'ironridge', x: -8.8, z: -17.0, label: 'Steel pick', cost: 1250, materials: { ingot: 4 }, requires: ['pad_forge'],
     effects: [{ type: 'mod', key: 'mineSpeed', mul: 1.6 }, { type: 'tool', tool: 'pick' }], icon: { prop: 'oreVein' } },
-  { id: 'pad_miner', area: 'ironridge', x: -6.2, z: -15.6, label: 'Hire a miner', cost: 1750, requires: ['pad_forge'],
+  { id: 'pad_miner', area: 'ironridge', x: -7.8, z: -13.4, label: 'Hire a miner', cost: 1750, requires: ['pad_forge'],
     effects: [{ type: 'unlock', id: 'oreBin' }, { type: 'hire', helper: 'miner' }], icon: { character: 'miner' } },
   { id: 'pad_pack5', area: 'ironridge', x: -0.4, z: -17.6, label: 'Iron-frame pack', cost: 2000, materials: { ingot: 8 }, requires: ['pad_pick'],
     effects: [{ type: 'capacity', add: 5 }], icon: { item: 'ingot' } },
@@ -299,7 +308,7 @@ export const LATE_PADS: PadDef[] = [
     effects: [{ type: 'hire', helper: 'lumberjack3' }], icon: { character: 'lumberjack' } },
   { id: 'pad_courierB', area: 'ironridge', x: -5.8, z: -11.0, label: 'Sled-dog courier', cost: 2200, requires: ['pad_miner'],
     effects: [{ type: 'unlock', id: 'ridgeLogRack' }, { type: 'hire', helper: 'ridgeDog' }], icon: { character: 'dog' } },
-  { id: 'pad_oreBelt', area: 'ironridge', x: -7.6, z: -13.2, label: 'Ore conveyor', cost: 2200, requires: ['pad_miner'],
+  { id: 'pad_oreBelt', area: 'ironridge', x: -5.6, z: -15.2, label: 'Ore conveyor', cost: 2200, requires: ['pad_miner'],
     effects: [{ type: 'unlock', id: 'oreBelt' }], icon: { prop: 'conveyor' } },
   { id: 'pad_steelAxe', area: 'ironridge', x: -1.2, z: -9.8, label: 'Steel axe', cost: 1750, materials: { ingot: 6 }, requires: ['pad_pack5'],
     effects: [{ type: 'mod', key: 'chopSpeed', mul: 1.4 }, { type: 'tool', tool: 'axe' }], icon: { prop: 'stump' } },
@@ -308,7 +317,7 @@ export const LATE_PADS: PadDef[] = [
     icon: { prop: 'kettle', level: 3 } },
   { id: 'pad_greatKitchen', area: 'ironridge', x: 3.4, z: -13.4, label: 'Great Kitchen', cost: 2800, materials: { plank: 20, ingot: 10 },
     requires: ['pad_courierB', 'pad_steelKettle'], effects: [{ type: 'unlock', id: 'greatKitchen' }], icon: { prop: 'greatKitchen' } },
-  { id: 'pad_feastCounterA', area: 'ironridge', x: 7.6, z: -16.6, label: 'Feast counter', cost: 3000, requires: ['pad_greatKitchen'],
+  { id: 'pad_feastCounterA', area: 'ironridge', x: 7.6, z: -17.0, label: 'Feast counter', cost: 3000, requires: ['pad_greatKitchen'],
     effects: [{ type: 'unlock', id: 'feastCounterA' }], icon: { prop: 'counter' } },
   { id: 'pad_kitchenPorter', area: 'ironridge', x: 1.2, z: -12.2, label: 'Hire a kitchen porter', cost: 3200, requires: ['pad_feastCounterA'],
     effects: [{ type: 'hire', helper: 'kitchenPorter' }], icon: { character: 'porter' } },
@@ -326,20 +335,20 @@ export const LATE_PADS: PadDef[] = [
     effects: [{ type: 'hearth', level: 5 }], icon: { prop: 'hearth', level: 5 } },
 
   // ---- Beacon Peak ----
-  { id: 'pad_beacon1', area: 'beaconPeak', ...BEACON_PAD, label: 'Beacon: timber frame', cost: 2400, materials: { plank: 60 },
+  { id: 'pad_beacon1', area: 'beaconPeak', ...BEACON_PAD, label: 'Beacon: timber frame', cost: 2800, materials: { plank: 60 },
     requires: ['pad_hearth5'], effects: [{ type: 'beacon', stage: 1 }], icon: { prop: 'beacon', level: 1 } },
-  { id: 'pad_peakLights', area: 'beaconPeak', x: -4.0, z: -28.2, label: 'Trail braziers', cost: 3600, requires: ['pad_beacon1'],
+  { id: 'pad_peakLights', area: 'beaconPeak', x: -4.0, z: -28.2, label: 'Trail braziers', cost: 4200, requires: ['pad_beacon1'],
     effects: [{ type: 'unlock', id: 'peakBrazier1' }, { type: 'unlock', id: 'peakBrazier2' }, { type: 'unlock', id: 'peakBrazier3' },
       { type: 'unlock', id: 'peakBrazier4' }, { type: 'mod', key: 'moveSpeed', mul: 1.1 }], icon: { prop: 'brazier' } },
-  { id: 'pad_beacon2', area: 'beaconPeak', ...BEACON_PAD, label: 'Beacon: iron crown', cost: 4000, materials: { ingot: 40 },
+  { id: 'pad_beacon2', area: 'beaconPeak', ...BEACON_PAD, label: 'Beacon: iron crown', cost: 4800, materials: { ingot: 40 },
     requires: ['pad_beacon1'], effects: [{ type: 'beacon', stage: 2 }], icon: { prop: 'beacon', level: 2 } },
-  { id: 'pad_feastCounterB', area: 'ironridge', x: 7.6, z: -21.4, label: 'Second feast counter', cost: 4800, requires: ['pad_beacon1'],
+  { id: 'pad_feastCounterB', area: 'ironridge', x: 7.6, z: -21.4, label: 'Second feast counter', cost: 5600, requires: ['pad_beacon1'],
     effects: [{ type: 'unlock', id: 'feastCounterB' }], icon: { prop: 'counter' } },
-  { id: 'pad_chef', area: 'ironridge', x: 6.0, z: -12.6, label: 'Hire a chef', cost: 4400, requires: ['pad_beacon2'],
+  { id: 'pad_chef', area: 'ironridge', x: 6.0, z: -12.6, label: 'Hire a chef', cost: 5000, requires: ['pad_beacon2'],
     effects: [{ type: 'hire', helper: 'chef' }], icon: { character: 'cook' } },
-  { id: 'pad_pack7', area: 'beaconPeak', x: 4.0, z: -28.2, label: 'Summit pack', cost: 4800, materials: { ingot: 12, plank: 20 },
+  { id: 'pad_pack7', area: 'beaconPeak', x: 4.0, z: -28.2, label: 'Summit pack', cost: 5400, materials: { ingot: 12, plank: 20 },
     requires: ['pad_beacon2'], effects: [{ type: 'capacity', add: 5 }], icon: { item: 'plank' } },
-  { id: 'pad_beacon3', area: 'beaconPeak', ...BEACON_PAD, label: 'Beacon: fire bed', cost: 5000, materials: { log: 60 },
+  { id: 'pad_beacon3', area: 'beaconPeak', ...BEACON_PAD, label: 'Beacon: fire bed', cost: 5600, materials: { log: 60 },
     requires: ['pad_beacon2'], effects: [{ type: 'beacon', stage: 3 }], icon: { prop: 'beacon', level: 3 } },
   { id: 'pad_feastBeltB', area: 'ironridge', x: 1.6, z: -20.0, label: 'Feast conveyor', cost: 5000, requires: ['pad_beacon3', 'pad_feastCounterB'],
     effects: [{ type: 'unlock', id: 'feastBeltB' }], icon: { prop: 'conveyor' } },
@@ -387,6 +396,7 @@ export const LATE_DECOR: DecorDef[] = [
   { id: 'lakeSled', area: 'frozenLake', model: 'sled', x: 22.4, z: 2.4, rot: 1.2, solid: { r: 0.6 } },
   { id: 'lakeBarrel', area: 'frozenLake', model: 'barrel', x: 22.6, z: -6.6, solid: { r: 0.35 } },
   // Ironridge
+  { id: 'shelfPeakDecor', area: 'beaconPeak', model: 'rugMat', x: -5.0, z: -31.4 },
   { id: 'cabin5', area: 'ironridge', model: 'cabin', x: 4.8, z: -24.4, rot: 1.2, unlockedBy: 'pad_cabin5', solid: { hw: 1.3, hd: 1.1 } },
   { id: 'ridgeLantern1', area: 'ironridge', model: 'lantern', x: 1.0, z: -16.0 },
   { id: 'ridgeLantern2', area: 'ironridge', model: 'lantern', x: 1.0, z: -23.0 },

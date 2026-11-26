@@ -21,6 +21,8 @@ export interface PlayerState {
   returning: string | null;
   /** Pile the player has taken from during the current visit (never hand back to it then). */
   pickedFrom: string | null;
+  /** Spare shelf zone the player is in, and what entering decided: set everything down, or pick it back up. */
+  shelf?: { id: string; mode: 'drop' | 'pick' } | null;
 }
 
 export interface PileState { kind: 'pile'; count: number; acc: number }
@@ -28,7 +30,9 @@ export interface NodeState { kind: 'node'; alive: boolean; hits: number; work: n
 export interface ProcState { kind: 'processor'; inputs: ItemCounts; output: number; progress: number; operated: boolean; active: boolean }
 export interface CounterState { kind: 'counter'; stock: number; serveT: number; queue: number[] }
 export interface DepositState { kind: 'deposit'; count: number }
-export type StationState = PileState | NodeState | ProcState | CounterState | DepositState;
+/** Spare shelf: any mix of kinds, unlimited; last element = most recently shelved. */
+export interface ShelfState { kind: 'shelf'; items: ItemKind[] }
+export type StationState = PileState | NodeState | ProcState | CounterState | DepositState | ShelfState;
 
 export interface PadState {
   paid: number;
@@ -194,6 +198,8 @@ export function createStationState(def: GameData['stations'][number]): StationSt
       return { kind: 'counter', stock: 0, serveT: 0, queue: [] };
     case 'deposit':
       return { kind: 'deposit', count: 0 };
+    case 'shelf':
+      return { kind: 'shelf', items: [] };
   }
 }
 
@@ -255,6 +261,7 @@ export function normalizeState(s: SimState, data: GameData): void {
   s.guideUnload = !!s.guideUnload;
   s.player.returning = s.player.returning ?? null;
   s.player.pickedFrom = s.player.pickedFrom ?? null;
+  s.player.shelf = s.player.shelf ?? null;
   s.beacon = s.beacon ?? 0;
   s.finale = s.finale ?? { phase: 'none', t: 0, progress: 0 };
   s.tools = s.tools ?? {};
