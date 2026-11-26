@@ -10,6 +10,7 @@ import { Hud } from './ui/hud';
 import { Joystick } from './ui/joystick';
 import { TitleScreen } from './ui/title';
 import { DebugOverlay } from './ui/debug';
+import { FrameStats } from './platform/perf';
 import { View } from './view/view';
 import * as THREE from 'three';
 
@@ -49,6 +50,7 @@ function createSim(): Sim {
   return new Sim(GAME_DATA, { seed });
 }
 
+const frameStats = new FrameStats();
 const hadSave = !fresh && !!store.read();
 let sim = createSim();
 const showTitle = !autoplayParam && !params.has('skiptitle');
@@ -185,7 +187,9 @@ for (const ev of ['touchend', 'click', 'keydown'] as const) {
 let paused = false;
 let lost = false;
 function save(): void {
+  const a = performance.now();
   store.write(sim.serialize());
+  frameStats.lastSaveMs = performance.now() - a;
 }
 window.setInterval(() => {
   if (!paused) save();
@@ -290,6 +294,8 @@ const cheat = {
     sim = new Sim(GAME_DATA, { seed: 1 });
     view.setSim(sim);
   },
+  /** Frame-time summary over the last n frames (perf tests / debug). */
+  perf: (n = 600) => frameStats.summary(n),
   /** Leave the title screen (tests). */
   begin: () => title?.finish(false),
 };
@@ -323,6 +329,7 @@ function loop(now: number): void {
   }
 
   const t0 = performance.now();
+  const dtMs = dt * 1000;
   acc += dt * timeScale;
   let steps = 0;
   while (acc >= STEP && steps < MAX_STEPS) {
@@ -338,9 +345,13 @@ function loop(now: number): void {
     recent.push(...events);
     if (recent.length > 300) recent.splice(0, recent.length - 300);
   }
+  const t1 = performance.now();
   view.frame(acc / STEP, dt);
+  const t2 = performance.now();
   hud.update(sim, dt, (w) => view.project(projV.set(w.x, w.y, w.z)));
-  view.cpuMs += (performance.now() - t0 - view.cpuMs) * 0.1;
+  const t3 = performance.now();
+  frameStats.push(dtMs, t1 - t0, t2 - t1, t3 - t2, steps);
+  view.cpuMs += (t3 - t0 - view.cpuMs) * 0.1;
   debug?.update(dt, view);
   if (firstFrame) {
     firstFrame = false;
