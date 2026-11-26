@@ -55,6 +55,10 @@ export class Hud {
   private shownEmbers = 0;
   private targetEmbers = 0;
   private lastPop = -1;
+  private questTick = -1;
+  private cosyKey = '';
+  private hasFuel = false;
+  private fuelCheckTick = -1;
   private lastQuest = '';
   private floats: Floater[] = [];
   private sheet: SettingsSheet;
@@ -165,19 +169,33 @@ export class Hud {
       this.popEl.textContent = fmt(s.population);
     }
     // Cosy meter (once logs exist).
-    const hasFuel = sim.data.stations.some((d) => d.type === 'node' && d.item === 'log' && sim.isUsable(d.id));
-    this.cosy.style.display = hasFuel ? '' : 'none';
-    this.root.classList.toggle('fk-has-cosy', hasFuel);
-    if (hasFuel) {
-      const fr = sim.fuelFraction();
-      this.cosyBar.style.width = `${Math.round(fr * 100)}%`;
-      this.cosy.classList.toggle('fk-on', sim.cosy);
-      this.cosy.classList.toggle('fk-off', !sim.cosy);
-      const label = sim.cosy ? 'Cosy ×2' : 'Feed logs';
-      if (this.cosyTxt.textContent !== label) this.cosyTxt.textContent = label;
-      this.cosyTxt.className = sim.cosy ? 'fk-x2' : '';
+    // Only touch the DOM when something actually changed.
+    if (s.tick - this.fuelCheckTick > 30 || this.fuelCheckTick < 0) {
+      this.fuelCheckTick = s.tick;
+      this.hasFuel = sim.data.stations.some((d) => d.type === 'node' && d.item === 'log' && sim.isUsable(d.id));
+    }
+    const hasFuel = this.hasFuel;
+    const pct = hasFuel ? Math.round(sim.fuelFraction() * 100) : -1;
+    const key = `${hasFuel}|${pct}|${sim.cosy}`;
+    if (key !== this.cosyKey) {
+      this.cosyKey = key;
+      this.cosy.style.display = hasFuel ? '' : 'none';
+      this.root.classList.toggle('fk-has-cosy', hasFuel);
+      if (hasFuel) {
+        this.cosyBar.style.width = `${pct}%`;
+        this.cosy.classList.toggle('fk-on', sim.cosy);
+        this.cosy.classList.toggle('fk-off', !sim.cosy);
+        this.cosyTxt.textContent = sim.cosy ? 'Cosy ×2' : 'Feed logs';
+        this.cosyTxt.className = sim.cosy ? 'fk-x2' : '';
+      }
     }
     // Quest chip.
+    if (s.tick !== this.questTick) this.updateQuest(sim);
+    this.questTick = s.tick;
+    this.updateToastsAndFloaters(dt, project);
+  }
+
+  private updateQuest(sim: Sim): void {
     const q = sim.questProgress();
     const key = `${q.id}|${q.cur}|${q.max}`;
     if (key !== this.lastQuest) {
@@ -195,6 +213,9 @@ export class Hud {
         window.setTimeout(() => this.quest.classList.remove('fk-pop-in'), 220);
       }
     }
+  }
+
+  private updateToastsAndFloaters(dt: number, project: (w: { x: number; y: number; z: number }) => { x: number; y: number; on: boolean }): void {
     // Toasts: one at a time, briefly.
     this.toastBusy -= dt;
     if (this.toastBusy <= 0 && this.toastQueue.length) {

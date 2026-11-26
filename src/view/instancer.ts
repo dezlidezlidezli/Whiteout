@@ -49,19 +49,25 @@ export class PropInstancer {
   }
 
   setCount(n: number): void {
+    if (n === this.count) return;
     this.count = n;
     this.dirty = true;
   }
+
+  private boundedCount = -1;
 
   /** Push changes to the GPU and refresh culling bounds. */
   commit(recomputeBounds = true): void {
     if (!this.dirty) return;
     this.dirty = false;
+    const bound = this.boundedCount;
     for (const p of this.parts) {
       p.mesh.count = this.count;
       p.mesh.instanceMatrix.needsUpdate = true;
-      if (recomputeBounds && this.count > 0) p.mesh.computeBoundingSphere();
+      // Bounds only when the instance count changes (not every animated frame).
+      if (recomputeBounds && this.count > 0 && bound !== this.count) p.mesh.computeBoundingSphere();
     }
+    if (recomputeBounds) this.boundedCount = this.count;
   }
 
   setVisible(v: boolean): void {

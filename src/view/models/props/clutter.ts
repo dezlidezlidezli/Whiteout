@@ -89,8 +89,7 @@ export function firewoodRack(seed = 0): PropSpec {
     for (let i = 0; i < nLogs; i++) {
       const x = -W / 2 + 0.17 + i * 0.24 + (row % 2) * 0.1;
       if (x > W / 2 - 0.1) continue;
-      b.add(cyl(0.11, 0.11, 0.62, 6), pick(r, [P.bark, 0x6e4a2e, P.wood]), { p: [x, 0.22 + row * 0.22, 0], r: [Math.PI / 2, 0, 0], top: P.woodPale, bottom: P.woodPale, topY: 2 });
-      b.add(cyl(0.09, 0.09, 0.63, 6), P.woodPale, { p: [x, 0.22 + row * 0.22, 0], r: [Math.PI / 2, 0, 0], s: [1, 1.001, 1] });
+      b.add(cyl(0.11, 0.11, 0.62, 6), pick(r, [P.bark, 0x6e4a2e, P.wood]), { p: [x, 0.22 + row * 0.22, 0], r: [Math.PI / 2, 0, 0], front: pick(r, [P.woodPale, 0xd8b480]), back: P.woodPale, frontZ: 0.9 });
     }
   }
   // lean-to roof with snow
@@ -191,7 +190,7 @@ export function basketPile(seed = 0): PropSpec {
     b.add(lathe([[0, 0], [0.18, 0], [0.24, 0.1], [0.26, 0.24], [0.23, 0.24], [0, 0.2]], 8), 0xc8a060, { p: [x, 0, z], s, shade: 0.06, seed: i });
     b.add(cyl(0.265 * s, 0.265 * s, 0.03, 8, true), 0x9a7440, { p: [x, 0.12 * s, z] });
     const [c1, c2] = fills[(i + seed) % fills.length];
-    for (let k = 0; k < 5; k++) b.add(sphere(0.06 * s, 5, 4), k % 2 ? c1 : c2, { p: [x + (r() - 0.5) * 0.25 * s, 0.24 * s, z + (r() - 0.5) * 0.25 * s] });
+    for (let k = 0; k < 4; k++) b.add(sphere(0.065 * s, 5, 3), k % 2 ? c1 : c2, { p: [x + (r() - 0.5) * 0.25 * s, 0.24 * s, z + (r() - 0.5) * 0.25 * s] });
   }
   b.add(torus(0.18, 0.025, 3, 8, Math.PI), 0x9a7440, { p: [0, 0.32, 0], r: [0, 0.5, 0] });
   return { layers: [{ name: 'body', b }], userData: { radius: 0.65, decor: true } };

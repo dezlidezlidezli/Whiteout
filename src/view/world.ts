@@ -87,11 +87,13 @@ export class WorldView {
   private stumpInst: PropInstancer;
   private tentInst: PropInstancer;
   private tentAppear: number[] = [];
+  private tentDone: boolean[] = [];
   private walls: WallView[] = [];
   private beltInst = new Map<string, PropInstancer>();
   private hearthObj: THREE.Object3D | null = null;
   private hearthLevel = 0;
   readonly hearthLight: THREE.PointLight;
+  private pendingBuf = new Set<string>();
   private firePool: { light: THREE.PointLight; id: string; want: number }[] = [];
   /** Particle emitter callback (steam/smoke) wired by the view. */
   onEmit: (kind: 'steam' | 'smoke', x: number, y: number, z: number) => void = () => {};
@@ -256,6 +258,7 @@ export class WorldView {
     }
     for (const [id, inst] of this.beltInst) inst.setVisible(sim.isActive(id));
     this.tentAppear = [];
+    this.tentDone = [];
     for (let i = 0; i < sim.state.tents; i++) this.tentAppear[i] = 1;
     this.setHearthLevel(sim.state.hearth.level);
   }
@@ -312,7 +315,8 @@ export class WorldView {
 
   /** Ghost previews for buildings whose pad is visible. */
   private updateGhosts(sim: Sim, time: number): void {
-    const pending = new Set<string>();
+    const pending = this.pendingBuf;
+    pending.clear();
     for (const p of this.data.pads) {
       const ps = sim.state.pads[p.id];
       if (!ps.visible || ps.done) continue;
@@ -412,8 +416,10 @@ export class WorldView {
         this.tentAppear[i] = 0;
         this.onAppear(spots[i].x, spots[i].z, 1.3);
       }
+      if (this.tentAppear[i] >= 1 && this.tentDone[i]) continue;
       this.tentAppear[i] = Math.min(1, this.tentAppear[i] + dt / 0.7);
       this.tentInst.set(i, trs(_m, spots[i].x, 0, spots[i].z, spots[i].rot, backOut(this.tentAppear[i])));
+      this.tentDone[i] = this.tentAppear[i] >= 1;
     }
     this.tentInst.setCount(nt);
     this.tentInst.commit(nt > 0);

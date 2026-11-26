@@ -88,15 +88,9 @@ function buildFloor(type: FloorType, W: number, D: number, o: FloorOpts): Builde
       const h = 0.04 + r() * 0.03;
       b.add(box(s * (0.9 + r() * 0.1), h, s * (0.9 + r() * 0.1)), pick(cols), { p: [xx + (r() - 0.5) * 0.03, 0.03 + h / 2, z + (r() - 0.5) * 0.03], r: [0, (r() - 0.5) * 0.12, 0] });
     });
-    // a few patches of snow drifted into the corners
-    for (let k = 0; k < 3; k++) {
-      const x = (r() - 0.5) * W * 0.9, z = (r() - 0.5) * D * 0.9;
-      if (isIn(x, z)) b.add(sphere(0.4, 6, 3), P.snow, { p: [x, 0.04, z], s: [1.4, 0.12, 1], jitter: 0.03, seed: k });
-    }
   } else if (type === 'packedEarth') {
     const sx = Math.max(2, Math.round(W / 0.6)), sz = Math.max(2, Math.round(D / 0.6));
     const pg = new THREE.PlaneGeometry(W, D, sx, sz).rotateX(-Math.PI / 2);
-    // clip by polygon: drop faces outside
     b.add(pg, 0x8a6446, { p: [0, 0.045, 0], jitter: 0.015, seed: o.seed ?? 1, shade: 0.12 });
     // wood chips, straw and sawdust
     const n = Math.round(W * D * 1.6);
@@ -108,7 +102,7 @@ function buildFloor(type: FloorType, W: number, D: number, o: FloorOpts): Builde
     }
     for (let k = 0; k < 5; k++) {
       const x = (r() - 0.5) * W * 0.8, z = (r() - 0.5) * D * 0.8;
-      if (isIn(x, z)) b.add(cone(0.35, 0.12, 6), 0xe8cf9a, { p: [x, 0.08, z], s: [1.3, 1, 1] });
+      if (isIn(x, z)) b.add(cone(0.25, 0.08, 7), 0xc8a26a, { p: [x, 0.08, z], s: [1.3, 1, 1], jitter: 0.02, seed: k });
     }
   } else {
     // ice shelf: pale slab with frosty patches and cracks
@@ -119,7 +113,7 @@ function buildFloor(type: FloorType, W: number, D: number, o: FloorOpts): Builde
       const x = (r() - 0.5) * W * 0.9, z = (r() - 0.5) * D * 0.9;
       if (!isIn(x, z)) continue;
       if (r() < 0.5) b.add(box(0.015, 0.005, 0.6 + r() * 1.2), 0x6fa8cc, { p: [x, 0.05, z], r: [0, r() * 3, 0] });
-      else b.add(sphere(0.3 + r() * 0.3, 6, 3), 0xdff2fb, { p: [x, 0.04, z], s: [1.4, 0.04, 1], r: [0, r() * 3, 0] });
+      else b.add(cyl(0.3 + r() * 0.3, 0.3 + r() * 0.3, 0.012, 9), 0xd6eef9, { p: [x, 0.047, z], s: [1.4, 1, 1], r: [0, r() * 3, 0], jitter: 0.03, seed: k });
     }
   }
 
