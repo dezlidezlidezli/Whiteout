@@ -166,7 +166,7 @@ export const PADS: PadDef[] = [
     effects: [{ type: 'capacity', add: 3 }], icon: { item: 'stew' } },
   { id: 'pad_cook', area: 'kettleYard', x: 5.0, z: 12.4, label: 'Hire a cook', cost: 220, requires: ['pad_beltA'],
     requiresPop: 25, effects: [{ type: 'hire', helper: 'cook' }], icon: { character: 'cook' } },
-  { id: 'pad_hearth2', area: 'camp', x: 0, z: 3.4, label: 'Raise the Hearth', cost: 360, requires: ['pad_pack2', 'pad_cook'],
+  { id: 'pad_hearth2', area: 'camp', x: 0, z: 3.4, label: 'Raise the Hearth', cost: 480, requires: ['pad_pack2', 'pad_cook'],
     effects: [{ type: 'hearth', level: 2 }], icon: { prop: 'hearth', level: 2 } },
   // ---- Pinewood ----
   { id: 'pad_sawmill', area: 'pinewood', x: -11.6, z: 9.2, label: 'Sawmill', cost: 180, requires: ['pad_hearth2'],

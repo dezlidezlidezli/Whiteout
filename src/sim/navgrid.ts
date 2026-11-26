@@ -133,9 +133,24 @@ export class NavGrid {
     return true;
   }
 
+  private memoFrom = -1;
+  private memoTo = -1;
+  private memo: { x: number; z: number } | null = null;
+
   /** Next waypoint from (fx,fz) towards (tx,tz), or null if the grid can't help (caller falls back). */
   next(fx: number, fz: number, tx: number, tz: number): { x: number; z: number } | null {
     if (this.nx === 0) return null;
+    // Same player cell (quantised finer than the grid) and same target: same answer.
+    const from = Math.round(fx * 8) * 100003 + Math.round(fz * 8);
+    const to = Math.round(tx * 8) * 100003 + Math.round(tz * 8);
+    if (from === this.memoFrom && to === this.memoTo) return this.memo;
+    this.memoFrom = from;
+    this.memoTo = to;
+    this.memo = this.nextRaw(fx, fz, tx, tz);
+    return this.memo;
+  }
+
+  private nextRaw(fx: number, fz: number, tx: number, tz: number): { x: number; z: number } | null {
     if (Math.hypot(tx - fx, tz - fz) <= SEED_R + 0.3) return null;
     this.ensureField(tx, tz);
     const { nx, dist } = this;

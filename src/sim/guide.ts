@@ -118,8 +118,8 @@ function wantedItems(sim: Sim, g: import('../data/types').QuestGuide | { pad: st
     if (depth === 0) finalWanted.add(it);
     if (out.has(it) || depth > 4) return;
     out.add(it);
-    for (const d of sim.data.stations) {
-      if (d.type === 'processor' && sim.data.recipes[d.recipe].output === it) {
+    for (const d of producersOf(sim, it)) {
+      {
         for (const k in sim.data.recipes[d.recipe].inputs) {
           const kk = k as ItemKind;
           if (!consumers.has(kk)) consumers.set(kk, []);
@@ -164,6 +164,24 @@ function earnItems(sim: Sim, addUp: (it: ItemKind, d: number) => void, out: Set<
     if (sim.room('hearth', 'log') > 0) finalWanted.add('log');
   }
   return out;
+}
+
+const producerCache = new WeakMap<object, Map<ItemKind, ProcessorDef[]>>();
+
+/** Processors whose recipe outputs `item` (static per data bundle). */
+function producersOf(sim: Sim, item: ItemKind): ProcessorDef[] {
+  let m = producerCache.get(sim.data);
+  if (!m) {
+    m = new Map();
+    for (const d of sim.data.stations) {
+      if (d.type !== 'processor') continue;
+      const out = sim.data.recipes[d.recipe].output;
+      if (!m.has(out)) m.set(out, []);
+      m.get(out)!.push(d);
+    }
+    producerCache.set(sim.data, m);
+  }
+  return m.get(item) ?? [];
 }
 
 /** Ingredient → processors on the current goal's chain that consume it (filled by wantedItems). */
@@ -304,9 +322,7 @@ function source(sim: Sim, item: ItemKind, depth: number): GuideTarget | null {
   // Prefer working the node we're standing at over walking to a far ground pile.
   if (best && best.kind !== 'node') return best;
   // 2. A processor that makes it.
-  const producers = sim.data.stations.filter(
-    (d): d is ProcessorDef => d.type === 'processor' && sim.isUsable(d.id) && sim.data.recipes[d.recipe].output === item,
-  );
+  const producers = producersOf(sim, item).filter((d) => sim.isUsable(d.id));
   producers.sort((a, b) => dist(sim, a.x, a.z) - dist(sim, b.x, b.z));
   for (const pd of producers) {
     const st = sim.state.stations[pd.id] as ProcState;
@@ -392,9 +408,18 @@ function padGuide(sim: Sim, padId: string): GuideTarget | null {
 function earn(sim: Sim): GuideTarget | null {
   const s = sim.state;
   // Big ember piles lying around: scoop them.
+  // Pick the pile worth the walk (big piles far away, small ones only when close).
+  let pile: (typeof s.emberPiles)[number] | null = null;
+  let ps = 0;
   for (const e of s.emberPiles) {
-    if (e.count >= 6) return { x: e.x, z: e.z, id: e.id, kind: 'embers', reach: 1.2 };
+    if (e.count < 6) continue;
+    const v = e.count / (dist(sim, e.x, e.z) + 12);
+    if (v > ps) {
+      ps = v;
+      pile = e;
+    }
   }
+  if (pile) return { x: pile.x, z: pile.z, id: pile.id, kind: 'embers', reach: 1.2 };
   // Serve the busiest counter's dish.
   let best: CounterDef | null = null;
   let bq = -Infinity;

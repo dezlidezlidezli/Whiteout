@@ -62,6 +62,7 @@ export const LATE_QUESTS: QuestDef[] = [
   pad('chef', 'Hire a chef', 500),
   pad('pack7', 'Sew a summit pack', 500),
   pad('beacon3', 'Stack the fire bed', 600),
+  pad('feastBeltB', 'Build a second feast conveyor', 600),
   pad('beacon4', 'Light the Great Beacon!', 0, 'Every ember you have gathered leads here'),
   { id: 'q_dawn', text: 'The Long Night ends…', goal: { type: 'stat', stat: 'finale', n: 1 }, guide: { type: 'none' }, reward: 0 },
   // ---- Open Season onboarding ----
