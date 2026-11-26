@@ -168,6 +168,14 @@ function assert(cond, msg) {
   assert(!after.lost && after.calls > 10, 'rendering recovers after context restore (' + after.calls + ' calls)');
   await shot('07-after-context-restore');
 
+  // ---- frame budget: steady-state never runs more than 4 sim steps in a frame, and the
+  // per-frame JS (sim + view logic + HUD, GL submit excluded) stays well inside a 60 Hz frame.
+  const perf = await fk(() => __fk.cheat.perf(120));
+  assert(perf.stepsMax <= 4, 'at most 4 sim steps per frame (got ' + perf.stepsMax + ')');
+  const bench = await fk(() => __fk.cheat.bench(240));
+  console.log('js bench', JSON.stringify(bench));
+  assert(bench.total.p95 < 8, 'per-frame JS p95 under 8 ms (got ' + bench.total.p95 + ')');
+
   // ---- big crowd perf sample
   await fk(() => {
     __fk.cheat.teleport(0, 4);
