@@ -4,7 +4,7 @@ export const BALANCE: Balance = {
   playerSpeed: 5.2,
   playerRadius: 0.38,
   startCapacity: 6,
-  maxCapacity: 40,
+  maxCapacity: 64,
   transferInterval: 0.1,
   emberCollectRadius: 2.4,
   emberCollectRate: 40,

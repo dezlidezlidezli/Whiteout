@@ -1,6 +1,6 @@
 import type { AreaId, GameData, ItemCounts, ItemKind, ModKey } from '../data/types';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 export interface PlayerState {
   x: number;
@@ -36,6 +36,10 @@ export interface PadState {
   done: boolean;
   visible: boolean;
   acc: number;
+  /** Repeatable pads: times completed (cost grows with it). */
+  level?: number;
+  /** Repeatable pads: just completed a level; no payment until the player steps off. */
+  hold?: boolean;
 }
 
 export type CustomerPhase = 'queue' | 'thaw' | 'leave';
@@ -75,12 +79,52 @@ export interface HelperState {
   lastX: number;
   lastZ: number;
   sideT: number;
+  /** Courier: index of the next route waypoint. */
+  wp?: number;
 }
 
 export interface BeltItem { item: ItemKind; p: number }
 export interface LinkState { t: number; belt: BeltItem[] }
 
 export interface EmberPile { id: string; x: number; z: number; count: number }
+
+/** Finale state machine: 'lighting' (beacon flares) → 'dawn' (storm breaks, valley thaws) → 'done' (forever). */
+export type FinalePhase = 'none' | 'lighting' | 'dawn' | 'done';
+export interface FinaleState {
+  phase: FinalePhase;
+  /** Seconds into the current phase. */
+  t: number;
+  /** 0..1 through the current phase (1 once done). */
+  progress: number;
+}
+
+/** An open caravan order on the Open Season notice board. */
+export interface OrderState {
+  id: number;
+  item: ItemKind;
+  n: number;
+  got: number;
+  reward: number;
+}
+
+/** Lifetime stats for the stats page. */
+export interface Totals {
+  served: number;
+  thawed: number;
+  embersEarned: number;
+  carried: number;
+  /** Metres walked by the player. */
+  distance: number;
+  /** Seconds of play (sim time). */
+  playTime: number;
+  ordersDone: number;
+  upgrades: number;
+  decorations: number;
+}
+
+export function createTotals(): Totals {
+  return { served: 0, thawed: 0, embersEarned: 0, carried: 0, distance: 0, playTime: 0, ordersDone: 0, upgrades: 0, decorations: 0 };
+}
 
 export interface SimState {
   version: number;
@@ -103,12 +147,25 @@ export interface SimState {
   areasOpen: Record<string, boolean>;
   population: number;
   tents: number;
-  quest: { index: number; base: number };
+  /** `id` (v2) re-anchors the index if quests are inserted by later content. */
+  quest: { index: number; base: number; id?: string };
   stats: Record<string, number>;
   mods: Record<ModKey, number>;
   guideMemo: ItemKind | null;
   /** Guidance is mid-way through handing in items the goal can't use. */
   guideUnload: boolean;
+  // ---- v2: late campaign + Open Season ----
+  /** Great Beacon stages completed (0..4). */
+  beacon: number;
+  finale: FinaleState;
+  /** Tool tiers (axe, pick, kettle, auger), for the view's tool models. */
+  tools: Record<string, number>;
+  /** Open Season caravan orders (empty until the finale is done). */
+  orders: OrderState[];
+  nextOrderId: number;
+  /** Open Season level: grows as orders are filled; gently scales order size and reward. */
+  season: number;
+  totals: Totals;
 }
 
 export const DEFAULT_MODS: Record<ModKey, number> = {
@@ -120,6 +177,9 @@ export const DEFAULT_MODS: Record<ModKey, number> = {
   chopSpeed: 1,
   helperSpeed: 1,
   helperCapacity: 0,
+  fishSpeed: 1,
+  mineSpeed: 1,
+  priceMul: 1,
 };
 
 export function createStationState(def: GameData['stations'][number]): StationState {
@@ -167,11 +227,18 @@ export function createState(data: GameData, seed: number): SimState {
     areasOpen: {},
     population: 0,
     tents: 0,
-    quest: { index: 0, base: 0 },
+    quest: { index: 0, base: 0, id: data.quests[0]?.id },
     stats: {},
     mods: { ...DEFAULT_MODS },
     guideMemo: null,
     guideUnload: false,
+    beacon: 0,
+    finale: { phase: 'none', t: 0, progress: 0 },
+    tools: {},
+    orders: [],
+    nextOrderId: 1,
+    season: 1,
+    totals: createTotals(),
   };
   normalizeState(s, data);
   return s;
@@ -188,4 +255,17 @@ export function normalizeState(s: SimState, data: GameData): void {
   s.guideUnload = !!s.guideUnload;
   s.player.returning = s.player.returning ?? null;
   s.player.pickedFrom = s.player.pickedFrom ?? null;
+  s.beacon = s.beacon ?? 0;
+  s.finale = s.finale ?? { phase: 'none', t: 0, progress: 0 };
+  s.tools = s.tools ?? {};
+  s.orders = s.orders ?? [];
+  s.nextOrderId = s.nextOrderId ?? 1;
+  s.season = s.season ?? 1;
+  s.totals = { ...createTotals(), ...(s.totals ?? {}) };
+  // Quest chain re-anchoring: keep the player on the same quest even if quests were inserted before it.
+  if (s.quest.id) {
+    const i = data.quests.findIndex((q) => q.id === s.quest.id);
+    if (i >= 0) s.quest.index = i;
+  }
+  s.quest.id = data.quests[s.quest.index]?.id;
 }

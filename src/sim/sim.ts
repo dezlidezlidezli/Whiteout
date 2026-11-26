@@ -4,10 +4,13 @@ import type {
   CounterDef, DepositDef, Effect, GameData, ItemKind, LinkDef, NodeDef, PadDef, PileDef, ProcessorDef, Rect, Solid,
   StationDef, Vec2,
 } from '../data/types';
-import { moveCircle, navNext } from './collision';
+import { moveCircle, navNext, pushOut } from './collision';
+import { NavGrid } from './navgrid';
 import type { Actor, Place, SimEvent } from './events';
 import { updateCustomers, updateHelpers, hireHelper } from './agents';
 import { computeGuide, type GuideTarget } from './guide';
+import { deliverOrder, orderRoom, updateTotals } from './endless';
+import { finaleWarmRadius, setBeaconStage, updateFinale } from './finale';
 import { migrate } from './save';
 import { nextRandom } from './rng';
 import {
@@ -42,6 +45,12 @@ export class Sim {
   private solidCache: Solid[] | null = null;
   private rectCache: Rect[] | null = null;
   private padTickT = 0;
+  private nav: NavGrid | null = null;
+  private allSolidsCache: Solid[] | null = null;
+  private allSolidsTick = -1;
+  private allSolidsBase: Solid[] | null = null;
+  private navSolids: Solid[] | null = null;
+  private navRects: Rect[] | null = null;
 
   constructor(data: GameData, opts: { seed?: number; save?: string } = {}) {
     this.data = data;
@@ -104,6 +113,8 @@ export class Sim {
     this.updateLinks(dt);
     updateHelpers(this, dt);
     updateCustomers(this, dt);
+    updateFinale(this, dt);
+    updateTotals(this, dt);
     this.updateQuest();
   }
 
@@ -165,9 +176,34 @@ export class Sim {
     return this.state.hearth.cosy;
   }
 
-  warmRadius(level = this.state.hearth.level): number {
+  /** Warm radius for a Hearth level; with no argument, the current one (whole map once the finale's dawn breaks). */
+  warmRadius(level?: number): number {
     const w = this.data.balance.warmRadius;
-    return w[Math.max(0, Math.min(w.length - 1, level - 1))];
+    const base = w[Math.max(0, Math.min(w.length - 1, (level ?? this.state.hearth.level) - 1))];
+    return level === undefined ? finaleWarmRadius(this, base) : base;
+  }
+
+  /** Embers paid per dish of `item` right now (price + bonuses, ×Cosy). */
+  dishPrice(item: ItemKind): number {
+    const s = this.state;
+    return (this.data.items[item].price + s.mods.pricePlus) * s.mods.priceMul * (s.hearth.cosy ? this.data.balance.cosyMultiplier : 1);
+  }
+
+  /** Current ember cost of a pad (repeatable pads grow with each level bought). */
+  padCost(id: string): number {
+    const def = this.padDefs.get(id)!;
+    if (!def.repeat) return def.cost;
+    const lv = this.state.pads[id]?.level ?? 0;
+    return Math.round(def.cost * Math.pow(def.repeat.growth, lv));
+  }
+
+  /** Times a repeatable pad has been bought. */
+  padLevel(id: string): number {
+    return this.state.pads[id]?.level ?? 0;
+  }
+
+  invalidateRects(): void {
+    this.rectCache = null;
   }
 
   /** Total fuel as 0..1 of the Hearth's capacity. */
@@ -211,12 +247,17 @@ export class Sim {
   /** Solids including currently standing trees. */
   allSolids(): Solid[] {
     const base = this.solids();
+    // Cached for the current tick (nodes only fall/regrow in updateInteract/updateStations; a one-step lag is harmless).
+    if (this.allSolidsCache && this.allSolidsTick === this.state.tick && this.allSolidsBase === base) return this.allSolidsCache;
     const out = base.slice();
     for (const d of this.data.stations) {
       if (d.type !== 'node' || !d.solid || !('r' in d.solid)) continue;
       const st = this.state.stations[d.id] as NodeState;
       if (st.alive) out.push({ kind: 'circle', x: d.x, z: d.z, r: d.solid.r });
     }
+    this.allSolidsCache = out;
+    this.allSolidsTick = this.state.tick;
+    this.allSolidsBase = base;
     return out;
   }
 
@@ -239,7 +280,46 @@ export class Sim {
   /** Next waypoint from the player towards (x,z) through open areas (for the arrow and the bot). */
   navFromPlayer(x: number, z: number): { x: number; z: number } {
     const p = this.state.player;
-    return navNext(this.walkRects(), p.x, p.z, x, z);
+    const rects = this.walkRects();
+    const solidsNow = this.solids();
+    if (!this.nav || this.navSolids !== solidsNow || this.navRects !== rects) {
+      this.nav = new NavGrid(rects, solidsNow, this.data.balance.playerRadius);
+      this.navSolids = solidsNow;
+      this.navRects = rects;
+    }
+    const g = this.nav.next(p.x, p.z, x, z);
+    if (g) return g;
+    const w = navNext(rects, p.x, p.z, x, z);
+    if (w.x === x && w.z === z) return w;
+    // The portal waypoint may sit inside a tent or prop: slide it to the nearest free point still inside the portal.
+    const r = this.data.balance.playerRadius;
+    const solids = this.allSolids();
+    const free = (qx: number, qz: number) => {
+      let n = 0;
+      for (const rc of rects) if (qx >= rc.x0 + r && qx <= rc.x1 - r && qz >= rc.z0 + r && qz <= rc.z1 - r) n++;
+      if (n < 2) return false;
+      const q = { x: qx, z: qz };
+      pushOut(q, r + 0.1, solids);
+      return Math.abs(q.x - qx) + Math.abs(q.z - qz) < 1e-6;
+    };
+    if (free(w.x, w.z)) return w;
+    for (let rad = 0.3; rad <= 4.5; rad += 0.3) {
+      let best: { x: number; z: number } | null = null;
+      let bd = Infinity;
+      for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * Math.PI * 2;
+        const qx = w.x + Math.cos(a) * rad;
+        const qz = w.z + Math.sin(a) * rad;
+        if (!free(qx, qz)) continue;
+        const d = Math.hypot(qx - p.x, qz - p.z) + Math.hypot(x - qx, z - qz);
+        if (d < bd) {
+          bd = d;
+          best = { x: qx, z: qz };
+        }
+      }
+      if (best) return best;
+    }
+    return w;
   }
 
   questProgress(): QuestProgress {
@@ -255,7 +335,7 @@ export class Sim {
     } else if (g.type === 'pad') {
       const def = this.padDefs.get(g.pad)!;
       const ps = s.pads[g.pad];
-      max = def.cost + sumCounts(def.materials);
+      max = this.padCost(def.id) + sumCounts(def.materials);
       cur = ps.paid + sumCounts(ps.mats);
     } else if (g.type === 'hearth') {
       cur = s.hearth.level;
@@ -279,7 +359,7 @@ export class Sim {
       const r = (def.materials![kk] ?? 0) - (ps.mats[kk] ?? 0);
       if (r > 0) mats[kk] = r;
     }
-    return { embers: Math.max(0, def.cost - ps.paid), mats };
+    return { embers: Math.max(0, this.padCost(id) - ps.paid), mats };
   }
 
   /** Pad visible but gated by population. */
@@ -333,6 +413,7 @@ export class Sim {
       case 'counter':
         return d.item === item ? Math.max(0, d.cap - (st as CounterState).stock) : 0;
       case 'deposit':
+        if (d.role === 'orders') return byHelper ? 0 : orderRoom(this, item);
         return d.accepts.includes(item) ? Math.max(0, d.cap - (st as DepositState).count) : 0;
       case 'pile':
         return byHelper && d.accepts && d.item === item ? Math.max(0, d.cap - (st as PileState).count) : 0;
@@ -343,6 +424,12 @@ export class Sim {
 
   put(id: string, item: ItemKind): void {
     const st = this.state.stations[id];
+    const od = this.stationDefs.get(id);
+    if (od && od.type === 'deposit' && od.role === 'orders') {
+      this.addStat(`deliver.${id}`, 1);
+      deliverOrder(this, item);
+      return;
+    }
     if (st.kind === 'processor') st.inputs[item] = (st.inputs[item] ?? 0) + 1;
     else if (st.kind === 'counter') st.stock++;
     else if (st.kind === 'deposit') st.count++;
@@ -397,6 +484,7 @@ export class Sim {
     }
 
     // Pads.
+    const prevPad = p.onPad;
     p.onPad = null;
     for (const def of this.data.pads) {
       const ps = s.pads[def.id];
@@ -406,6 +494,7 @@ export class Sim {
         break;
       }
     }
+    if (prevPad && prevPad !== p.onPad && s.pads[prevPad]) s.pads[prevPad].hold = false;
     if (p.onPad && !this.padLocked(p.onPad)) {
       p.padTime += dt;
       this.payPad(p.onPad, dt);
@@ -431,7 +520,7 @@ export class Sim {
       const st = this.state.stations[best.id] as NodeState;
       if (p.stack.length < p.capacity || st.ground < best.groundCap) {
         p.working = best.id;
-        st.work += dt * s.mods.chopSpeed;
+        st.work += dt * s.mods[best.speedMod ?? 'chopSpeed'];
         if (st.work >= best.hitTime) {
           st.work -= best.hitTime;
           this.hitNode(best, PLAYER, p.stack, p.capacity);
@@ -462,6 +551,7 @@ export class Sim {
     for (let i = 0; i < def.yieldPerHit; i++) {
       if (stack.length < cap) {
         stack.push(def.item);
+        if (by.kind === 'player') this.addStat('carried', 1);
         this.emit({ type: 'pickup', item: def.item, from: { kind: 'ground', id: def.id }, by, height: stack.length });
       } else if (st.ground < def.groundCap) {
         st.ground++;
@@ -530,7 +620,8 @@ export class Sim {
     for (const d of inReach) {
       if (d.type !== 'pile') continue;
       const ps = this.state.stations[d.id] as PileState;
-      if (ps.count >= d.cap) continue;
+      // Accepting piles (racks, woodpile) take a full pack back even past their cap, so a pack is never stuck full.
+      if (ps.count >= d.cap + (d.accepts ? p.capacity : 0)) continue;
       if (p.returning !== d.id && !(still && p.stack.length >= p.capacity && p.pickedFrom !== d.id)) continue;
       const i = p.stack.lastIndexOf(d.item);
       if (i < 0) continue;
@@ -558,6 +649,7 @@ export class Sim {
       if (d.type === 'pile') p.pickedFrom = d.id;
       p.stack.push(it);
       this.addStat(`pickup.${it}`, 1);
+      this.addStat('carried', 1);
       const from: Place = d.type === 'node' ? { kind: 'ground', id: d.id } : { kind: 'station', id: d.id };
       this.emit({ type: 'pickup', item: it, from, by: PLAYER, height: p.stack.length });
       return true;
@@ -571,10 +663,12 @@ export class Sim {
     const s = this.state;
     const def = this.padDefs.get(id)!;
     const ps = s.pads[id];
-    const remaining = def.cost - ps.paid;
+    if (ps.hold) return;
+    const cost = this.padCost(id);
+    const remaining = cost - ps.paid;
     if (remaining > 0 && s.embers > 0) {
       const b = this.data.balance;
-      const rate = Math.max(b.padBaseRate, def.cost / b.padSecondsToFill) * (1 + b.padAccel * s.player.padTime);
+      const rate = Math.max(b.padBaseRate, cost / b.padSecondsToFill) * (1 + b.padAccel * s.player.padTime);
       ps.acc += rate * dt;
       const n = Math.min(Math.floor(ps.acc), remaining, s.embers);
       if (n > 0) {
@@ -584,7 +678,7 @@ export class Sim {
         this.padTickT -= dt;
         if (this.padTickT <= 0) {
           this.padTickT = 0.07;
-          this.emit({ type: 'padTick', pad: id, frac: ps.paid / def.cost });
+          this.emit({ type: 'padTick', pad: id, frac: ps.paid / cost });
         }
       }
     } else {
@@ -596,7 +690,7 @@ export class Sim {
   private checkPadDone(id: string): void {
     const def = this.padDefs.get(id)!;
     const ps = this.state.pads[id];
-    if (ps.done || ps.paid < def.cost) return;
+    if (ps.done || ps.hold || ps.paid < this.padCost(id)) return;
     for (const k in def.materials ?? {}) {
       const kk = k as ItemKind;
       if ((ps.mats[kk] ?? 0) < (def.materials![kk] ?? 0)) return;
@@ -609,6 +703,24 @@ export class Sim {
     if (!def) return;
     const ps = this.state.pads[id];
     if (ps.done) return;
+    if (def.repeat) {
+      // Repeatable upgrade: level up, reset, and wait for the player to step off before taking more.
+      const lv = (ps.level ?? 0) + 1;
+      ps.level = lv;
+      ps.paid = 0;
+      ps.mats = {};
+      ps.acc = 0;
+      ps.hold = true;
+      this.state.player.padTime = 0;
+      if (def.repeat.max !== undefined && lv >= def.repeat.max) ps.done = true;
+      this.addStat('padsDone', 1);
+      this.addStat('upgrades', 1);
+      this.emit({ type: 'padComplete', pad: id });
+      this.emit({ type: 'upgrade', pad: id, level: lv, cost: this.padCost(id), maxed: ps.done });
+      for (const e of def.effects) this.applyEffect(e, lv);
+      this.refreshPads(true);
+      return;
+    }
     ps.done = true;
     ps.paid = def.cost;
     ps.mats = { ...(def.materials ?? {}) };
@@ -618,13 +730,39 @@ export class Sim {
     this.refreshPads(true);
   }
 
-  applyEffect(e: Effect): void {
+  /** Apply a pad effect. `level` is the pad level just reached (repeatable pads), 1 otherwise. */
+  applyEffect(e: Effect, level = 1): void {
     const s = this.state;
     switch (e.type) {
       case 'unlock':
         s.unlocked[e.id] = true;
         this.invalidateSolids();
         this.emit({ type: 'unlock', id: e.id });
+        this.openCrowd(e.id);
+        break;
+      case 'growth': {
+        const bonus = (lv: number) => e.max * (1 - Math.pow(1 - e.rate, lv));
+        if (e.key === 'helperCapacity' || e.key === 'pricePlus') {
+          s.mods[e.key] += Math.floor(bonus(level)) - Math.floor(bonus(level - 1));
+        } else {
+          s.mods[e.key] *= (1 + bonus(level)) / (1 + bonus(level - 1));
+        }
+        break;
+      }
+      case 'tool': {
+        const lv = (s.tools[e.tool] ?? 0) + 1;
+        s.tools[e.tool] = lv;
+        this.emit({ type: 'toolUpgrade', tool: e.tool, level: lv });
+        break;
+      }
+      case 'beacon':
+        setBeaconStage(this, e.stage);
+        break;
+      case 'decorate':
+        for (const id of e.ids) s.unlocked[id] = true;
+        this.invalidateSolids();
+        this.addStat('decorations', 1);
+        this.emit({ type: 'decorate', ids: e.ids });
         break;
       case 'capacity':
         s.player.capacity = Math.min(this.data.balance.maxCapacity, s.player.capacity + e.add);
@@ -783,7 +921,12 @@ export class Sim {
       }
       ls.t += dt;
       const last = ls.belt[ls.belt.length - 1];
-      if (ls.t >= l.interval && ls.belt.length < l.maxOnBelt && (!last || last.p >= gap) && this.takeable(l.from, l.item)) {
+      // The player standing at the source with room in their pack gets first pick (the belt waits).
+      const fd = this.stationDefs.get(l.from);
+      const pl = this.state.player;
+      const playerTaking = !!fd && pl.stack.length < pl.capacity && Math.hypot(fd.x - pl.x, fd.z - pl.z) <= fd.reach
+        && Math.hypot(pl.vx, pl.vz) < 0.5;
+      if (!playerTaking && ls.t >= l.interval && ls.belt.length < l.maxOnBelt && (!last || last.p >= gap) && this.takeable(l.from, l.item)) {
         ls.t = 0;
         this.take(l.from);
         ls.belt.push({ item: l.item, p: 0 });
@@ -794,6 +937,17 @@ export class Sim {
   }
 
   // ------------------------------------------------------------------ customers & embers (shared with agents)
+
+  /** A crowd counter just opened: a big crowd of Icebound streams in from the storm at once. */
+  private openCrowd(id: string): void {
+    const c = this.stationDefs.get(id);
+    if (!c || c.type !== 'counter' || !c.startCrowd || !this.state.areasOpen[c.area]) return;
+    const cs = this.state.stations[id] as CounterState;
+    const n = Math.min(c.startCrowd, c.queueLen - cs.queue.length);
+    for (let i = 0; i < n; i++) {
+      this.spawnCustomerAt(c, c.spawn.x + (this.rand() - 0.5) * 6, c.spawn.z + (this.rand() - 0.5) * 6);
+    }
+  }
 
   spawnCustomerAt(c: CounterDef, x: number, z: number): void {
     const s = this.state;
@@ -828,6 +982,7 @@ export class Sim {
     const s = this.state;
     s.quest.index = index;
     const q = this.data.quests[index];
+    s.quest.id = q?.id;
     if (!q) return;
     s.quest.base = q.goal.type === 'stat' ? s.stats[q.goal.stat] ?? 0 : 0;
     if (emit) this.emit({ type: 'questStart', quest: q.id, index });

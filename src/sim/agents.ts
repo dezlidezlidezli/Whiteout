@@ -2,6 +2,7 @@
 
 import type { CounterDef, HelperDef, ItemKind, NodeDef } from '../data/types';
 import { pushOut, steer } from './collision';
+import { courier } from './courier';
 import type { Sim } from './sim';
 import type { CounterState, CustomerState, HelperState, NodeState } from './state';
 
@@ -10,24 +11,28 @@ import type { CounterState, CustomerState, HelperState, NodeState } from './stat
 export function updateCustomers(sim: Sim, dt: number): void {
   const s = sim.state;
   const b = sim.data.balance;
-  const counters = sim.data.stations.filter((d): d is CounterDef => d.type === 'counter' && sim.isUsable(d.id));
+  const counters = counterDefs(sim).filter((d) => sim.isUsable(d.id));
 
   // Spawning: each counter draws its own trickle of Icebound out of the storm.
   s.spawnT += dt * s.mods.spawnRate;
   if (s.spawnT >= b.spawnInterval) {
     s.spawnT -= b.spawnInterval;
     let waiting = 0;
-    for (const c of s.customers) if (c.phase === 'queue') waiting++;
+    // Only counters without their own crowd (spawnPer) share the global maxCustomers cap.
+    for (const c of s.customers) if (c.phase === 'queue' && (sim.stationDefs.get(c.counter) as CounterDef).spawnPer === undefined) waiting++;
     for (const c of counters) {
-      const q = (s.stations[c.id] as CounterState).queue.length;
-      if (q < c.queueLen && waiting < b.maxCustomers) {
-        waiting++;
-        sim.spawnCustomerAt(c, c.spawn.x + (sim.rand() - 0.5) * 3, c.spawn.z + sim.rand() * 2);
+      // Crowd counters (spawnPer) keep a big standing crowd and are capped by their own queueLen only.
+      for (let k = 0; k < (c.spawnPer ?? 1); k++) {
+        const q = (s.stations[c.id] as CounterState).queue.length;
+        if (q < c.queueLen && (c.spawnPer !== undefined || waiting < b.maxCustomers)) {
+          waiting++;
+          sim.spawnCustomerAt(c, c.spawn.x + (sim.rand() - 0.5) * 3, c.spawn.z + sim.rand() * 2);
+        }
       }
     }
   }
 
-  const price = (item: ItemKind) => (sim.data.items[item].price + s.mods.pricePlus) * (s.hearth.cosy ? b.cosyMultiplier : 1);
+  const price = (item: ItemKind) => sim.dishPrice(item);
 
   // Serving (front of each queue).
   for (const c of counters) {
@@ -63,15 +68,14 @@ export function updateCustomers(sim: Sim, dt: number): void {
 
   // Movement.
   const camp = sim.data.camp;
+  const slots = queueSlots(sim);
   for (let i = s.customers.length - 1; i >= 0; i--) {
     const cu = s.customers[i];
-    const c = sim.data.stations.find((d) => d.id === cu.counter) as CounterDef;
+    const c = sim.stationDefs.get(cu.counter) as CounterDef;
     if (cu.phase === 'queue') {
-      const cs = s.stations[c.id] as CounterState;
-      const slot = Math.max(0, cs.queue.indexOf(cu.id));
-      const tx = c.queueStart.x + c.queueDir.x * c.queueSpacing * slot;
-      const tz = c.queueStart.z + c.queueDir.z * c.queueSpacing * slot;
-      moveTo(cu, tx, tz, b.customerSpeed * dt);
+      const slot = slots.get(cu.id) ?? 0;
+      const t = queueSlotPos(c, slot);
+      moveTo(cu, t.x, t.z, b.customerSpeed * dt);
     } else if (cu.phase === 'thaw') {
       cu.t += dt;
       if (cu.t >= b.thawTime) {
@@ -94,6 +98,60 @@ export function updateCustomers(sim: Sim, dt: number): void {
     }
   }
   void camp;
+}
+
+const slotMap = new Map<number, number>();
+const counterCache = new WeakMap<object, CounterDef[]>();
+
+function counterDefs(sim: Sim): CounterDef[] {
+  let c = counterCache.get(sim.data);
+  if (!c) {
+    c = sim.data.stations.filter((d): d is CounterDef => d.type === 'counter');
+    counterCache.set(sim.data, c);
+  }
+  return c;
+}
+const slotCache = new WeakMap<CounterDef, { x: number; z: number }[]>();
+
+/** Customer id → queue slot, for every counter (one pass instead of indexOf per customer). */
+function queueSlots(sim: Sim): Map<number, number> {
+  const m = slotMap;
+  m.clear();
+  for (const d of counterDefs(sim)) {
+    const st = sim.state.stations[d.id] as CounterState;
+    for (let i = 0; i < st.queue.length; i++) m.set(st.queue[i], i);
+  }
+  return m;
+}
+
+/** World position of queue slot `slot`: along queuePath when given, else straight along queueDir. */
+export function queueSlotPos(c: CounterDef, slot: number): { x: number; z: number } {
+  let cache = slotCache.get(c);
+  if (!cache) {
+    cache = [];
+    for (let i = 0; i < c.queueLen + 4; i++) cache.push(slotPosRaw(c, i));
+    slotCache.set(c, cache);
+  }
+  return cache[slot] ?? slotPosRaw(c, slot);
+}
+
+function slotPosRaw(c: CounterDef, slot: number): { x: number; z: number } {
+  const path = c.queuePath;
+  if (!path || path.length < 2) {
+    return { x: c.queueStart.x + c.queueDir.x * c.queueSpacing * slot, z: c.queueStart.z + c.queueDir.z * c.queueSpacing * slot };
+  }
+  let d = slot * c.queueSpacing;
+  for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1];
+    const b = path[i];
+    const l = Math.hypot(b.x - a.x, b.z - a.z);
+    if (d <= l || i === path.length - 1) {
+      const k = l > 0 ? d / l : 0;
+      return { x: a.x + (b.x - a.x) * k, z: a.z + (b.z - a.z) * k };
+    }
+    d -= l;
+  }
+  return path[path.length - 1];
 }
 
 function moveTo(o: { x: number; z: number }, tx: number, tz: number, step: number): boolean {
@@ -132,16 +190,17 @@ export function updateHelpers(sim: Sim, dt: number): void {
     h.action = 'none';
     if (def.role === 'haul') haul(sim, def, h, dt);
     else if (def.role === 'harvest') harvest(sim, def, h, dt);
+    else if (def.role === 'courier') courier(sim, def, h, dt);
     else operate(sim, def, h, dt);
   }
 }
 
-function helperSpeed(sim: Sim, def: HelperDef): number {
+export function helperSpeed(sim: Sim, def: HelperDef): number {
   const s = sim.state;
   return def.speed * s.mods.helperSpeed * (s.hearth.cosy ? sim.data.balance.cosyHelperSpeed : 1);
 }
 
-function capOf(sim: Sim, def: HelperDef): number {
+export function capOf(sim: Sim, def: HelperDef): number {
   return def.capacity + sim.state.mods.helperCapacity;
 }
 
@@ -295,7 +354,7 @@ function harvest(sim: Sim, def: HelperDef, h: HelperState, dt: number): void {
   }
   h.action = 'chop';
   h.facing = Math.atan2(node.x - h.x, node.z - h.z);
-  h.t += dt * sim.state.mods.chopSpeed * (sim.state.hearth.cosy ? sim.data.balance.cosyHelperSpeed : 1);
+  h.t += dt * sim.state.mods[node.speedMod ?? 'chopSpeed'] * (sim.state.hearth.cosy ? sim.data.balance.cosyHelperSpeed : 1);
   if (h.t >= node.hitTime * 1.5) {
     h.t = 0;
     sim.hitNode(node, { kind: 'helper', id: def.id }, h.stack, cap);

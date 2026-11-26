@@ -101,6 +101,8 @@ export interface NodeDef extends StationBase {
   regrow: number;
   /** Items that spill to the ground when the harvester's stack is full. */
   groundCap: number;
+  /** Global modifier that scales work speed here (default 'chopSpeed'). */
+  speedMod?: ModKey;
 }
 
 export interface ProcessorDef extends StationBase {
@@ -135,14 +137,23 @@ export interface CounterDef extends StationBase {
   spawn: Vec2;
   wantMin: number;
   wantMax: number;
+  /** Optional queue polyline (starting at queueStart); slots are laid along it instead of queueDir. */
+  queuePath?: Vec2[];
+  /**
+   * Icebound drawn per spawn tick for this counter (default 1). Counters that set it keep a big standing
+   * crowd (serving is supply-limited) and are not limited by Balance.maxCustomers, only by queueLen.
+   */
+  spawnPer?: number;
+  /** Icebound that stream in at once when the counter opens. */
+  startCrowd?: number;
 }
 
 export interface DepositDef extends StationBase {
   type: 'deposit';
   accepts: ItemKind[];
   cap: number;
-  /** 'fuel' feeds the Hearth (Cosy bonus). */
-  role: 'fuel' | 'store';
+  /** 'fuel' feeds the Hearth (Cosy bonus). 'orders' = the Open Season notice board (takes items for open orders). */
+  role: 'fuel' | 'store' | 'orders';
 }
 
 export type StationDef = PileDef | NodeDef | ProcessorDef | CounterDef | DepositDef;
@@ -168,7 +179,17 @@ export type Effect =
   | { type: 'capacity'; add: number }
   | { type: 'hire'; helper: string }
   | { type: 'hearth'; level: number }
-  | { type: 'mod'; key: ModKey; add?: number; mul?: number };
+  | { type: 'mod'; key: ModKey; add?: number; mul?: number }
+  /** Repeatable upgrade: total bonus after L levels is max·(1−(1−rate)^L) (multiplicative, or additive for add-type mods). */
+  | { type: 'growth'; key: ModKey; max: number; rate: number }
+  /** Tool tier up (view swaps the tool model). */
+  | { type: 'tool'; tool: ToolKind }
+  /** Great Beacon stage complete (1..4); stage 4 starts the finale. */
+  | { type: 'beacon'; stage: number }
+  /** Cosmetic camp decoration: unlocks these decor ids. */
+  | { type: 'decorate'; ids: string[] };
+
+export type ToolKind = 'axe' | 'pick' | 'kettle' | 'auger';
 
 export type ModKey =
   | 'moveSpeed'
@@ -178,7 +199,10 @@ export type ModKey =
   | 'cookSpeed'
   | 'chopSpeed'
   | 'helperSpeed'
-  | 'helperCapacity';
+  | 'helperCapacity'
+  | 'fishSpeed'
+  | 'mineSpeed'
+  | 'priceMul';
 
 export type PadIcon = { prop: string; level?: number } | { item: ItemKind } | { character: string };
 
@@ -196,9 +220,13 @@ export interface PadDef {
   requiresPop?: number;
   effects: Effect[];
   icon: PadIcon;
+  /** Repeatable pad: after each completion the cost grows ×growth (up to `max` levels, default infinite). */
+  repeat?: { growth: number; max?: number };
+  /** UI grouping for Open Season pads. */
+  group?: 'upgrade' | 'decor';
 }
 
-export type HelperRole = 'haul' | 'harvest' | 'operate';
+export type HelperRole = 'haul' | 'harvest' | 'operate' | 'courier';
 
 export interface HelperDef {
   id: string;
@@ -221,6 +249,8 @@ export interface HelperDef {
   station?: string;
   /** Seconds per item transfer. */
   transferTime: number;
+  /** courier: fixed trail from the source depot (first point) to the destination depot (last point). */
+  route?: Vec2[];
 }
 
 export interface LinkDef {
@@ -253,6 +283,9 @@ export type QuestGuide =
   | { type: 'station'; id: string }
   | { type: 'harvest'; tag: string }
   | { type: 'earn' }
+  | { type: 'pad'; pad: string }
+  | { type: 'orders' }
+  | { type: 'openSeason' }
   | { type: 'none' };
 
 export interface QuestDef {
@@ -304,6 +337,42 @@ export interface Balance {
   padAccel: number;
 }
 
+/** One kind of caravan order the notice board can post. */
+export interface OrderKindDef {
+  item: ItemKind;
+  /** Base quantity at season 1. */
+  n: number;
+  /** Embers per unit at season 1. */
+  value: number;
+  /** Relative draw weight. */
+  weight: number;
+}
+
+export interface EndlessDef {
+  /** Station id of the notice board (a deposit with role 'orders'). */
+  board: string;
+  slots: number;
+  orders: OrderKindDef[];
+  /** Orders completed per season level. */
+  ordersPerSeason: number;
+  /** Per season level above 1: quantity growth and per-unit reward growth (linear, gentle). */
+  seasonQty: number;
+  seasonValue: number;
+  /** Quantity never exceeds base·qtyCapMul. */
+  qtyCapMul: number;
+}
+
+export interface FinaleDef {
+  /** Seconds of each cinematic phase (the sim keeps running; the view drives the camera from progress). */
+  lightingTime: number;
+  dawnTime: number;
+  /** Embers granted at dawn, piled at the beacon. */
+  reward: number;
+  rewardSpot: Vec2;
+  /** Warm radius once the Long Night has ended (covers the whole map). */
+  warmRadius: number;
+}
+
 export interface GameData {
   items: Record<ItemKind, ItemDef>;
   recipes: Record<string, RecipeDef>;
@@ -318,4 +387,6 @@ export interface GameData {
   quests: QuestDef[];
   camp: CampDef;
   playerStart: Vec2;
+  endless: EndlessDef;
+  finale: FinaleDef;
 }

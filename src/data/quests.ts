@@ -1,3 +1,4 @@
+import { LATE_QUESTS } from './quests_late';
 import type { QuestDef } from './types';
 
 // Linear quest chain. The first few double as the tutorial (no text walls).
@@ -47,6 +48,6 @@ export const QUESTS: QuestDef[] = [
   { id: 'q_cabin3', text: 'Raise a third cabin', goal: { type: 'pad', pad: 'pad_cabin3' }, reward: 50 },
   { id: 'q_hearth3', text: 'Raise the Hearth again', goal: { type: 'pad', pad: 'pad_hearth3' }, reward: 60,
     hint: 'The Frozen Lake lies beyond the eastern frost' },
-  // ---- End of the current content ----
-  { id: 'q_more', text: 'The Frozen Lake thaws soon…', goal: { type: 'never' }, guide: { type: 'none' }, reward: 0 },
+  // ---- Frozen Lake, Ironridge, Beacon Peak, Open Season (see quests_late.ts) ----
+  ...LATE_QUESTS,
 ];

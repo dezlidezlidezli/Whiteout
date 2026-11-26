@@ -2,7 +2,31 @@ import { SAVE_VERSION, type SimState } from './state';
 
 /** Migrations keyed by the version they upgrade FROM. Each returns state at version+1. */
 const MIGRATIONS: Record<number, (s: any) => any> = {
-  // 1: (s) => ({ ...s, newField: 0, version: 2 }),
+  // v1 → v2: Areas 3–5, finale and Open Season. v1 content ended on the placeholder quest 'q_more'
+  // (index 32); the Frozen Lake chain now starts at that index, so the quest index carries over as is.
+  1: (s) => ({
+    ...s,
+    version: 2,
+    quest: { ...s.quest, id: s.quest?.index === 32 ? 'q_lakefish' : undefined },
+    beacon: 0,
+    finale: { phase: 'none', t: 0, progress: 0 },
+    tools: { ...(s.pads?.pad_axe?.done ? { axe: 1 } : {}), ...(s.pads?.pad_pots?.done ? { kettle: 1 } : {}) },
+    orders: [],
+    nextOrderId: 1,
+    season: 1,
+    totals: {
+      served: s.stats?.served ?? 0,
+      thawed: s.stats?.thawed ?? 0,
+      embersEarned: s.stats?.embersEarned ?? 0,
+      carried: 0,
+      distance: 0,
+      playTime: s.time ?? 0,
+      ordersDone: 0,
+      upgrades: 0,
+      decorations: 0,
+    },
+    mods: { ...s.mods, fishSpeed: 1, mineSpeed: 1, priceMul: 1 },
+  }),
 };
 
 export function migrate(raw: { v?: number; state?: any }): SimState {

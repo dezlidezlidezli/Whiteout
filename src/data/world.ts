@@ -8,6 +8,7 @@
 //
 // Screen "up" is -Z (the camera looks from +Z).
 
+import { LATE_LANES } from './late';
 import type { AreaDef, CampDef, DecorDef, HelperDef, LinkDef, PadDef, StationDef, Vec2, WallDef } from './types';
 
 export const AREAS: AreaDef[] = [
@@ -34,7 +35,7 @@ export const STATIONS: StationDef[] = [
   // ---- Camp ----
   {
     id: 'hearth', type: 'deposit', area: 'camp', name: 'Hearth', model: 'hearth', x: 0, z: 0,
-    solid: { r: 1.25 }, reach: 2.5, accepts: ['log'], cap: 16, role: 'fuel',
+    solid: { r: 1.25 }, reach: 2.5, accepts: ['log'], cap: 40, role: 'fuel',
   },
   // ---- Kettle Yard ----
   {
@@ -175,9 +176,9 @@ export const PADS: PadDef[] = [
   { id: 'pad_pack3', area: 'pinewood', x: -17.0, z: 12.4, label: 'Sturdy pack', cost: 260, materials: { plank: 6 }, requires: ['pad_sawmill'],
     effects: [{ type: 'capacity', add: 4 }], icon: { item: 'log' } },
   { id: 'pad_axe', area: 'pinewood', x: -13.8, z: 12.6, label: 'Sharper axe', cost: 220, requires: ['pad_pack3'],
-    effects: [{ type: 'mod', key: 'chopSpeed', mul: 1.6 }], icon: { prop: 'stump' } },
+    effects: [{ type: 'mod', key: 'chopSpeed', mul: 1.6 }, { type: 'tool', tool: 'axe' }], icon: { prop: 'stump' } },
   { id: 'pad_pots', area: 'kettleYard', x: 5.0, z: 15.0, label: 'Copper pots', cost: 340, materials: { plank: 10 }, requires: ['pad_cabin1'],
-    effects: [{ type: 'mod', key: 'cookSpeed', mul: 1.6 }, { type: 'mod', key: 'pricePlus', add: 1 }], icon: { prop: 'kettle', level: 2 } },
+    effects: [{ type: 'mod', key: 'cookSpeed', mul: 1.6 }, { type: 'mod', key: 'pricePlus', add: 1 }, { type: 'tool', tool: 'kettle' }], icon: { prop: 'kettle', level: 2 } },
   { id: 'pad_lumberjack', area: 'pinewood', x: -11.4, z: 0.6, label: 'Hire a lumberjack', cost: 420, requires: ['pad_cabin1', 'pad_pack3'],
     requiresPop: 45, effects: [{ type: 'unlock', id: 'woodpile' }, { type: 'hire', helper: 'lumberjack' }], icon: { character: 'lumberjack' } },
   { id: 'pad_boots', area: 'camp', x: 3.4, z: -2.2, label: 'Warm boots', cost: 330, requires: ['pad_pots'],
@@ -226,14 +227,12 @@ export const DECOR: DecorDef[] = [
   { id: 'bench2', area: 'camp', model: 'bench', x: 2.6, z: 2.3, rot: -2.3 },
   { id: 'barrel1', area: 'kettleYard', model: 'barrel', x: -6.0, z: 8.0, solid: { r: 0.4 } },
   { id: 'crate1', area: 'kettleYard', model: 'crate', x: -5.8, z: 16.4, solid: { r: 0.45 } },
-  { id: 'snowman1', area: 'camp', model: 'snowman', x: 7.8, z: 6.4, solid: { r: 0.45 } },
-  { id: 'board1', area: 'camp', model: 'noticeBoard', x: 7.6, z: 0.5, rot: -Math.PI / 2, solid: { r: 0.5 } },
+  { id: 'snowman1', area: 'camp', model: 'snowman', x: 7.8, z: 6.4 }, // no collision: it stands in the yard–lake passage
   { id: 'brazier1', area: 'pinewood', model: 'brazier', x: -9.8, z: 11.6 },
   { id: 'sled1', area: 'pinewood', model: 'sled', x: -10.2, z: -7.8, rot: 0.6, solid: { r: 0.6 } },
   { id: 'sign_lake', area: 'frozenLake', model: 'signpost', x: 10.2, z: 4.0, rot: -0.4 },
   { id: 'sign_ridge', area: 'ironridge', model: 'signpost', x: 3, z: -10.2, rot: 0.2 },
   ...fences(),
-  ...lakeDecor(),
   ...forest(),
 ];
 
@@ -253,18 +252,6 @@ function fences(): DecorDef[] {
   return out;
 }
 
-function lakeDecor(): DecorDef[] {
-  const out: DecorDef[] = [];
-  const r = lrng(31);
-  for (let i = 0; i < 6; i++) {
-    out.push({ id: `lakehole${i}`, area: 'frozenLake', model: 'iceHole', x: 14 + r() * 10, z: -5 + r() * 14, seed: i });
-  }
-  for (let i = 0; i < 8; i++) {
-    out.push({ id: `lakerock${i}`, area: 'frozenLake', model: 'rock', x: 10 + r() * 16, z: -8 + r() * 22, rot: r() * 6, seed: i, scale: 0.7 + r() * 0.6 });
-  }
-  return out;
-}
-
 /** True if a point lies inside any walkable rect (expanded by m) or a reserved corridor. */
 function nearPlay(x: number, z: number, m: number): boolean {
   for (const a of AREAS) {
@@ -274,6 +261,8 @@ function nearPlay(x: number, z: number, m: number): boolean {
   }
   // Icebound walk-in lanes south of the yard.
   if (z > 18 && z < 44 && (Math.abs(x + 2.2) < 2.2 || Math.abs(x - 3) < 2.2)) return true;
+  // Queues and walk-in lanes of the late counters.
+  for (const rc of LATE_LANES) if (x > rc.x0 - m && x < rc.x1 + m && z > rc.z0 - m && z < rc.z1 + m) return true;
   return false;
 }
 

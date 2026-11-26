@@ -1,4 +1,5 @@
-import type { AreaId, ItemKind } from '../data/types';
+import type { AreaId, ItemKind, ToolKind } from '../data/types';
+import type { FinalePhase } from './state';
 
 /** Who moved an item: the player, a helper id, or a link id. */
 export type Actor = { kind: 'player' } | { kind: 'helper'; id: string } | { kind: 'link'; id: string };
@@ -33,6 +34,22 @@ export type SimEvent =
   | { type: 'arrive'; customer: number; x: number; z: number; population: number }
   | { type: 'tent'; index: number }
   | { type: 'cosy'; on: boolean }
-  | { type: 'spawn'; customer: number };
+  | { type: 'spawn'; customer: number }
+  // ---- late campaign + Open Season ----
+  /** A sled-dog courier set off along its trail (item null = running back empty). */
+  | { type: 'courierDepart'; helper: string; item: ItemKind | null; n: number }
+  | { type: 'courierArrive'; helper: string; at: 'source' | 'dest'; items: number }
+  | { type: 'toolUpgrade'; tool: ToolKind; level: number }
+  /** A repeatable (Open Season) upgrade pad was bought; `cost` is the next level's price. */
+  | { type: 'upgrade'; pad: string; level: number; cost: number; maxed: boolean }
+  | { type: 'decorate'; ids: string[] }
+  | { type: 'beaconStage'; stage: number }
+  | { type: 'finale'; phase: FinalePhase }
+  /** At dawn: the storm breaks for good. */
+  | { type: 'longNightEnds'; thawed: number; reward: number }
+  | { type: 'orderPosted'; order: number; item: ItemKind; n: number; reward: number; slot: number }
+  | { type: 'orderProgress'; order: number; got: number; n: number }
+  | { type: 'orderComplete'; order: number; item: ItemKind; reward: number }
+  | { type: 'seasonUp'; level: number };
 
 export type SimEventType = SimEvent['type'];
