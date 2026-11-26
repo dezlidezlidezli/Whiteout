@@ -154,7 +154,7 @@ export class View {
     this.items = new ItemBatcher(this.scene);
     this.actors = new Actors(this.scene, this.data);
     this.crowd = new Crowd(this.scene, this.data);
-    this.crowd.residentCap = quality >= 1 ? 52 : 34;
+    this.crowd.residentCap = quality >= 1 ? 44 : 30;
     this.crowd.onEnterHome = (x, z) => {
       this.fx.puff(x, 0.3, z, 5, 0.5, 0.9);
       this.fx.glint(x, 0.9, z, 5, 1.2);

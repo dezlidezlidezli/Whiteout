@@ -266,7 +266,7 @@ const cheat = {
   },
   autoplay: (on = true) => {
     autoplay = on;
-    if (on) hud.hideHint();
+    if (on) markMoved();
   },
   /** Fast-forward the sim headlessly (bot plays), then snap the view. */
   fastForward: (seconds: number) => {
@@ -319,7 +319,7 @@ function loop(now: number): void {
   if (!autoplay) {
     const v = settingsOpen || title ? { x: 0, z: 0 } : stick.vector();
     sim.setMove(v.x, v.z);
-    if (!touchedOnce && Math.hypot(v.x, v.z) > 0.2) markMoved();
+    if (!touchedOnce && (Math.hypot(v.x, v.z) > 0.2 || !isBrandNew())) markMoved();
   }
 
   const t0 = performance.now();

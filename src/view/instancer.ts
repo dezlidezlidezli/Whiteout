@@ -25,6 +25,10 @@ export class PropInstancer {
     tpl.traverse((o) => {
       const m = o as THREE.Mesh;
       if (!m.isMesh) return;
+      // Respect parts the model starts hidden (e.g. an unlit flame).
+      let vis = true;
+      for (let p: THREE.Object3D | null = m; p && p !== tpl; p = p.parent) if (!p.visible) vis = false;
+      if (!vis) return;
       const im = new THREE.InstancedMesh(m.geometry, m.material, capacity);
       im.count = 0;
       im.castShadow = shadows ? shadows.cast : m.castShadow;

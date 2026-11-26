@@ -72,14 +72,12 @@ function assert(cond, msg) {
   b = await pos();
   assert(moved(a, b) > 0.5, 'drag moves the player');
   // A second finger must not steal or re-centre the stick.
-  const dir1 = { x: b.x - a.x, z: b.z - a.z };
+  const m1 = await fk(() => __fk.sim.getMove());
   await touch('touchMove', [[140, 560, 1], [330, 300, 2]]);
   await touch('touchMove', [[140, 560, 1], [380, 200, 2]]);
-  const c0 = await pos();
-  await page.waitForTimeout(600);
-  const c1 = await pos();
-  const dir2 = { x: c1.x - c0.x, z: c1.z - c0.z };
-  assert(dir1.x * dir2.x + dir1.z * dir2.z > 0, 'second finger ignored (same heading)');
+  await page.waitForTimeout(300);
+  const m2 = await fk(() => __fk.sim.getMove());
+  assert(Math.hypot(m1.x - m2.x, m1.z - m2.z) < 0.02 && Math.hypot(m2.x, m2.z) > 0.5, 'second finger ignored (stick vector unchanged)');
   await touch('touchEnd', [[380, 200, 2]]);
   await touch('touchEnd', []);
   await page.waitForTimeout(400);

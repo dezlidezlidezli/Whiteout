@@ -8,6 +8,7 @@ export class Sky {
   readonly mesh: THREE.Mesh;
   private mat: THREE.ShaderMaterial;
   private aurora: THREE.Object3D | null = null;
+  private curtain: THREE.Object3D | null = null;
 
   constructor(parent: THREE.Object3D, horizon: THREE.Color) {
     this.mat = new THREE.ShaderMaterial({
@@ -69,15 +70,25 @@ export class Sky {
     // If the art set provides an aurora mesh, hang it in the northern sky as well.
     if ((PROP_NAMES as readonly string[]).includes('aurora')) {
       this.aurora = createProp('aurora');
-      this.aurora.position.set(0, 26, -95);
-      this.aurora.scale.setScalar(3);
+      this.aurora.position.set(0, 32, -95);
       parent.add(this.aurora);
+      this.curtain = this.aurora.getObjectByName('curtain') ?? this.aurora;
+      // It hangs beyond the fog distance: never fog it out.
+      this.aurora.traverse((o) => {
+        const m = (o as THREE.Mesh).material as THREE.Material | undefined;
+        if (m && 'fog' in m) (m as THREE.MeshBasicMaterial).fog = false;
+      });
     }
   }
 
   update(time: number, camPos: THREE.Vector3): void {
     this.mat.uniforms.uTime.value = time;
     this.mesh.position.copy(camPos);
-    if (this.aurora) this.aurora.position.set(camPos.x, 26, camPos.z - 95);
+    if (this.aurora && this.curtain) {
+      // Gentle wave: breathe in height and drift sideways.
+      this.aurora.position.set(camPos.x + Math.sin(time * 0.07) * 6, 32, camPos.z - 95);
+      this.curtain.scale.y = 1 + Math.sin(time * 0.35) * 0.2;
+      this.curtain.position.x = Math.sin(time * 0.21) * 3;
+    }
   }
 }
