@@ -303,7 +303,10 @@ export class FinaleDirector implements LatePart, MoodSource {
       const f = Number.isFinite(x0) ? new THREE.Vector3((x0 + x1) / 2, 0, (z0 + z1) / 2) : new THREE.Vector3(a.focus.x, 0, a.focus.z);
       const span = Number.isFinite(x0) ? Math.max(x1 - x0, (z1 - z0) * 0.8) : 18;
       const dist = THREE.MathUtils.clamp(span * 0.85, 13, 30);
-      keys.push({ T, pos: at(f, dist * 0.78, dist * 0.92), look: at(f, -0.5, 0.5) });
+      // Linger over each yard: arrive, drift a little sideways, then move on.
+      const slot = (t1 - t0) / Math.max(1, areas.length);
+      keys.push({ T: T - slot * 0.28, pos: at(f, dist * 0.8, dist * 0.92, -1.6), look: at(f, -0.5, 0.5, -0.8) });
+      keys.push({ T: T + slot * 0.28, pos: at(f, dist * 0.74, dist * 0.9, 1.6), look: at(f, -0.5, 0.5, 0.8) });
     });
     keys.push({ T: L + D + 6.6, pos: at(H, 24, 18, 2), look: H.clone().setY(1.0) });
     keys.push({ T: L + D + 9, pos: at(H, 15.5, 9.5, 3), look: H.clone().setY(1.4) });

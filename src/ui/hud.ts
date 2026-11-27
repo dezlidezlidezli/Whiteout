@@ -189,7 +189,8 @@ export class Hud {
   private explainRehoused(sim: Sim, info: HousingInfo): void {
     const r = info.rehoused!;
     const everyone = Math.max(info.lifetimeThawed, r.from);
-    this.toast(`Your camp now counts the villagers it can house: ${fmt(r.to)}. Everyone you have thawed — ${fmt(everyone)} — is in the Journal.`, 'card');
+    const n = (v: number) => Math.round(v).toLocaleString('en-US');
+    this.toast(`Your camp now counts the villagers it can house: ${n(r.to)}. Everyone you have thawed — ${n(everyone)} — is in the Journal.`, 'card');
     ackRehoused(sim);
   }
 

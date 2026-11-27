@@ -62,7 +62,12 @@ function assert(cond, msg) {
     await fk(() => window.__fk.cheat.lateFinale());
     assert((await fk(() => window.__fk.sim.state.finale.phase)) === 'lighting', 'last Beacon stage starts the finale');
     await until(() => document.querySelector('.fk-ui.fk-cinema') !== null, 10000, 'cinema mode');
-    await until(() => window.__fk.sim.state.finale.t > 2.5 || window.__fk.sim.state.finale.phase !== 'lighting', 60000, 'finale runs');
+    // Let the lighting play a little (headless steps: software-rendered browsers run the sim slowly).
+    for (let i = 0; i < 7; i++) {
+      await fk(() => window.__fk.sim.advance(0.4));
+      await page.waitForTimeout(150);
+    }
+    assert((await fk(() => window.__fk.sim.state.finale.t)) > 2.5, 'finale runs');
     await shot('finale-lighting');
     // Close the app mid-finale: the save resumes the sequence.
     await fk(() => window.__fk.cheat.save());
@@ -128,7 +133,8 @@ function assert(cond, msg) {
     }
     await until(() => !!document.querySelector('.fk-journal.fk-open'), 5000, 'Journal opens');
     const tabs = await page.evaluate(() => [...document.querySelectorAll('.fk-jtabs button')].filter((b) => b.style.display !== 'none').map((b) => b.textContent));
-    assert(tabs.join() === 'Stats,Valley', 'Found page hidden until the rescue mechanic exists (' + tabs.join() + ')');
+    const rescueOn = await fk(() => !!window.__fk.sim.data.mechanics.rescue);
+    assert(tabs.join() === (rescueOn ? 'Stats,Valley,Found' : 'Stats,Valley'), `Found page only with the rescue mechanic (rescue ${rescueOn ? 'on' : 'off'}: ${tabs.join()})`);
     await page.evaluate(() => [...document.querySelectorAll('.fk-jtabs button')].find((b) => b.textContent === 'Valley').click());
     assert(await page.evaluate(() => document.querySelectorAll('.fk-jarea').length >= 5), 'Valley page lists the areas');
     await page.click('.fk-journal .fk-close', { force: true });
