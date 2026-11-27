@@ -148,15 +148,16 @@ export const LINKS: LinkDef[] = [
 export const HELPERS: HelperDef[] = [
   {
     id: 'porter', name: 'Porter', role: 'haul', model: 'porter', home: { x: -0.4, z: 7.6 }, capacity: 5, speed: 3.4,
-    from: ['crateA'], to: ['kettleA', 'kettleB'], item: 'fish', transferTime: 0.16,
+    from: ['crateA'], to: ['kettleA'], item: 'fish', transferTime: 0.16,
   },
   {
     id: 'yardFisher', name: 'Fisher', role: 'harvest', model: 'fisher', home: { x: -3.6, z: 7.0 }, capacity: 6,
     speed: 3.4, nodeTag: 'stream', to: ['crateA'], transferTime: 0.12,
   },
   {
-    id: 'cook', name: 'Cook', role: 'operate', model: 'cook', home: { x: 3.6, z: 8.4 }, capacity: 0, speed: 3,
-    station: 'kettleB', transferTime: 0.2,
+    // Runs the second kettle by herself: fetches fish from the crate, cooks at double speed, stacks the stew.
+    id: 'cook', name: 'Cook', role: 'operate', model: 'cook', home: { x: 3.6, z: 8.4 }, capacity: 6, speed: 3.2,
+    station: 'kettleB', from: ['crateA'], transferTime: 0.14,
   },
   {
     id: 'lumberjack', name: 'Lumberjack', role: 'harvest', model: 'lumberjack', home: { x: -13, z: -0.4 }, capacity: 6,
@@ -170,15 +171,15 @@ export const HELPERS: HelperDef[] = [
 
 export const PADS: PadDef[] = [
   // ---- Kettle Yard ----
-  { id: 'pad_pack1', area: 'kettleYard', x: 1.2, z: 12.4, label: 'Bigger pack', cost: 20, requires: [],
+  { id: 'pad_pack1', area: 'kettleYard', x: 1.4, z: 13.0, label: 'Bigger pack', cost: 20, requires: [],
     effects: [{ type: 'capacity', add: 3 }], icon: { item: 'fish' } },
   { id: 'pad_kettleB', area: 'kettleYard', x: 1.6, z: 10.0, label: 'Second kettle', cost: 50, requires: ['pad_pack1'],
     effects: [{ type: 'unlock', id: 'kettleB' }], icon: { prop: 'kettle' } },
   { id: 'pad_counterB', area: 'kettleYard', x: 3.2, z: 14.4, label: 'Second counter', cost: 110, requires: ['pad_kettleB'],
     effects: [{ type: 'unlock', id: 'counterB' }], icon: { prop: 'counter' } },
-  { id: 'pad_ladles', area: 'camp', x: -7.0, z: 9.0, label: 'Iron ladles', cost: 130, requires: ['pad_counterB'],
+  { id: 'pad_ladles', area: 'camp', x: -7.0, z: 9.0, label: 'Iron ladles', cost: 75, requires: ['pad_counterB'],
     effects: [{ type: 'mod', key: 'cookSpeed', mul: 1.25 }, { type: 'mod', key: 'transferRate', mul: 1.15 }], icon: { prop: 'kettle' } },
-  { id: 'pad_fisherYard', area: 'kettleYard', x: -4.0, z: 7.2, label: 'Hire a fisher', cost: 140, requires: ['pad_counterB'],
+  { id: 'pad_fisherYard', area: 'kettleYard', x: -4.0, z: 7.2, label: 'Hire a fisher', cost: 140, requires: ['pad_ladles'],
     requiresPop: 6, effects: [{ type: 'hire', helper: 'yardFisher' }], icon: { character: 'fisher' } },
   { id: 'pad_porter', area: 'kettleYard', x: 4.4, z: 7.6, label: 'Hire a porter', cost: 150, requires: ['pad_fisherYard'],
     requiresPop: 10, effects: [{ type: 'hire', helper: 'porter' }], icon: { character: 'porter' } },
@@ -186,7 +187,7 @@ export const PADS: PadDef[] = [
     effects: [{ type: 'unlock', id: 'streamHole2' }], icon: { prop: 'iceHole' } },
   { id: 'pad_beltA', area: 'kettleYard', x: -0.8, z: 13.6, label: 'Stew conveyor', cost: 260, requires: ['pad_porter'],
     effects: [{ type: 'unlock', id: 'beltA' }], icon: { prop: 'conveyor' } },
-  { id: 'pad_pack2', area: 'kettleYard', x: 1.2, z: 12.4, label: 'Bigger pack', cost: 250, requires: ['pad_beltA', 'pad_crateB'],
+  { id: 'pad_pack2', area: 'kettleYard', x: 1.4, z: 13.0, label: 'Bigger pack', cost: 250, requires: ['pad_beltA', 'pad_crateB'],
     effects: [{ type: 'capacity', add: 3 }], icon: { item: 'stew' } },
   { id: 'pad_cook', area: 'kettleYard', x: 5.2, z: 10.6, label: 'Hire a cook', cost: 320, requires: ['pad_beltA'],
     requiresPop: 25, effects: [{ type: 'hire', helper: 'cook' }], icon: { character: 'cook' } },
@@ -209,14 +210,14 @@ export const PADS: PadDef[] = [
     effects: [{ type: 'mod', key: 'moveSpeed', mul: 1.15 }], icon: { prop: 'sled' } },
   { id: 'pad_cabin2', area: 'camp', x: 12.4, z: -11.4, label: 'Cabin', cost: 550, materials: { plank: 14 }, requires: ['pad_lumberjack'],
     effects: [{ type: 'unlock', id: 'cabin2' }, { type: 'mod', key: 'spawnRate', add: 0.25 }], icon: { prop: 'cabin' } },
-  { id: 'pad_woodbelt', area: 'pinewood', x: -9.4, z: 8.0, label: 'Log conveyor', cost: 670, requires: ['pad_lumberjack'],
+  { id: 'pad_woodbelt', area: 'pinewood', x: -9.4, z: 8.0, label: 'Log conveyor', cost: 560, requires: ['pad_lumberjack'],
     effects: [{ type: 'unlock', id: 'woodbelt' }], icon: { prop: 'conveyor' } },
   { id: 'pad_stoker', area: 'camp', x: -4.2, z: -4.2, label: 'Hire a stoker', cost: 700, requires: ['pad_woodbelt'],
     requiresPop: 70, effects: [{ type: 'hire', helper: 'stoker' }], icon: { character: 'porter' } },
   { id: 'pad_cabin3', area: 'camp', x: 12.4, z: 8.0, label: 'Cabin', cost: 1000, materials: { plank: 20 }, requires: ['pad_cabin2', 'pad_boots'],
     effects: [{ type: 'unlock', id: 'cabin3' }, { type: 'mod', key: 'spawnRate', add: 0.25 }, { type: 'mod', key: 'helperSpeed', mul: 1.2 }],
     icon: { prop: 'cabin' } },
-  { id: 'pad_hearth3', area: 'camp', x: 4.2, z: 4.2, label: 'Raise the Hearth', cost: 1800, materials: { plank: 30 },
+  { id: 'pad_hearth3', area: 'camp', x: 4.2, z: 4.2, label: 'Raise the Hearth', cost: 1550, materials: { plank: 30 },
     requires: ['pad_stoker', 'pad_cabin3'], effects: [{ type: 'hearth', level: 3 }], icon: { prop: 'hearth', level: 3 } },
 ];
 

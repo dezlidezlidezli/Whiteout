@@ -219,15 +219,16 @@ export const LATE_HELPERS: HelperDef[] = [
   },
   {
     id: 'lakePorter', name: 'Porter', role: 'haul', model: 'porter', home: { x: 14.0, z: -0.4 }, capacity: 8, speed: 3.6,
-    from: ['fishRack'], to: ['smokehouseA', 'smokehouseB'], item: 'fish', transferTime: 0.14,
+    from: ['fishRack'], to: ['smokehouseA'], item: 'fish', transferTime: 0.14,
   },
   {
     id: 'sledDog', name: 'Sled dog', role: 'courier', model: 'dog', home: ROUTE_LAKE[0], capacity: 16, speed: 7.5,
     from: ['woodpile'], to: ['smokehouseA', 'logRack'], item: 'log', transferTime: 0.08, route: ROUTE_LAKE,
   },
   {
-    id: 'smoker', name: 'Smoker', role: 'operate', model: 'cook', home: { x: 19.6, z: 0.2 }, capacity: 0, speed: 3,
-    station: 'smokehouseB', transferTime: 0.2,
+    // Runs the second smokehouse by herself: fetches fish and logs from the racks, smokes at double speed.
+    id: 'smoker', name: 'Smoker', role: 'operate', model: 'cook', home: { x: 19.6, z: 0.2 }, capacity: 8, speed: 3.4,
+    station: 'smokehouseB', from: ['fishRack', 'logRack'], transferTime: 0.12,
   },
   {
     id: 'lumberjack3', name: 'Lumberjack', role: 'harvest', model: 'lumberjack', home: { x: -20.6, z: 9.6 }, capacity: 6,
@@ -254,8 +255,9 @@ export const LATE_HELPERS: HelperDef[] = [
     station: 'capLift', transferTime: 0.2,
   },
   {
-    id: 'chef', name: 'Chef', role: 'operate', model: 'cook', home: { x: 6.2, z: -14.6 }, capacity: 0, speed: 3,
-    station: 'greatKitchen', transferTime: 0.2,
+    // Runs the Great Kitchen at double speed and serves the second feast counter herself.
+    id: 'chef', name: 'Chef', role: 'operate', model: 'cook', home: { x: 6.2, z: -14.6 }, capacity: 8, speed: 3.6,
+    station: 'greatKitchen', to: ['feastCounterB'], transferTime: 0.12,
   },
 ];
 

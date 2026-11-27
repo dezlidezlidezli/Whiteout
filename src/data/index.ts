@@ -4,13 +4,15 @@ import { QUESTS } from './quests';
 import { DRESSING } from './dressing';
 import { MECH, mechDecor, mechStations } from './mechanics';
 import { ENDLESS, FINALE, LATE_DECOR, LATE_HELPERS, LATE_LANES, LATE_LINKS, LATE_PADS, LATE_STATIONS } from './late';
+import { applyPropSolids } from './declutter';
 import { growForest, LAYOUT_REV, packTents, placeAreas } from './layout';
+export { tentLevel, wallGoneBy } from './layout';
 import { ALL_MECHANICS, NO_MECHANICS, SHIPPED_MECHANICS, withMechanics } from './mechflags';
 import type { GameData } from './types';
 import { AREAS, CAMP, DECOR, HELPERS, LINKS, PADS, PLAYER_START, STATIONS, WALLS } from './world';
 
 export * from './types';
-export { declutter, FLAT_DECOR, FOOTPRINT, FROST_WALL_HALF, NATURAL_DECOR, TOLERANCE, segDist } from './declutter';
+export { applyPropSolids, declutter, FLAT_DECOR, PROP_SOLID, FOOTPRINT, FROST_WALL_HALF, NATURAL_DECOR, TOLERANCE, segDist } from './declutter';
 export { ITEM_KINDS, ITEMS, RECIPES } from './items';
 export { ORDER_BOARD } from './late';
 export { MECH } from './mechanics';
@@ -52,7 +54,8 @@ const FULL_DATA: GameData = (() => {
   const tentSpots = packTents(data, data.camp.tentAt.length);
   const camp = { ...data.camp, tentSpots, tentAt: data.camp.tentAt.slice(0, tentSpots.length) };
   const placed = { ...data, camp };
-  return { ...placed, decor: [...placed.decor, ...growForest(placed, lanes)] };
+  // Small props: one collision rule per model (solid with a small radius, or clearly walk-through).
+  return { ...placed, decor: applyPropSolids([...placed.decor, ...growForest(placed, lanes)]) };
 })();
 
 /**

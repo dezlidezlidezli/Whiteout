@@ -11,6 +11,28 @@ export const FOOTPRINT: Record<string, number> = {
   noticeBoard: 1.0, cabin: 2.45, signpost: 0.5, lantern: 0.35, bench: 0.8, barrel: 0.45, snowman: 0.65,
   brazier: 0.6, festivalLamp: 0.35, sled: 0.9, rock: 0.95, pineSnowy: 1.15, beacon: 2.3, tent: 1.65, pad: 0.95,
 };
+/**
+ * Collision policy per small prop model, so nothing is ever a surprise: every instance of a model is either
+ * solid with this (unscaled) radius, or, if listed as 0, clearly walk-through (thin posts, lamps, flags).
+ * Buildings and stations keep their authored solids.
+ */
+export const PROP_SOLID: Record<string, number> = {
+  barrel: 0.4, crate: 0.4, sled: 0.55, snowman: 0.45, brazier: 0.4, trailBrazier: 0.4, bench: 0.45,
+  statue: 0.5, iceSculpture: 0.5, monument: 0.6, foundBoard: 0.3, capstan: 0.45, mineLift: 0.5,
+  lantern: 0, festivalLamp: 0, signpost: 0,
+};
+/** Apply PROP_SOLID to every decor entry of those models. */
+export function applyPropSolids<T extends { model: string; scale?: number; solid?: { r: number } | { hw: number; hd: number } }>(decor: T[]): T[] {
+  return decor.map((d) => {
+    const r = PROP_SOLID[d.model];
+    if (r === undefined) return d;
+    if (r === 0) {
+      const { solid: _gone, ...rest } = d;
+      return rest as T;
+    }
+    return { ...d, solid: { r: Math.round(r * (d.scale ?? 1) * 100) / 100 } };
+  });
+}
 /** Half-depth of a frost wall section. */
 export const FROST_WALL_HALF = 1.7;
 /** Ground-hugging things that may overlap anything. */

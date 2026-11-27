@@ -38,7 +38,8 @@ export type SimEvent =
   // ---- late campaign + Open Season ----
   /** A sled-dog courier set off along its trail (item null = running back empty). */
   | { type: 'courierDepart'; helper: string; item: ItemKind | null; n: number }
-  | { type: 'courierArrive'; helper: string; at: 'source' | 'dest'; items: number }
+  /** item: what the sled carries (the first of its load, or the courier's item kind when empty); count = items. */
+  | { type: 'courierArrive'; helper: string; at: 'source' | 'dest'; items: number; item: ItemKind | null; count: number }
   | { type: 'toolUpgrade'; tool: ToolKind; level: number }
   /** A repeatable (Open Season) upgrade pad was bought; `cost` is the next level's price. */
   | { type: 'upgrade'; pad: string; level: number; cost: number; maxed: boolean }

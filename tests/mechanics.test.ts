@@ -273,6 +273,28 @@ describe('collision', () => {
     walk(sim, 0, -1, 1.2);
     expect(sim.state.player.z).toBeLessThan(k.z);
   });
+  it('the glide keeps full stride: no frame slower than 80 % once up to speed, dead centre or glancing', () => {
+    for (const off of [0, 0.05, 0.3, 0.9]) {
+      const sim = fresh();
+      const k = sim.stationDefs.get('kettleA')!;
+      tp(sim, k.x + off, k.z + 2.5);
+      sim.setMove(0, -1);
+      const p = sim.state.player;
+      for (let i = 0; i < 72; i++) {
+        const x0 = p.x;
+        const z0 = p.z;
+        sim.step();
+        if (i > 10) expect(Math.hypot(p.x - x0, p.z - z0) * 60, `offset ${off} frame ${i}`).toBeGreaterThan(GAME_DATA.balance.playerSpeed * 0.8);
+      }
+    }
+  });
+  it('pushing head-on into a flat wall stops (no sideways drift)', () => {
+    const sim = fresh();
+    const yard = GAME_DATA.areas.find((a) => a.id === 'kettleYard')!.rects[0];
+    tp(sim, (yard.x0 + yard.x1) / 2 + 2, yard.z1 - 1.0);
+    walk(sim, 0, 1, 1.5);
+    expect(Math.abs(sim.state.player.x - ((yard.x0 + yard.x1) / 2 + 2))).toBeLessThan(0.3);
+  });
 });
 
 describe('save v3', () => {

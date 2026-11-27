@@ -243,16 +243,41 @@ describe('Helpers + Links', () => {
     sim.advance(20);
     expect(sim.state.stats['deliver.kettleA'] ?? 0).toBeGreaterThan(3);
   });
-  it('cook operates kettle B (boost)', () => {
+  it('the cook runs kettle B by herself: fetches fish from the crate, cooks boosted, stacks the stew', () => {
     const sim = fresh();
     sim.applyEffect({ type: 'unlock', id: 'kettleB' });
     sim.applyEffect({ type: 'hire', helper: 'cook' });
-    sim.advance(8);
-    expect(sim.state.helpers.cook.phase).toBe('work');
-    (sim.state.stations.kettleB as ProcState).inputs.fish = 8;
-    tp(sim, 0, 0);
+    (sim.state.stations.crateA as PileState).count = 14;
+    tp(sim, 0, 0); // the player stays by the Hearth and does nothing
+    sim.advance(25);
+    const k = sim.state.stations.kettleB as ProcState;
+    expect((sim.state.stations.crateA as PileState).count).toBeLessThan(10);
+    expect(k.output).toBeGreaterThanOrEqual(6);
+    // While she stands at it the kettle runs at double speed.
+    k.inputs.fish = 8;
+    const out = k.output;
+    for (let i = 0; i < 600 && sim.state.helpers.cook.phase !== 'work'; i++) sim.step();
     sim.advance(1.5);
-    expect((sim.state.stations.kettleB as ProcState).output).toBeGreaterThanOrEqual(3);
+    expect(k.output - out).toBeGreaterThanOrEqual(3);
+  });
+  it('the smoker runs the second smokehouse from the racks; the chef serves the second feast counter', () => {
+    const sim = fresh();
+    sim.setHearth(3);
+    for (const id of ['smokehouseB', 'fishRack', 'logRack']) sim.applyEffect({ type: 'unlock', id });
+    (sim.state.stations.fishRack as PileState).count = 20;
+    (sim.state.stations.logRack as PileState).count = 10;
+    sim.applyEffect({ type: 'hire', helper: 'smoker' });
+    tp(sim, 0, 0);
+    sim.advance(40);
+    expect((sim.state.stations.smokehouseB as ProcState).output).toBeGreaterThanOrEqual(4);
+    expect((sim.state.stations.logRack as PileState).count).toBeLessThan(10);
+    sim.setHearth(4);
+    for (const id of ['greatKitchen', 'feastCounterB']) sim.applyEffect({ type: 'unlock', id });
+    (sim.state.stations.greatKitchen as ProcState).output = 8;
+    const stock = (sim.state.stations.feastCounterB as CounterState).stock;
+    sim.applyEffect({ type: 'hire', helper: 'chef' });
+    sim.advance(30);
+    expect((sim.state.stations.feastCounterB as CounterState).stock + (sim.state.stats['served.feast'] ?? 0)).toBeGreaterThan(stock + 3);
   });
   it('lumberjack chops pines and fills the woodpile', () => {
     const sim = fresh();

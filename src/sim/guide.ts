@@ -435,7 +435,12 @@ function source(sim: Sim, item: ItemKind, depth: number, near?: { x: number; z: 
     for (const m of missing) {
       // Bring it once we carry as much as the processor can take (or can't get more): no over-fetching.
       const c = carrying(sim, m);
-      if (c > 0 && (c >= sim.room(pd.id, m, true) || full(sim) || !sourceAvailable(sim, m))) return stTarget(pd);
+      // Once committed to bringing it, keep going (a source flickering back into stock must not turn us round).
+      if (c > 0 && sim.state.guideMemo === m) return stTarget(pd);
+      if (c > 0 && (c >= sim.room(pd.id, m, true) || full(sim) || !sourceAvailable(sim, m))) {
+        sim.state.guideMemo = m;
+        return stTarget(pd);
+      }
     }
     for (const m of missing) {
       const sub = full(sim) ? null : source(sim, m, depth + 1, pd);
@@ -663,8 +668,20 @@ function crankGuide(sim: Sim, id: string): GuideTarget | null {
  * it came from (with a full pack), and only for things nothing wants right now, in the bin. */
 function emptyHands(sim: Sim): GuideTarget | null {
   const p = sim.state.player;
-  for (let i = p.stack.length - 1; i >= 0; i--) {
-    const it = p.stack[i];
+  // Go where the most of the pack can be put down (nearer wins ties), so a stray item picked up on
+  // the way does not flip the target back and forth.
+  const counts = new Map<ItemKind, number>();
+  for (const it of p.stack) counts.set(it, (counts.get(it) ?? 0) + 1);
+  let pick: GuideTarget | null = null;
+  let ps = -Infinity;
+  const consider = (t: GuideTarget, n: number, x: number, z: number) => {
+    const sc = n / (1 + dist(sim, x, z) / 25);
+    if (sc > ps + 1e-9) {
+      ps = sc;
+      pick = t;
+    }
+  };
+  for (const [it, n] of counts) {
     let best: StationDef | null = null;
     let bd = Infinity;
     for (const d of sim.data.stations) {
@@ -675,13 +692,15 @@ function emptyHands(sim: Sim): GuideTarget | null {
         best = d;
       }
     }
-    if (best) return stTarget(best);
+    if (best) consider(stTarget(best), n, best.x, best.z);
     for (const def of sim.data.pads) {
-      const ps = sim.state.pads[def.id];
-      if (!ps.visible || ps.done || sim.padLocked(def.id) || (sim.padRemaining(def.id).mats[it] ?? 0) <= 0) continue;
-      return { x: def.x, z: def.z, id: def.id, kind: 'pad', reach: 0.5 };
+      const st = sim.state.pads[def.id];
+      const need = sim.padRemaining(def.id).mats[it] ?? 0;
+      if (!st.visible || st.done || sim.padLocked(def.id) || need <= 0) continue;
+      consider({ x: def.x, z: def.z, id: def.id, kind: 'pad', reach: 0.5 }, Math.min(n, need), def.x, def.z);
     }
   }
+  if (pick) return pick;
   if (full(sim)) {
     const j = unloadJunk(sim, new Set(), true);
     if (j) return j;

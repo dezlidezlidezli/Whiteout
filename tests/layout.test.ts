@@ -2,8 +2,8 @@
 // palisade, on a conveyor or a walk lane, or hidden behind a tall building from the fixed camera.
 // Footprints here are VISUAL radii (how big the model looks), not collision solids.
 import { beforeAll, describe, expect, it } from 'vitest';
-import { ALL_MECHANICS, FLAT_DECOR, FOOTPRINT, FROST_WALL_HALF, GAME_DATA, NATURAL_DECOR, TOLERANCE, segDist, wallSolids, withMechanics } from '../src/data';
-import type { GameData, Vec2 } from '../src/data';
+import { ALL_MECHANICS, FLAT_DECOR, FOOTPRINT, FROST_WALL_HALF, GAME_DATA, NATURAL_DECOR, PROP_SOLID, TOLERANCE, segDist, tentLevel, wallGoneBy, wallSolids, withMechanics } from '../src/data';
+import type { CounterDef, GameData, Vec2 } from '../src/data';
 
 /** The configuration under audit (both the shipped one, mechanics off, and every mechanic on). */
 let D: GameData = GAME_DATA;
@@ -62,9 +62,11 @@ export function findProblems(): string[] {
   // 2. Frost walls: built things keep 2 m clear of the wall section (natural scatter just stays out of it).
   for (const w of D.walls) {
     for (const t of all) {
+      // A late tent plot (needed only once this wall has melted) just keeps clear of the ice itself.
+      const late = t.kind === 'tent' && wallGoneBy(D, w.area, tentLevel(D, Number(t.id.slice(4))));
       for (let k = 0; k + 1 < w.points.length; k++) {
         const d = segDist(t.x, t.z, w.points[k], w.points[k + 1]);
-        const pen = t.r + (t.natural ? FROST_WALL_HALF : FROST_WALL_HALF + 2.0) - d;
+        const pen = t.r + (t.natural ? FROST_WALL_HALF : FROST_WALL_HALF + (late ? 0.3 : 2.0)) - d;
         if (pen > TOL) {
           bad.push(`frostWall:${w.id} x ${t.kind}:${t.id} overlap ${pen.toFixed(2)} m at ${at(t)}`);
           break;
@@ -126,6 +128,23 @@ export function findProblems(): string[] {
   for (const s of D.stations) if (READABLE.has((s as { model: string }).model) && Math.abs(wrap(s.rot ?? 0)) > Math.PI / 3) bad.push(`edge-on: ${s.id} rot ${s.rot}`);
   for (const d of D.decor) if (READABLE.has(d.model) && Math.abs(wrap(d.rot ?? 0)) > Math.PI / 3) bad.push(`edge-on: ${d.id} rot ${d.rot}`);
   for (const a of D.dressing) for (const l of a.landmarks) if (READABLE.has(l.prop) && Math.abs(wrap(l.yaw ?? 0)) > Math.PI / 3) bad.push(`edge-on: ${l.prop}@${l.x},${l.z}`);
+  // 7b. Counters serve towards their queue; cabin doors face the camera's half of the compass or the Hearth.
+  // (Models face +z at rot 0; rot θ turns the front to (sin θ, cos θ).)
+  const front = (rot: number) => ({ x: Math.sin(rot), z: Math.cos(rot) });
+  for (const s of D.stations) {
+    if (s.type !== 'counter') continue;
+    const f = front(s.rot ?? 0);
+    const q = (s as CounterDef).queueDir;
+    if (f.x * q.x + f.z * q.z < Math.cos(Math.PI / 6)) bad.push(`counter back to front: ${s.id} rot ${s.rot} queue ${q.x},${q.z}`);
+  }
+  for (const d of D.decor) {
+    if (d.model !== 'cabin') continue;
+    const f = front(d.rot ?? 0);
+    const hx = D.camp.hearth.x - d.x;
+    const hz = D.camp.hearth.z - d.z;
+    const toHearth = (f.x * hx + f.z * hz) / Math.hypot(hx, hz);
+    if (f.z < 0 && toHearth < Math.cos(Math.PI / 3)) bad.push(`cabin door hidden: ${d.id} rot ${d.rot}`);
+  }
   // 8. Pads that can show at the same time stand ≥ 3 m apart (their labels must not overlap).
   const req = new Map(D.pads.map((p) => [p.id, p.requires] as const));
   const after = (a: string, b: string, seen = new Set<string>()): boolean => {
@@ -207,9 +226,20 @@ for (const [name, data] of CONFIGS) describe(`world layout: ${name}`, () => {
     if (bad.length) (globalThis as any).process?.stdout?.write?.(`LAYOUT ${bad.length} problems\n${bad.join('\n')}\nEND\n`);
     expect(bad).toEqual([]);
   });
-  it('the camp holds a village: at least 12 tent plots and 3 cabins', () => {
-    expect(D.camp.tentSpots.length).toBeGreaterThanOrEqual(12);
+  it('the camp holds a village: every tent plot the housing needs (16) and 3 cabins', () => {
+    expect(D.camp.tentSpots.length).toBe(D.camp.housing!.tentsPerLevel.at(-1));
     expect(D.decor.filter((d) => d.area === 'camp' && d.model === 'cabin').length).toBeGreaterThanOrEqual(3);
+  });
+  it('small props are never a surprise: every instance of a model is solid alike, or walk-through', () => {
+    for (const d of D.decor) {
+      const r = PROP_SOLID[d.model];
+      if (r === undefined) continue;
+      if (r === 0) expect(d.solid, `${d.id} (${d.model}) should be walk-through`).toBeUndefined();
+      else expect(d.solid && 'r' in d.solid ? d.solid.r : -1, `${d.id} (${d.model})`).toBeCloseTo(r * (d.scale ?? 1), 1);
+    }
+    // Landmarks are dressing (never solid), so only thin or wall-mounted props may be landmarks.
+    const THIN = new Set(['lampPost', 'flagPole', 'woodenArch', 'signBoard', 'bellows', 'toolRack', 'firewoodRack', 'dryingRack', 'marketStall', 'watchTower']);
+    for (const a of D.dressing) for (const l of a.landmarks) expect(THIN.has(l.prop), `landmark ${l.prop}`).toBe(true);
   });
   it('the Hearth is a short walk from the Kettle Yard kettles (≤ 4 s)', () => {
     const k = D.stations.find((s) => s.id === 'kettleA')!;
