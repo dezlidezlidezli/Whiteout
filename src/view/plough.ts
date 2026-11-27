@@ -77,7 +77,6 @@ export class PloughView {
   private label: THREE.Sprite;
   private labelCanvas: HTMLCanvasElement;
   private labelKey = '';
-  private pushHold = 0;
   private pushTime = 0;
   private sprayT = 0;
   /** 0..1 scrape level for the `plough` ambience bed. */
@@ -235,9 +234,8 @@ export class PloughView {
     const st = sim.state.plough;
     const p = sim.state.player;
     const speed = Math.hypot(p.vx, p.vz);
-    if (st.pushing) this.pushHold = 0.35;
-    else this.pushHold = Math.max(0, this.pushHold - dt);
-    const pushing = this.pushHold > 0 && speed > 0.3;
+    // The sim holds `pushing` through brief gaps itself (0.35 s hysteresis), so no view smoothing is needed.
+    const pushing = st.pushing && speed > 0.3;
     // Deployed whenever the player has the plough and stands in (or at the edge of) a deep zone.
     let inZone = false;
     let near: ReturnType<typeof deepSnowZones>[number] | null = null;

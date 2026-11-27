@@ -1,5 +1,5 @@
 // Rescue walks presentation (docs/MECHANICS.md §2). Only constructed when the rescue mechanic is on.
-// - Whiteout fringe: three ground-hugging mist layers centred on the player. Each fragment is fogged by
+// - Whiteout fringe: four ground-hugging mist layers centred on the player. Each fragment is fogged by
 //   where its view ray lands on the ground, so the layers agree; ground inside any warmth (Hearth, lit
 //   braziers) and inside the lantern's glow stays clear. Purely atmosphere, never gameplay.
 // - The lantern: held upright in the right hand, a warm halo and a soft glow pool on the snow whose
@@ -21,7 +21,7 @@ export interface RescueHooks {
   ring(x: number, z: number, size: number, color: number, dur: number): void;
   glint(x: number, y: number, z: number, n: number, sp: number): void;
   float(text: string, x: number, y: number, z: number, kind: 'ember' | 'info' | 'big'): void;
-  toast(text: string, kind: 'unlock' | 'quest' | 'info' | 'area'): void;
+  toast(text: string, kind: 'unlock' | 'quest' | 'info' | 'area' | 'note'): void;
   sfx(name: 'dig' | 'rescued' | 'followerWait' | 'followerHome' | 'lanternOn' | 'allFound', opts?: { pitch?: number; volume?: number }): void;
   groundAt(x: number, z: number): number;
 }
@@ -478,7 +478,7 @@ export class RescueView {
           this.hooks.glint(v.x, 1.1, v.z, 8, 1.6);
           this.hooks.ring(v.x, v.z, 1.8, 0xffe0a8, 0.7);
           this.hooks.float(v.name, v.x, 2.3, v.z, 'big');
-          this.hooks.toast(`${v.name}: “${v.line}”`, 'info');
+          this.hooks.toast(`${v.name}: “${v.line}”`, 'note');
           this.hooks.sfx('rescued');
           break;
         }

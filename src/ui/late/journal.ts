@@ -24,9 +24,13 @@ export interface RescueInfo { villagers: LostVillager[]; found: Set<string>; tot
 export function rescueInfo(sim: Sim): RescueInfo | null {
   const st = (sim.state as unknown as Record<string, unknown>).rescue as Record<string, unknown> | undefined;
   if (!st || typeof st !== 'object') return null;
+  // Only while the rescue mechanic is switched on (its state exists in every save).
+  const flags = (sim.data as unknown as { mechanics?: Record<string, boolean> }).mechanics;
+  if (flags && !flags.rescue) return null;
   const data = sim.data as unknown as Record<string, unknown>;
   const rd = (data.rescue ?? {}) as Record<string, unknown>;
-  const rawList = (rd.villagers ?? rd.lost ?? data.lostVillagers ?? data.lost ?? []) as Record<string, unknown>[];
+  const mech = (data.mech ?? {}) as Record<string, unknown>;
+  const rawList = (mech.villagers ?? rd.villagers ?? rd.lost ?? data.lostVillagers ?? data.lost ?? []) as Record<string, unknown>[];
   const villagers: LostVillager[] = Array.isArray(rawList)
     ? rawList.map((v, i) => ({
         id: String(v.id ?? i),
@@ -49,6 +53,9 @@ export function rescueInfo(sim: Sim): RescueInfo | null {
     }
   };
   take(st.found ?? st.home ?? st.rescued ?? st.villagers);
+  // Sim shape: status[id] = 'buried' | 'following' | 'waiting' | 'home'.
+  const status = st.status as Record<string, string> | undefined;
+  if (status) for (const [k, v] of Object.entries(status)) if (v === 'home') found.add(k);
   const total = villagers.length || Number((rd.total as number) ?? 24) || 24;
   return { villagers, found, total };
 }

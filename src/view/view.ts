@@ -32,7 +32,7 @@ export type Quality = 0 | 1 | 2;
 export interface ViewHooks {
   /** Floating "+N" style text at a world position. */
   float(text: string, world: THREE.Vector3, kind: 'ember' | 'info' | 'big'): void;
-  toast(text: string, kind: 'unlock' | 'quest' | 'info' | 'area'): void;
+  toast(text: string, kind: 'unlock' | 'quest' | 'info' | 'area' | 'note'): void;
   /** Ember wallet "bump" when embers land. */
   emberLand(n: number): void;
 }
@@ -84,6 +84,7 @@ export class View {
   private plough: PloughView | null = null;
   private rescue: RescueView | null = null;
   private skate: SkateView | null = null;
+  private padNote: { id: string; t: number } | null = null;
   private pads = new Map<string, PadVisual>();
   private actors: Actors;
   private crowd: Crowd;
@@ -581,6 +582,11 @@ export class View {
     return [[0, -0.88], [0.88, 0], [0, 0.88], [-0.88, 0]].map(([dx, dz]) => this.project(new THREE.Vector3(o.x + dx * k, o.y + 0.12 * k, o.z + dz * k)));
   }
 
+  /** Point the guide marker at a pad for a while (the HUD's homes-full hint). */
+  notePad(id: string, seconds = 14): void {
+    this.padNote = { id, t: seconds };
+  }
+
   /** Debug/e2e: skating presentation state (null when the mechanic is off). */
   debugSkate(): ReturnType<SkateView['debug']> | null {
     return this.skate ? this.skate.debug() : null;
@@ -672,7 +678,9 @@ export class View {
       return out.set(d.x, 0.5, d.z);
     }
     if (place.kind === 'ground') {
-      const d = this.sim.stationDefs.get(place.id)!;
+      const d = this.sim.stationDefs.get(place.id);
+      // A fish scooped from a skating leap (`leap<id>`, no station): it comes up off the ice at the skater's feet.
+      if (!d) return out.set(this.actors.playerTop.x, 0.3, this.actors.playerTop.z);
       // Fish leap out of the water; logs and ore come from the top of the tree/vein.
       return out.set(d.x, nodeAction(d.model) === 'fish' ? 0.15 : 1.6, d.z);
     }
@@ -1102,8 +1110,15 @@ export class View {
       }
     }
 
-    // Guidance.
-    const g = this.title ? null : sim.guide();
+    // Guidance (a HUD hint can send the marker to a pad for a while, e.g. "camp is full — raise a cabin").
+    let g = this.title ? null : sim.guide();
+    if (this.padNote && !this.title) {
+      this.padNote.t -= dt;
+      const pd = this.data.pads.find((q) => q.id === this.padNote!.id);
+      const ps = s.pads[this.padNote.id];
+      if (this.padNote.t <= 0 || !pd || !ps?.visible || ps.done || p.onPad === pd.id) this.padNote = null;
+      else g = { ...(g ?? {}), kind: 'pad', id: pd.id, x: pd.x, z: pd.z } as NonNullable<typeof g>;
+    }
     if (g) {
       const w = sim.navFromPlayer(g.x, g.z);
       const my = g.kind === 'station' ? this.world.stationTop(g.id) : g.kind === 'node' ? 2.6 : 0.4;

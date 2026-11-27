@@ -248,6 +248,7 @@ function toggleDebug(): void {
 if (params.get('debug') === '1' || params.get('debug') === 'collision') toggleDebug();
 if (params.get('debug') === 'collision') view.toggleCollisionDebug(true);
 hud.onSecretTap = toggleDebug;
+hud.onNotePad = (pad) => view.notePad(pad);
 // Extra unlock paths (some browsers only count click/touchend as activation).
 for (const ev of ['touchend', 'click', 'keydown'] as const) {
   window.addEventListener(ev, () => audio.unlock(), { passive: true });
@@ -475,6 +476,7 @@ function loop(now: number): void {
   if (events.length) {
     view.handleEvents(events);
     late.handleEvents(events); // LATE-GAME HOOK
+    hud.handleEvents(sim, events);
     recent.push(...events);
     if (recent.length > 300) recent.splice(0, recent.length - 300);
   }

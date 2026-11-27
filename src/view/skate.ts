@@ -56,7 +56,7 @@ export class SkateView {
 
   constructor(private parent: THREE.Object3D, sim: Sim, private hooks: SkateHooks, extendOver: { x0: number; x1: number; z0: number; z1: number }[]) {
     const g = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
-    const mat = new THREE.MeshBasicMaterial({ color: 0xf4fbff, transparent: true, opacity: 0.6, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3, toneMapped: false });
+    const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3, toneMapped: false });
     this.trail = new THREE.InstancedMesh(g, mat, TRAIL_MAX);
     this.trail.count = 0;
     this.trail.frustumCulled = false;
@@ -133,7 +133,7 @@ export class SkateView {
       _e.set(0, this.tyaw[i], 0);
       _q.setFromEuler(_e);
       _p.set(this.tx[i], this.ty[i], this.tz[i]);
-      _s.set(0.035 * k + 0.008, 1, this.tlen[i]);
+      _s.set(0.06 * k + 0.012, 1, this.tlen[i]);
       this.trail.setMatrixAt(n++, _m.compose(_p, _q, _s));
     }
     this.trail.count = n;
