@@ -230,6 +230,97 @@ for (const [name, data] of CONFIGS) describe(`world layout: ${name}`, () => {
     expect(D.camp.tentSpots.length).toBe(D.camp.housing!.tentsPerLevel.at(-1));
     expect(D.decor.filter((d) => d.area === 'camp' && d.model === 'cabin').length).toBeGreaterThanOrEqual(3);
   });
+  it('the Frozen Lake is a real rink: big open ice, holes on it, everything built on the shore', () => {
+    const ice = D.mech.ice;
+    if (!ice.length) return; // skating switched off in this configuration
+    const onIce = (x: number, z: number) => ice.some((r) => x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1);
+    const mats = D.mech.gripMats;
+    const onMat = (x: number, z: number) => mats.some((g) => Math.hypot(g.x - x, g.z - z) < g.r);
+    // 1. Every ice-fishing hole is on the ice, standing on a grip mat that covers where one fishes from.
+    const holes = D.stations.filter((s) => s.type === 'node' && s.tag === 'iceHole');
+    expect(holes.length).toBeGreaterThanOrEqual(9);
+    for (const h of holes) {
+      expect(onIce(h.x, h.z), `${h.id} on the ice`).toBe(true);
+      const g = mats.find((m) => Math.hypot(m.x - h.x, m.z - h.z) < 0.3);
+      expect(g && g.r >= (h.solid && 'r' in h.solid ? h.solid.r : 0.5) + 0.6, `${h.id} grip mat`).toBe(true);
+    }
+    // 2. Nothing else built on the ice (stations, pads, decor, landmarks, tents, clutter, conveyors).
+    const bad: string[] = [];
+    const overIce = (x: number, z: number, r: number) =>
+      [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]].some(([dx, dz]) => onIce(x + dx * 0.8, z + dz * 0.8));
+    for (const t of things()) {
+      if (t.kind === 'iceHole' || FLAT_DECOR.has(t.kind)) continue;
+      if (overIce(t.x, t.z, t.r)) bad.push(`${t.kind}:${t.id} on the rink`);
+    }
+    for (const a of D.dressing) for (const c of a.clutterZones) if (overIce(c.x, c.z, 0) || ice.some((r) => c.x - c.w / 2 < r.x1 && c.x + c.w / 2 > r.x0 && c.z - c.d / 2 < r.z1 && c.z + c.d / 2 > r.z0)) bad.push(`clutter ${c.theme} on the rink`);
+    for (const l of D.links) for (const q of l.path) if (onIce(q.x, q.z)) bad.push(`conveyor ${l.id} on the rink`);
+    for (const v of D.mech.villagers) if (onIce(v.x, v.z)) bad.push(`villager ${v.id} on the rink`);
+    expect(bad).toEqual([]);
+    // 3. At least ~14 x 12 m of connected, obstacle-free skating ice (no holes, grip mats or solids).
+    const solids = [...D.stations.flatMap((s) => (s.solid ? [{ x: s.x, z: s.z, r: 'r' in s.solid ? s.solid.r : Math.hypot(s.solid.hw, s.solid.hd) }] : []))];
+    const cell = 0.25;
+    const x0 = Math.min(...ice.map((r) => r.x0));
+    const z0 = Math.min(...ice.map((r) => r.z0));
+    const nx = Math.ceil((Math.max(...ice.map((r) => r.x1)) - x0) / cell);
+    const nz = Math.ceil((Math.max(...ice.map((r) => r.z1)) - z0) / cell);
+    const free = (i: number, j: number) => {
+      const x = x0 + (i + 0.5) * cell;
+      const z = z0 + (j + 0.5) * cell;
+      return onIce(x, z) && !onMat(x, z) && !solids.some((s) => Math.hypot(s.x - x, s.z - z) < s.r + 0.4);
+    };
+    const seen = new Uint8Array(nx * nz);
+    let best = { n: 0, w: 0, d: 0 };
+    for (let j0 = 0; j0 < nz; j0++) for (let i0 = 0; i0 < nx; i0++) {
+      if (seen[j0 * nx + i0] || !free(i0, j0)) continue;
+      const stack = [[i0, j0]];
+      seen[j0 * nx + i0] = 1;
+      let n = 0, mi = i0, Mi = i0, mj = j0, Mj = j0;
+      while (stack.length) {
+        const [i, j] = stack.pop()!;
+        n++;
+        mi = Math.min(mi, i); Mi = Math.max(Mi, i); mj = Math.min(mj, j); Mj = Math.max(Mj, j);
+        for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const a = i + di, b = j + dj;
+          if (a < 0 || b < 0 || a >= nx || b >= nz || seen[b * nx + a] || !free(a, b)) continue;
+          seen[b * nx + a] = 1;
+          stack.push([a, b]);
+        }
+      }
+      if (n > best.n) best = { n, w: (Mi - mi + 1) * cell, d: (Mj - mj + 1) * cell };
+    }
+    const area = best.n * cell * cell;
+    if ((globalThis as any).process?.env?.RINK) (globalThis as any).process.stdout.write(`RINK open ice ${best.w} x ${best.d} m, ${area} m2\n`);
+    expect(Math.max(best.w, best.d), `open ice ${best.w} x ${best.d}`).toBeGreaterThanOrEqual(14);
+    expect(Math.min(best.w, best.d), `open ice ${best.w} x ${best.d}`).toBeGreaterThanOrEqual(12);
+    expect(area, 'open ice area').toBeGreaterThanOrEqual(150);
+    // ...and it really is one open sheet: a 14 x 12 m window (either way round) with nothing in it.
+    const ps = new Int32Array((nx + 1) * (nz + 1));
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      ps[(j + 1) * (nx + 1) + i + 1] = (free(i, j) ? 1 : 0) + ps[j * (nx + 1) + i + 1] + ps[(j + 1) * (nx + 1) + i] - ps[j * (nx + 1) + i];
+    }
+    const window = (w: number, d: number) => {
+      for (let j = 0; j + d <= nz; j++) for (let i = 0; i + w <= nx; i++) {
+        const n = ps[(j + d) * (nx + 1) + i + w] - ps[j * (nx + 1) + i + w] - ps[(j + d) * (nx + 1) + i] + ps[j * (nx + 1) + i];
+        if (n === w * d) return true;
+      }
+      return false;
+    };
+    expect(window(14 / cell, 12 / cell) || window(12 / cell, 14 / cell), 'a clear 14 x 12 m window of ice').toBe(true);
+    // 4. Every lake station can be used from the shore or a grip mat (never only from bare ice).
+    for (const s of D.stations) {
+      if (s.area !== 'frozenLake') continue;
+      let ok = false;
+      for (let k = 0; k < 24 && !ok; k++) {
+        const a = (k / 24) * Math.PI * 2;
+        for (const d of [s.reach - 0.4, s.reach - 0.8]) {
+          const x = s.x + Math.cos(a) * d;
+          const z = s.z + Math.sin(a) * d;
+          if (!onIce(x, z) || onMat(x, z)) ok = true;
+        }
+      }
+      expect(ok, `${s.id} usable off the ice`).toBe(true);
+    }
+  });
   it('small props are never a surprise: every instance of a model is solid alike, or walk-through', () => {
     for (const d of D.decor) {
       const r = PROP_SOLID[d.model];

@@ -92,6 +92,18 @@ export interface MechDef {
 
 // ------------------------------------------------------------------ data
 
+/** Frozen Lake rink (area-local): one rounded sheet, about 17.6 x 14.8 m overall. */
+export const RINK: Rect[] = [
+  { x0: 10.4, x1: 26.4, z0: -14.4, z1: -1.2 },
+  { x0: 9.6, x1: 27.2, z0: -13.2, z1: -2.4 },
+  { x0: 11.6, x1: 25.2, z0: -15.4, z1: -0.6 },
+];
+/** Ice-fishing holes on the rink's rims (area-local): five along the north, four down the east. */
+export const LAKE_HOLES: Vec2[] = [
+  ...[12.6, 15.6, 18.6, 21.6, 24.6].map((x) => ({ x, z: -14.7 })),
+  ...[-11.2, -8.0, -4.8, -1.8].map((z) => ({ x: 26.0, z })),
+];
+
 const v = (id: string, name: string, area: AreaId, x: number, z: number, line: string, underSnow?: boolean): LostVillagerDef =>
   ({ id, name, line, area, x, z, underSnow });
 
@@ -100,7 +112,7 @@ export const MECH: MechDef = {
   // Side lots off each yard (never on a helper route or a station's access).
   deepSnow: [
     { id: 'dsPine', area: 'pinewood', x0: -27.4, x1: -21.6, z0: -9.8, z1: 10.2, reward: 250 },
-    { id: 'dsLake', area: 'frozenLake', x0: 29.4, x1: 34.8, z0: -9.8, z1: 7.4, reward: 600 },
+    { id: 'dsLake', area: 'frozenLake', x0: 28.6, x1: 34.8, z0: -16.0, z1: -8.2, reward: 600 },
   ],
   finds: [
     { id: 'fPineCache', zone: 'dsPine', x: -25.6, z: -5.8, kind: 'embers', amount: 150 },
@@ -108,11 +120,11 @@ export const MECH: MechDef = {
     { id: 'fPineV1', zone: 'dsPine', x: -26.4, z: 8.6, kind: 'villager', villager: 'lv_pine5' },
     { id: 'fPineV2', zone: 'dsPine', x: -22.6, z: -8.8, kind: 'villager', villager: 'lv_pine6' },
     { id: 'fPineMark', zone: 'dsPine', x: -24.6, z: 0.2, kind: 'landmark', decor: 'lm_pineStatue' },
-    { id: 'fLakeCache', zone: 'dsLake', x: 33.0, z: -8.0, kind: 'embers', amount: 300 },
-    { id: 'fLakeCrate', zone: 'dsLake', x: 31.6, z: 5.0, kind: 'crate', station: 'crateFindLake' },
-    { id: 'fLakeV1', zone: 'dsLake', x: 33.8, z: 2.0, kind: 'villager', villager: 'lv_lake5' },
-    { id: 'fLakeV2', zone: 'dsLake', x: 30.4, z: -4.4, kind: 'villager', villager: 'lv_lake6' },
-    { id: 'fLakeMark', zone: 'dsLake', x: 32.2, z: -1.2, kind: 'landmark', decor: 'lm_lakeSculpture' },
+    { id: 'fLakeCache', zone: 'dsLake', x: 33.2, z: -9.4, kind: 'embers', amount: 300 },
+    { id: 'fLakeCrate', zone: 'dsLake', x: 31.4, z: -14.8, kind: 'crate', station: 'crateFindLake' },
+    { id: 'fLakeV1', zone: 'dsLake', x: 33.8, z: -12.8, kind: 'villager', villager: 'lv_lake5' },
+    { id: 'fLakeV2', zone: 'dsLake', x: 29.6, z: -10.0, kind: 'villager', villager: 'lv_lake6' },
+    { id: 'fLakeMark', zone: 'dsLake', x: 31.4, z: -11.6, kind: 'landmark', decor: 'lm_lakeSculpture' },
   ],
   wade: 0.45,
   ploughSpeed: [0.8, 1.0],
@@ -124,12 +136,12 @@ export const MECH: MechDef = {
     v('lv_pine4', 'Marta Fennick', 'pinewood', -16.2, -9.6, 'Knits faster when frightened. Has eleven scarves.'),
     v('lv_pine5', 'Hollis Reed', 'pinewood', -26.4, 8.6, 'Dreamt of stew the whole time. Would like some now.', true),
     v('lv_pine6', 'Juniper Vale', 'pinewood', -22.6, -8.8, 'Talked to a fox for three days. The fox was polite.', true),
-    v('lv_lake1', 'Captain Odo', 'frozenLake', 8.2, -9.4, 'Ice-fished through the night. Caught one boot.'),
+    v('lv_lake1', 'Captain Odo', 'frozenLake', 8.4, -4.8, 'Ice-fished through the night. Caught one boot.'),
     v('lv_lake2', 'Sable Wick', 'frozenLake', 25.0, 7.2, 'Followed a lantern that turned out to be the moon.'),
-    v('lv_lake3', 'Tamsin Brook', 'frozenLake', 16.6, -9.4, 'Skated in circles until the circles froze too.'),
-    v('lv_lake4', 'Ferris Lowe', 'frozenLake', 26.6, -9.6, 'Insists the lake hummed a tune. Still humming it.'),
-    v('lv_lake5', 'Nell Harrow', 'frozenLake', 33.8, 2.0, 'Built a snow fort. It was very good. Too good.', true),
-    v('lv_lake6', 'Bartley Frost', 'frozenLake', 30.4, -4.4, 'No relation to the weather, he would like you to know.', true),
+    v('lv_lake3', 'Tamsin Brook', 'frozenLake', 8.4, -12.4, 'Skated in circles until the circles froze too.'),
+    v('lv_lake4', 'Ferris Lowe', 'frozenLake', 34.2, -5.0, 'Insists the lake hummed a tune. Still humming it.'),
+    v('lv_lake5', 'Nell Harrow', 'frozenLake', 33.8, -12.8, 'Built a snow fort. It was very good. Too good.', true),
+    v('lv_lake6', 'Bartley Frost', 'frozenLake', 29.6, -10.0, 'No relation to the weather, he would like you to know.', true),
     v('lv_ridge1', 'Gretta Ironsong', 'ironridge', -15.4, -25.4, 'Mined a seam of pure silence. Not valuable, sadly.'),
     v('lv_ridge2', 'Dunstan Moss', 'ironridge', -15.4, -17.0, 'Hid in a crate. The crate was also cold.'),
     v('lv_ridge3', 'Ivy Kettering', 'ironridge', 7.8, -25.4, 'Kept a candle alive for a week. Then it was her turn.'),
@@ -149,12 +161,14 @@ export const MECH: MechDef = {
   rescueBonus: 60,
   areaFoundBonus: 400,
   // The lake ice (incl. the snowed-over east lot once ploughed); stations on it stand on grip mats.
-  ice: [{ x0: 17.4, x1: 34.8, z0: -9.8, z1: -2.0 }],
+  // The rink: one big rounded sheet of lake ice in the middle of the yard (three stacked boxes round its corners).
+  // Fishing holes ring its north and east rims; the middle stays open for gliding.
+  ice: RINK,
   // Grip mats under the ice holes (matching late.ts ICE_HOLES) and the skates pad.
-  gripMats: [...[-8.8, -6.2, -3.6].flatMap((z, j) => [19.0, 22.0, 25.0].map((x, i) => ({ x: x + ((j * 3 + i) % 2 ? 0.2 : 0), z, r: 1.6 }))),
-  ],
+  // A small grip mat under every hole: standing to fish is normal footing.
+  gripMats: LAKE_HOLES.map((h) => ({ x: h.x, z: h.z, r: 1.3 })),
   iceTop: [1.5, 1.75],
-  skateLane: [{ x: 27.4, z: -9.0 }, { x: 27.4, z: -2.8 }],
+  skateLane: [{ x: 11.4, z: -3.4 }, { x: 23.4, z: -11.6 }],
   cranks: [
     { id: 'capBellows', area: 'ironridge', x: -13.0, z: -13.0, inner: 1.2, outer: 2.8, use: 'bellows', target: 'forge', unlockedBy: 'capBellows' },
     { id: 'capLift', area: 'ironridge', x: -13.0, z: -21.0, inner: 1.2, outer: 2.8, use: 'lift', target: 'shaftPile', unlockedBy: 'capLift' },
@@ -163,8 +177,8 @@ export const MECH: MechDef = {
     // One optional brazier per earlier yard: lighting it makes that yard a little Cosier for good.
     { id: 'brazierYard', area: 'kettleYard', x: 2.8, z: 6.0, kind: 'yard' },
     { id: 'brazierPine', area: 'pinewood', x: -9.4, z: 9.6, kind: 'yard' },
-    { id: 'brazierLake', area: 'frozenLake', x: 28.6, z: -9.2, kind: 'yard' },
-    { id: 'brazierRidge', area: 'ironridge', x: -0.4, z: -22.2, kind: 'yard' },
+    { id: 'brazierLake', area: 'frozenLake', x: 27.8, z: 7.0, kind: 'yard' },
+    { id: 'brazierRidge', area: 'ironridge', x: 0.6, z: -28.4, kind: 'yard' },
     // The Trail of Light up Beacon Peak (lit in order; legs of ~6–9 m around the rock barriers).
     { id: 'trail1', area: 'beaconPeak', x: 0.0, z: -30.4, kind: 'trail', order: 1 },
     { id: 'trail2', area: 'beaconPeak', x: 5.8, z: -32.8, kind: 'trail', order: 2 },
@@ -211,7 +225,7 @@ export function mechDecor(): DecorDef[] {
   for (const g of MECH.gripMats) out.push({ id: `gripMat${out.length}`, area: 'frozenLake', model: 'gripMat', x: g.x, z: g.z });
   for (const l of MECH.festivalLamps) out.push({ id: l.id, area: 'camp', model: 'festivalLamp', x: l.x, z: l.z });
   out.push({ id: 'lm_pineStatue', area: 'pinewood', model: 'statue', x: -24.6, z: 0.2, unlockedBy: 'fPineMark' });
-  out.push({ id: 'lm_lakeSculpture', area: 'frozenLake', model: 'iceSculpture', x: 32.2, z: -1.2, unlockedBy: 'fLakeMark' });
+  out.push({ id: 'lm_lakeSculpture', area: 'frozenLake', model: 'iceSculpture', x: 31.4, z: -11.6, unlockedBy: 'fLakeMark' });
   out.push({ id: 'foundBoard', area: 'camp', model: 'foundBoard', x: -5.0, z: 9.6, unlockedBy: 'pad_lantern' });
   out.push({ id: 'monument', area: 'camp', model: 'monument', x: 6.2, z: 8.6, unlockedBy: 'allFound' });
   return out;
@@ -221,7 +235,7 @@ export function mechStations(): StationDef[] {
   return [
     { id: 'crateFindPine', type: 'pile', area: 'pinewood', name: 'Buried crate', model: 'buriedCrate', x: -23.8, z: 4.2,
       solid: { r: 0.5 }, reach: 1.6, item: 'plank', cap: 12, start: 12, refill: 0, unlockedBy: 'fPineCrate' },
-    { id: 'crateFindLake', type: 'pile', area: 'frozenLake', name: 'Buried crate', model: 'buriedCrate', x: 31.6, z: 5.0,
+    { id: 'crateFindLake', type: 'pile', area: 'frozenLake', name: 'Buried crate', model: 'buriedCrate', x: 31.4, z: -14.8,
       solid: { r: 0.5 }, reach: 1.6, item: 'smokedFish', cap: 12, start: 12, refill: 0, unlockedBy: 'fLakeCrate' },
     // Pit-head pile the mine lift hauls ore up into.
     { id: 'shaftPile', type: 'pile', area: 'ironridge', name: 'Pit-head pile', model: 'shaftPile', x: -9.6, z: -20.6,
