@@ -206,6 +206,7 @@ export class PadVisual {
   private wasVisible = false;
   private fillShown = 0;
   private hot = 0;
+  private labelT = -1;
 
   constructor(def: PadDef) {
     this.def = def;
@@ -253,7 +254,7 @@ export class PadVisual {
     const def = this.def;
     const matsTotal = Object.values(def.materials ?? {}).reduce((a, b) => a + (b ?? 0), 0);
     const matsHave = Object.entries(def.materials ?? {}).reduce((a, [k]) => a + Math.min(ps.mats[k as ItemKind] ?? 0, def.materials![k as ItemKind] ?? 0), 0);
-    const frac = (ps.paid + matsHave) / Math.max(1, def.cost + matsTotal);
+    const frac = (ps.paid + matsHave) / Math.max(1, sim.padCost(def.id) + matsTotal); // repeatable pads grow in cost
     this.fillShown += (frac - this.fillShown) * Math.min(1, dt * 10);
     this.hot += ((onPad ? 1 : 0) - this.hot) * Math.min(1, dt * 8);
     const locked = sim.padLocked(def.id);
@@ -264,7 +265,11 @@ export class PadVisual {
     this.rim.material = locked ? lockedRimMat : rimMat;
     const rem = sim.padRemaining(def.id);
     const mats: [ItemKind, number, number][] = Object.entries(def.materials ?? {}).map(([k, n]) => [k as ItemKind, Math.min(ps.mats[k as ItemKind] ?? 0, n ?? 0), n ?? 0]);
-    this.label.draw(def.label, rem.embers, mats, locked ? def.requiresPop ?? 0 : 0);
+    // Canvas redraw + texture upload is costly on phones: at most ~10x/s while the number ticks.
+    if (time - this.labelT > 0.1) {
+      this.labelT = time;
+      this.label.draw(def.label, rem.embers, mats, locked ? def.requiresPop ?? 0 : 0);
+    }
     this.icon.rotation.y = time * 0.9;
     this.icon.position.y = 0.45 + Math.sin(time * 2.2) * 0.08 + this.hot * 0.2;
     this.labelMesh.position.y = 1.25 + this.hot * 0.15;

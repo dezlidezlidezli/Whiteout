@@ -26,7 +26,7 @@ float fkMelt(vec2 xz) {
 }
 `;
 
-export function createGround(size = 260, segs = 130): { mesh: THREE.Mesh; uniforms: GroundUniforms } {
+export function createGround(size = 240, segs = 96): { mesh: THREE.Mesh; uniforms: GroundUniforms } {
   const geo = new THREE.PlaneGeometry(size, size, segs, segs);
   geo.rotateX(-Math.PI / 2);
   const uniforms: GroundUniforms = {
@@ -35,7 +35,8 @@ export function createGround(size = 260, segs = 130): { mesh: THREE.Mesh; unifor
     uTime: { value: 0 },
     uWave: { value: -100 },
   };
-  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0 });
+  // Lambert: the ground covers most pixels on a phone; PBR here buys nothing visible.
+  const mat = new THREE.MeshLambertMaterial({ color: 0xffffff });
   const snow = new THREE.Color(PALETTE.snow);
   const shade = new THREE.Color(PALETTE.snowShade);
   const earth = new THREE.Color(PALETTE.thawedGround);
@@ -51,6 +52,7 @@ export function createGround(size = 260, segs = 130): { mesh: THREE.Mesh; unifor
         `#include <common>
 uniform vec2 uCenter; uniform float uRadius; uniform float uTime;
 varying vec3 vFkWorld;
+varying vec3 vFkN; // per-vertex noise: snow shade, earth tone, dry patches
 ${NOISE}`,
       )
       .replace(
@@ -60,7 +62,8 @@ vec4 fkW = modelMatrix * vec4(transformed, 1.0);
 float fkM = fkMelt(fkW.xz);
 // Snow lies a little deeper than the thawed ground, with soft drifts.
 transformed.y += (1.0 - fkM) * (0.05 + fkFbm(fkW.xz * 0.15) * 0.22);
-vFkWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
+vFkWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;
+vFkN = vec3(fkFbm(fkW.xz * 0.6), fkFbm(fkW.xz * 0.9), fkFbm(fkW.xz * 0.45 + 11.0));`,
       );
     sh.fragmentShader = sh.fragmentShader
       .replace(
@@ -69,6 +72,7 @@ vFkWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;`,
 uniform vec2 uCenter; uniform float uRadius; uniform float uTime; uniform float uWave;
 uniform vec3 uSnow; uniform vec3 uShade; uniform vec3 uEarth;
 varying vec3 vFkWorld;
+varying vec3 vFkN;
 ${NOISE}`,
       )
       .replace(
@@ -77,15 +81,15 @@ ${NOISE}`,
 {
   vec2 xz = vFkWorld.xz;
   float m = fkMelt(xz);
-  float sn = fkFbm(xz * 0.6);
+  float sn = vFkN.x;
   vec3 snowC = mix(uShade, uSnow, 0.55 + 0.45 * sn);
   // Sparkle.
   float sp = step(0.985, fkHash(floor(xz * 9.0))) * (0.5 + 0.5 * sin(uTime * 3.0 + fkHash(floor(xz * 9.0)) * 40.0));
   snowC += sp * 0.25;
-  float g = fkFbm(xz * 0.9);
+  float g = vFkN.y;
   vec3 earthC = mix(uEarth * 0.72, uEarth * 1.08, g);
   // Grass tufts and dry patches.
-  earthC = mix(earthC, vec3(0.42, 0.33, 0.22), smoothstep(0.62, 0.75, fkFbm(xz * 0.45 + 11.0)) * 0.55);
+  earthC = mix(earthC, vec3(0.42, 0.33, 0.22), smoothstep(0.62, 0.75, vFkN.z) * 0.55);
   float rim = m * (1.0 - m) * 4.0;
   vec3 c = mix(snowC, earthC, m);
   c *= 1.0 - rim * 0.28; // wet edge where the snow is melting

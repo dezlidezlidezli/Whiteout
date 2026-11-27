@@ -65,6 +65,8 @@ interface Parts {
   armL: THREE.Object3D; armR: THREE.Object3D; legL: THREE.Object3D; legR: THREE.Object3D;
   tail?: THREE.Object3D; legBL?: THREE.Object3D; legBR?: THREE.Object3D; tool?: THREE.Object3D;
   quad: boolean; phase: number;
+  /** smoothed animation state (accumulated gait phase, blend weights) */
+  st?: AnimState;
 }
 const partsMap = new WeakMap<THREE.Object3D, Parts>();
 const geoCache = new Map<string, THREE.BufferGeometry>();
@@ -392,173 +394,193 @@ function getParts(rig: CharacterRig): Parts | undefined {
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 const ease = (x: number) => x * x * (3 - 2 * x);
 
+interface AnimState {
+  last: number;
+  gait: number;          // accumulated gait phase (radians)
+  speed: number;         // smoothed ground speed
+  carry: number;         // 0..1
+  act: Record<string, number>; // 0..1 per action
+}
+const ACTIONS = ['chop', 'mine', 'fish', 'cook', 'cheer', 'shiver'] as const;
+/** frame-rate independent exponential approach */
+const approach = (cur: number, target: number, rate: number, dt: number) => cur + (target - cur) * (1 - Math.exp(-rate * dt));
+const mix = (a: number, b: number, w: number) => a + (b - a) * w;
+
+function stepState(p: Parts, s: CharacterAnimState): { st: AnimState; dt: number } {
+  let st = p.st;
+  const time = s.time;
+  if (!st) {
+    st = { last: time, gait: 0, speed: Math.max(0, s.speed || 0), carry: s.carrying ? 1 : 0, act: {} };
+    for (const a of ACTIONS) st.act[a] = s.action === a ? 1 : 0;
+    p.st = st;
+  }
+  // clamp dt: tolerate pauses, time resets and huge frame gaps
+  let dt = time - st.last;
+  if (!(dt >= 0) || dt > 0.25) dt = dt > 0.25 ? 0.1 : 0;
+  st.last = time;
+  const target = Math.max(0, s.speed || 0);
+  st.speed = approach(st.speed, target, 9, dt);
+  st.carry = approach(st.carry, s.carrying ? 1 : 0, 10, dt);
+  for (const a of ACTIONS) st.act[a] = approach(st.act[a], s.action === a ? 1 : 0, 9, dt);
+  return { st, dt };
+}
+
 export function animate(rigDef: CharacterRig, s: CharacterAnimState): void {
   const p = getParts(rigDef);
   if (!p) return;
   if (p.quad) return animateDog(p, s);
+  const { st, dt } = stepState(p, s);
   const t = s.time + p.phase;
-  const speed = Math.max(0, s.speed || 0);
-  const moving = speed > 0.08;
-  const k = clamp(speed / 5, 0, 1.3);
-  const action = s.action ?? 'none';
+  const sp = st.speed;
+  const k = clamp(sp / 5, 0, 1.3);
+  // walk weight ramps in continuously from zero speed (no threshold snap)
+  const walkW = clamp(sp / 1.2, 0, 1);
+  const gaitRate = 7 + sp * 1.5;
+  st.gait = (st.gait + dt * gaitRate) % (Math.PI * 200);
+  const ph = st.gait + p.phase;
+  const sw = Math.sin(ph);
 
-  // reset
-  p.rig.position.set(0, 0, 0);
+  // ---- locomotion + idle
+  const amp = (0.3 + 0.55 * Math.min(k, 1)) * walkW;
+  const br = Math.sin(t * 2.1) * (1 - walkW);
+  let rigY = Math.abs(Math.cos(ph)) * (0.03 + 0.07 * k) * walkW;
+  let lean = (0.05 + 0.12 * k) * walkW;
+  let bodyRy = sw * 0.1 * walkW, bodyRz = sw * 0.06 * walkW, bodyX = 0;
+  const sq = Math.cos(ph * 2) * 0.03 * (0.5 + k) * walkW;
+  let sx = 1 - sq * 0.5 - br * 0.008, sy = 1 + sq + br * 0.018;
+  let headRx = -0.04 * k * walkW + Math.sin(t * 0.7) * 0.04 * (1 - walkW);
+  let headRy = -sw * 0.08 * walkW + Math.sin(t * 0.45) * 0.18 * (1 - walkW);
+  let headRz = 0;
+  let aLx = -sw * amp * 0.9, aRx = sw * amp * 0.9;
+  let aLz = 0.12 + br * 0.03 + (0.03 + 0.1 * k) * walkW, aRz = -aLz;
+  let lLx = sw * amp, lRx = -sw * amp, lLz = 0, lRz = 0;
+
+  // ---- carrying pose (blended)
+  const cw = st.carry;
+  if (cw > 1e-3) {
+    const bob = Math.sin(ph * 2) * 0.05 * walkW + Math.sin(t * 2.1) * 0.02 * (1 - walkW);
+    aLx = mix(aLx, -1.4 + bob, cw); aRx = mix(aRx, -1.4 + bob, cw);
+    aLz = mix(aLz, -0.18, cw); aRz = mix(aRz, 0.18, cw);
+    lean -= 0.16 * cw;
+  }
+  if (p.tool) p.tool.visible = cw < 0.5;
+
+  // ---- actions (each blended by its own smoothed weight)
+  for (const a of ACTIONS) {
+    const w = st.act[a];
+    if (w < 1e-3) continue;
+    switch (a) {
+      case 'chop':
+      case 'mine': {
+        const per = a === 'chop' ? 0.75 : 0.85;
+        const u = (t % per) / per;
+        let ar: number, bx: number;
+        if (u < 0.55) { const e = ease(u / 0.55); ar = -0.5 - 2.3 * e; bx = -0.15 * e; }
+        else if (u < 0.7) { const e = (u - 0.55) / 0.15; ar = -2.8 + 2.3 * e * e; bx = -0.15 + 0.5 * e; }
+        else { const e = ease((u - 0.7) / 0.3); ar = -0.5; bx = 0.35 - 0.35 * e; }
+        const tw = a === 'chop' ? 0.35 * (u < 0.55 ? ease(u / 0.55) : 1 - ease(clamp((u - 0.55) / 0.3, 0, 1))) : 0;
+        aLx = mix(aLx, ar, w); aRx = mix(aRx, ar, w); aLz = mix(aLz, -0.35, w); aRz = mix(aRz, 0.35, w);
+        lean += bx * (a === 'mine' ? 1.3 : 1) * w;
+        bodyRy = mix(bodyRy, tw, w);
+        lLx = mix(lLx, -0.15, w); lRx = mix(lRx, 0.2, w);
+        break;
+      }
+      case 'fish': {
+        const jerk = (t % 3.2) < 0.25 ? Math.sin(((t % 3.2) / 0.25) * Math.PI) : 0;
+        aRx = mix(aRx, -0.8 - jerk * 0.6 + Math.sin(t * 1.3) * 0.05, w); aRz = mix(aRz, 0.25, w);
+        aLx = mix(aLx, -0.7 - jerk * 0.5, w); aLz = mix(aLz, -0.35, w);
+        lean += (-0.05 - jerk * 0.1) * w;
+        headRx = mix(headRx, 0.15, w);
+        break;
+      }
+      case 'cook': {
+        const wv = t * 6;
+        aRx = mix(aRx, -1.0 + Math.sin(wv) * 0.25, w); aRz = mix(aRz, 0.35 + Math.cos(wv) * 0.25, w);
+        aLx = mix(aLx, -0.5, w); aLz = mix(aLz, -0.1, w);
+        bodyRz = mix(bodyRz, Math.sin(wv) * 0.05, w); bodyRy = mix(bodyRy, Math.cos(wv) * 0.08, w);
+        lean += 0.12 * w;
+        headRx = mix(headRx, 0.2, w);
+        break;
+      }
+      case 'cheer': {
+        const h = Math.abs(Math.sin(t * 5.5));
+        rigY = mix(rigY, h * 0.28, w);
+        const wave = Math.sin(t * 14) * 0.25;
+        aLx = mix(aLx, -2.7, w); aRx = mix(aRx, -2.7, w);
+        aLz = mix(aLz, 0.45 + wave, w); aRz = mix(aRz, -0.45 - wave, w);
+        lLx = mix(lLx, -0.3 * h, w); lRx = mix(lRx, -0.3 * h, w);
+        lLz = mix(lLz, 0.12 * h, w); lRz = mix(lRz, -0.12 * h, w);
+        const sq2 = (1 - h) * 0.08;
+        sx = mix(sx, 1 + sq2 * 0.6, w); sy = mix(sy, 1 - sq2, w);
+        headRx = mix(headRx, -0.25, w);
+        lean = mix(lean, -0.05, w);
+        break;
+      }
+      case 'shiver': {
+        const j = Math.sin(t * 48);
+        bodyRz = mix(bodyRz, j * 0.04, w); bodyX = mix(bodyX, j * 0.01, w);
+        aLx = mix(aLx, -0.9 + j * 0.05, w); aRx = mix(aRx, -0.9 - j * 0.05, w);
+        aLz = mix(aLz, -0.75, w); aRz = mix(aRz, 0.75, w);
+        headRx = mix(headRx, 0.2, w); headRz = mix(headRz, j * 0.05, w);
+        sx = mix(sx, 1.03, w); sy = mix(sy, 0.95, w);
+        lean += 0.18 * w;
+        break;
+      }
+    }
+  }
+
+  p.rig.position.set(0, rigY, 0);
   p.rig.rotation.set(0, 0, 0);
-  p.body.position.set(0, HIP, 0);
-  p.body.rotation.set(0, 0, 0);
-  p.body.scale.set(1, 1, 1);
-  p.head.rotation.set(0, 0, 0);
-  p.armL.rotation.set(0, 0, 0.1);
-  p.armR.rotation.set(0, 0, -0.1);
-  p.legL.rotation.set(0, 0, 0);
-  p.legR.rotation.set(0, 0, 0);
-
-  let lean = 0;
-  if (moving) {
-    const ph = t * (7 + speed * 1.5);
-    const sw = Math.sin(ph);
-    const amp = 0.3 + 0.55 * Math.min(k, 1);
-    p.legL.rotation.x = sw * amp;
-    p.legR.rotation.x = -sw * amp;
-    p.rig.position.y = Math.abs(Math.cos(ph)) * (0.03 + 0.07 * k);
-    p.body.rotation.z = sw * 0.06;
-    p.body.rotation.y = sw * 0.1;
-    p.head.rotation.y = -sw * 0.08;
-    p.head.rotation.x = -0.04 * k;
-    lean = 0.05 + 0.12 * k;
-    p.armL.rotation.x = -sw * amp * 0.9;
-    p.armR.rotation.x = sw * amp * 0.9;
-    p.armL.rotation.z = 0.15 + 0.1 * k;
-    p.armR.rotation.z = -0.15 - 0.1 * k;
-    // squash & stretch on footfall
-    const sq = Math.cos(ph * 2) * 0.03 * (0.5 + k);
-    p.body.scale.set(1 - sq * 0.5, 1 + sq, 1 - sq * 0.5);
-  } else {
-    const br = Math.sin(t * 2.1);
-    p.body.scale.set(1 - br * 0.008, 1 + br * 0.018, 1 - br * 0.008);
-    p.armL.rotation.z = 0.12 + br * 0.03;
-    p.armR.rotation.z = -0.12 - br * 0.03;
-    p.head.rotation.y = Math.sin(t * 0.45) * 0.18;
-    p.head.rotation.x = Math.sin(t * 0.7) * 0.04;
-  }
-
-  if (p.tool) p.tool.visible = !s.carrying; // tool is stowed while carrying a stack
-  if (s.carrying) {
-    const bob = moving ? Math.sin(t * (7 + speed * 1.5) * 2) * 0.05 : Math.sin(t * 2.1) * 0.02;
-    p.armL.rotation.set(-1.4 + bob, 0, -0.18);
-    p.armR.rotation.set(-1.4 + bob, 0, 0.18);
-    lean -= 0.16;
-  }
-
-  switch (action) {
-    case 'chop':
-    case 'mine': {
-      const per = action === 'chop' ? 0.75 : 0.85;
-      const u = (t % per) / per;
-      let a: number;
-      let bodyX: number;
-      if (u < 0.55) { const e = ease(u / 0.55); a = -0.5 - 2.3 * e; bodyX = -0.15 * e; }
-      else if (u < 0.7) { const e = (u - 0.55) / 0.15; a = -2.8 + 2.3 * e * e; bodyX = -0.15 + 0.5 * e; }
-      else { const e = ease((u - 0.7) / 0.3); a = -0.5; bodyX = 0.35 - 0.35 * e; }
-      const tw = action === 'chop' ? 0.35 : 0;
-      p.armL.rotation.set(a, 0, -0.35);
-      p.armR.rotation.set(a, 0, 0.35);
-      lean += bodyX * (action === 'mine' ? 1.3 : 1);
-      p.body.rotation.y = tw * (u < 0.55 ? ease(u / 0.55) : 1 - ease(clamp((u - 0.55) / 0.3, 0, 1)));
-      if (u > 0.55 && u < 0.75) p.rig.position.y = 0;
-      p.legL.rotation.x = -0.15; p.legR.rotation.x = 0.2;
-      break;
-    }
-    case 'fish': {
-      const jerk = (t % 3.2) < 0.25 ? Math.sin(((t % 3.2) / 0.25) * Math.PI) : 0;
-      p.armR.rotation.set(-0.8 - jerk * 0.6 + Math.sin(t * 1.3) * 0.05, 0, 0.25);
-      p.armL.rotation.set(-0.7 - jerk * 0.5, 0, -0.35);
-      lean += -0.05 - jerk * 0.1;
-      p.head.rotation.x = 0.15;
-      break;
-    }
-    case 'cook': {
-      const w = t * 6;
-      p.armR.rotation.set(-1.0 + Math.sin(w) * 0.25, 0, 0.35 + Math.cos(w) * 0.25);
-      p.armL.rotation.set(-0.5, 0, -0.1);
-      p.body.rotation.z = Math.sin(w) * 0.05;
-      p.body.rotation.y = Math.cos(w) * 0.08;
-      lean += 0.12;
-      p.head.rotation.x = 0.2;
-      break;
-    }
-    case 'cheer': {
-      const h = Math.abs(Math.sin(t * 5.5));
-      p.rig.position.y = h * 0.28;
-      const wave = Math.sin(t * 14) * 0.25;
-      p.armL.rotation.set(-2.7, 0, 0.45 + wave);
-      p.armR.rotation.set(-2.7, 0, -0.45 - wave);
-      p.legL.rotation.x = -0.3 * h; p.legR.rotation.x = -0.3 * h;
-      p.legL.rotation.z = 0.12 * h; p.legR.rotation.z = -0.12 * h;
-      const sq = (1 - h) * 0.08;
-      p.body.scale.set(1 + sq * 0.6, 1 - sq, 1 + sq * 0.6);
-      p.head.rotation.x = -0.25;
-      lean = -0.05;
-      break;
-    }
-    case 'shiver': {
-      const j = Math.sin(t * 48);
-      p.body.rotation.z = j * 0.04;
-      p.body.position.x = j * 0.01;
-      p.armL.rotation.set(-0.9 + j * 0.05, 0, -0.75);
-      p.armR.rotation.set(-0.9 - j * 0.05, 0, 0.75);
-      p.head.rotation.x = 0.2;
-      p.head.rotation.z = j * 0.05;
-      p.body.scale.set(1.03, 0.95, 1.03);
-      lean += 0.18;
-      break;
-    }
-  }
-  p.body.rotation.x = lean;
+  p.body.position.set(bodyX, HIP, 0);
+  p.body.rotation.set(lean, bodyRy, bodyRz);
+  p.body.scale.set(sx, sy, sx);
+  p.head.rotation.set(headRx, headRy, headRz);
+  p.armL.rotation.set(aLx, 0, aLz);
+  p.armR.rotation.set(aRx, 0, aRz);
+  p.legL.rotation.set(lLx, 0, lLz);
+  p.legR.rotation.set(lRx, 0, lRz);
 }
 
 function animateDog(p: Parts, s: CharacterAnimState) {
+  const { st, dt } = stepState(p, s);
   const t = s.time + p.phase;
-  const speed = Math.max(0, s.speed || 0);
-  const moving = speed > 0.08;
-  const k = clamp(speed / 6, 0, 1.3);
+  const sp = st.speed;
+  const k = clamp(sp / 6, 0, 1.3);
+  const walkW = clamp(sp / 1.2, 0, 1);
+  st.gait = (st.gait + dt * (9 + sp * 1.8)) % (Math.PI * 200);
+  const ph = st.gait + p.phase;
+  const sw = Math.sin(ph);
+  const amp = (0.35 + 0.45 * Math.min(k, 1)) * walkW;
   const LEG = 0.38;
-  p.rig.position.set(0, 0, 0);
-  p.body.rotation.set(0, 0, 0);
-  p.body.position.set(0, 0.36, 0);
-  p.head.rotation.set(0, 0, 0);
-  p.body.scale.set(1, 1, 1);
-  for (const l of [p.legL, p.legR, p.legBL!, p.legBR!]) { l.rotation.set(0, 0, 0); l.position.y = LEG; }
-  let wag = Math.sin(t * 6) * 0.35;
-  if (moving) {
-    const ph = t * (9 + speed * 1.8);
-    const sw = Math.sin(ph);
-    const amp = 0.35 + 0.45 * Math.min(k, 1);
-    p.legL.rotation.x = sw * amp; p.legBR!.rotation.x = sw * amp;
-    p.legR.rotation.x = -sw * amp; p.legBL!.rotation.x = -sw * amp;
-    p.rig.position.y = Math.abs(Math.cos(ph)) * (0.02 + 0.05 * k);
-    p.body.rotation.x = Math.cos(ph) * 0.05;
-    p.head.rotation.x = -Math.cos(ph) * 0.08 - 0.05;
-    wag = Math.sin(t * 14) * 0.5;
-  } else {
-    const br = Math.sin(t * 2.6);
-    p.body.scale.set(1 + br * 0.015, 1 + br * 0.015, 1);
-    p.head.rotation.y = Math.sin(t * 0.6) * 0.4;
-    p.head.rotation.z = Math.sin(t * 0.37) * 0.1;
-  }
-  if (s.action === 'cheer') {
+  let rigY = Math.abs(Math.cos(ph)) * (0.02 + 0.05 * k) * walkW;
+  let bodyRx = Math.cos(ph) * 0.05 * walkW, bodyRz = 0, bodyX = 0;
+  const br = Math.sin(t * 2.6) * 0.015 * (1 - walkW);
+  let headRx = (-Math.cos(ph) * 0.08 - 0.05) * walkW;
+  const headRy = Math.sin(t * 0.6) * 0.4 * (1 - walkW);
+  const headRz = Math.sin(t * 0.37) * 0.1 * (1 - walkW);
+  let fl = sw * amp, fr = -sw * amp, bl = -sw * amp, brr = sw * amp;
+  let wag = mix(Math.sin(t * 6) * 0.35, Math.sin(t * 14) * 0.5, walkW);
+  const wc = st.act.cheer, ws = st.act.shiver;
+  if (wc > 1e-3) {
     const h = Math.abs(Math.sin(t * 6));
-    p.rig.position.y = h * 0.22;
-    p.body.rotation.x = -0.25 * h;
-    p.legL.rotation.x = -0.6 * h; p.legR.rotation.x = -0.6 * h;
-    wag = Math.sin(t * 20) * 0.7;
-  } else if (s.action === 'shiver') {
-    const j = Math.sin(t * 50);
-    p.body.position.x = j * 0.01;
-    p.body.rotation.z = j * 0.03;
-    p.head.rotation.x = 0.2;
-    wag = 0;
+    rigY = mix(rigY, h * 0.22, wc);
+    bodyRx = mix(bodyRx, -0.25 * h, wc);
+    fl = mix(fl, -0.6 * h, wc); fr = mix(fr, -0.6 * h, wc);
+    wag = mix(wag, Math.sin(t * 20) * 0.7, wc);
   }
+  if (ws > 1e-3) {
+    const j = Math.sin(t * 50);
+    bodyX = mix(bodyX, j * 0.01, ws); bodyRz = mix(bodyRz, j * 0.03, ws);
+    headRx = mix(headRx, 0.2, ws);
+    wag = mix(wag, 0, ws);
+  }
+  p.rig.position.set(0, rigY, 0);
+  p.body.position.set(bodyX, 0.36, 0);
+  p.body.rotation.set(bodyRx, 0, bodyRz);
+  p.body.scale.set(1 + br, 1 + br, 1);
+  p.head.rotation.set(headRx, headRy, headRz);
+  const legs = [p.legL, p.legR, p.legBL!, p.legBR!];
+  const ang = [fl, fr, bl, brr];
+  legs.forEach((l, i) => { l.rotation.set(ang[i], 0, 0); l.position.y = LEG; });
   if (p.tail) p.tail.rotation.set(0, wag, 0);
 }

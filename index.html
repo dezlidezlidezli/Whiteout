@@ -51,8 +51,9 @@
         background: var(--fk-night); color: var(--fk-cream);
         -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
       }
+      html { height: var(--app-height); }
       body {
-        position: fixed; inset: 0; height: var(--app-height);
+        position: fixed; inset: 0; bottom: auto; height: var(--app-height);
         touch-action: none;
         -webkit-user-select: none; user-select: none;
         -webkit-touch-callout: none;
@@ -124,6 +125,30 @@
         #fk-rotate { display: flex; }
       }
     </style>
+    <script>
+      // iOS Home Screen apps with a translucent status bar report a viewport that is short by
+      // the status-bar height, which leaves an empty strip at the bottom. The web view really
+      // covers the whole screen there, so size the app from the screen itself.
+      (function () {
+        var isIosStandalone = 'standalone' in navigator && navigator.standalone === true;
+        if (!isIosStandalone) return;
+        var last = 0;
+        function fit() {
+          var portrait = window.innerHeight >= window.innerWidth;
+          var full = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+          var h = Math.max(window.innerHeight, full);
+          if (h === last) return;
+          last = h;
+          document.documentElement.style.setProperty('--app-height', h + 'px');
+          window.dispatchEvent(new Event('resize'));
+        }
+        fit();
+        ['resize', 'orientationchange', 'pageshow'].forEach(function (e) {
+          window.addEventListener(e, function () { setTimeout(fit, 0); setTimeout(fit, 300); });
+        });
+        document.addEventListener('visibilitychange', function () { setTimeout(fit, 0); });
+      })();
+    </script>
   </head>
   <body>
     <canvas id="game"></canvas>

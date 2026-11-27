@@ -43,7 +43,13 @@ function make() {
       );
   };
   crowd.customProgramCacheKey = () => 'fk-crowd-tint';
-  return { std, glow, ember, ice, crowd };
+  /** Additive sky curtain (RGBA vertex colours carry the alpha falloff). */
+  const aurora = new THREE.MeshBasicMaterial({
+    vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide, toneMapped: false, fog: false,
+  });
+  aurora.name = 'fk-aurora';
+  return { std, glow, ember, ice, crowd, aurora };
 }
 
 export function mats() {

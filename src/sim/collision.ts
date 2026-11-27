@@ -98,7 +98,7 @@ export function steer(p: P2, tx: number, tz: number, r: number, solids: readonly
     // Do not avoid the obstacle we are heading to.
     const tdx = tx - s.x;
     const tdz = tz - s.z;
-    if (tdx * tdx + tdz * tdz < (sr + 0.4) * (sr + 0.4)) continue;
+    if (s.kind === 'circle' ? tdx * tdx + tdz * tdz < (s.r + 0.15) * (s.r + 0.15) : Math.abs(tdx) < s.hw + 0.15 && Math.abs(tdz) < s.hd + 0.15) continue;
     const w = (1 - along / (look + sr)) * (clear - Math.abs(perp)) / clear;
     const dirSign = perp === 0 ? side : -Math.sign(perp);
     ax += -dz * dirSign * w * 2.2;

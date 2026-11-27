@@ -320,19 +320,25 @@ function deliver(sim: Sim, item: ItemKind, dest: Dest): GuideTarget | null {
   return have > 0 ? dest : null;
 }
 
-/** Where to go to obtain `item`. */
-function source(sim: Sim, item: ItemKind, depth: number): GuideTarget | null {
+/** Where to go to obtain `item`. With `near` (the processor it is for), prefer sources close to that processor. */
+function source(sim: Sim, item: ItemKind, depth: number, near?: { x: number; z: number }): GuideTarget | null {
   if (depth > 4) return null;
+  const cost = (x: number, z: number) => (near ? Math.hypot(x - near.x, z - near.z) + 0.5 * dist(sim, x, z) : dist(sim, x, z));
   // 1. Anything stocked.
   let best: Dest | null = null;
   let bd = Infinity;
   for (const d of sim.data.stations) {
     if (!sim.isUsable(d.id) || !sim.takeable(d.id, item)) continue;
-    const dd = dist(sim, d.x, d.z);
+    const dd = cost(d.x, d.z);
     if (dd < bd) {
       bd = dd;
       best = stTarget(d);
     }
+  }
+  // For a processor's ingredient, harvesting right by the processor beats fetching stock from across the map.
+  if (near && best && best.kind !== 'node') {
+    const n = nearestNode(sim, (nd) => nd.item === item, near);
+    if (n && cost(n.x, n.z) + 4 < bd) return n;
   }
   // Prefer working the node we're standing at over walking to a far ground pile.
   if (best && best.kind !== 'node') return best;
@@ -354,16 +360,16 @@ function source(sim: Sim, item: ItemKind, depth: number): GuideTarget | null {
       if (c > 0 && (c >= sim.room(pd.id, m, true) || full(sim) || !sourceAvailable(sim, m))) return stTarget(pd);
     }
     for (const m of missing) {
-      const sub = full(sim) ? null : source(sim, m, depth + 1);
+      const sub = full(sim) ? null : source(sim, m, depth + 1, pd);
       if (sub) return sub;
     }
   }
   if (best) return best;
   // 3. Harvest it.
-  return nearestNode(sim, (n) => n.item === item);
+  return nearestNode(sim, (n) => n.item === item, near);
 }
 
-function nearestNode(sim: Sim, pred: (n: NodeDef) => boolean): GuideTarget | null {
+function nearestNode(sim: Sim, pred: (n: NodeDef) => boolean, near?: { x: number; z: number }): GuideTarget | null {
   let best: NodeDef | null = null;
   let bd = Infinity;
   const p = sim.state.player;
@@ -374,7 +380,8 @@ function nearestNode(sim: Sim, pred: (n: NodeDef) => boolean): GuideTarget | nul
     // A full pack can only work a node that still has room to spill onto the ground.
     if (full(sim) && st.ground >= d.groundCap) continue;
     // Stick with the tree we're chopping.
-    const dd = Math.hypot(d.x - p.x, d.z - p.z) - (p.working === d.id ? 3 : 0);
+    const dp = Math.hypot(d.x - p.x, d.z - p.z);
+    const dd = (near ? Math.hypot(d.x - near.x, d.z - near.z) + 0.5 * dp : dp) - (p.working === d.id ? 3 : 0);
     if (dd < bd) {
       bd = dd;
       best = d;

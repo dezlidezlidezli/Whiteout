@@ -39,8 +39,13 @@ jobs:
     # branch but not built or deployed, so half-finished work never emails a failure.
     if: ${{ !startsWith(github.event.head_commit.message, 'WIP') }}
     runs-on: ubuntu-latest
+    outputs:
+      pages_enabled: ${{ steps.pages.outcome == 'success' }}
     steps:
+      # Full history so the in-app version number (commit count) is correct.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -48,13 +53,19 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      # Until Pages is switched on in the repository settings this step cannot succeed.
+      # That must not fail the run: tests and build above are the real checks.
+      - id: pages
+        uses: actions/configure-pages@v5
+        continue-on-error: true
+      - if: steps.pages.outcome == 'success'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
   deploy:
     needs: build
+    if: needs.build.outputs.pages_enabled == 'true'
     runs-on: ubuntu-latest
     # Non-default branches may be blocked by the github-pages environment protection rules;
     # that is expected until the branch is allowed, so it must not fail the run.

@@ -29,7 +29,8 @@ export class ItemBatcher {
       const c = k === 'ember' ? 900 : cap;
       const mesh = new THREE.InstancedMesh(def.geometry, def.material, c);
       mesh.count = 0;
-      mesh.castShadow = k !== 'ember';
+      // Items never cast real shadows (cost); stacks read fine with the carrier's shadow.
+      mesh.castShadow = false;
       mesh.receiveShadow = true;
       mesh.frustumCulled = false;
       mesh.name = `items:${k}`;

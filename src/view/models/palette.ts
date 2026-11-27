@@ -88,15 +88,25 @@ export const PALETTE = {
   pie: 0xe0a44a,
   berry: 0xc0334a,
   plate: 0xf0e8da,
+  gold: 0xe8b53a,
 
   // --- crowd ---
-  frozenCoat: 0xa9bcd8,
-  frozenSkin: 0xd8ecf8,
+  frozenCoat: 0x93a6bf,
+  frostWhite: 0xeaf6fb,
+  frozenIce: 0xbfe6ee,
+  frozenScarf: 0xb79ca4,
+  frozenHair: 0x6c7a8e,
+  frozenSkin: 0xc9dbe8,
   frozenDark: 0x7d9fc2,
-  frozenFace: 0x7f9ab8,
+  frozenFace: 0x8496ac,
   frozenArm: 0xb8cce4,
   frozenArmDark: 0x92b2d2,
-  frozenHat: 0x8fa6cc,
+  frozenHat: 0x8d9cc0,
 } as const;
 
 export type PaletteKey = keyof typeof PALETTE;
+
+/** Recommended instanceColor values for FROZEN crowd instances: pale frost tints (pick one per
+ *  instance). The frozen mesh only takes ~half of the tint (tintMask 0.5), so these just nudge
+ *  the frost between icy white, faint teal and faint lilac. Avoid saturated blues here. */
+export const FROZEN_TINTS: readonly number[] = [0xffffff, 0xeef8ff, 0xe4f6f6, 0xe8eefc, 0xf2f0fa, 0xdcefff];

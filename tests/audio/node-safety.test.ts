@@ -11,7 +11,8 @@ describe('audio module under Node', () => {
       audio.sfx('fanfare');
       audio.music('calm');
       audio.music(null);
-      audio.ambience({ wind: 0.5, fire: 1 });
+      audio.ambience({ wind: 0.5, fire: 1, crowd: 0.3, camp: 1 });
+      audio.sfx('dawn');
       audio.suspend();
       audio.resume();
     }).not.toThrow();

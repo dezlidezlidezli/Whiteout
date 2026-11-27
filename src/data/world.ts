@@ -78,7 +78,7 @@ function counter(id: string, x: number, unlockedBy: string | undefined, name: st
   return {
     id, type: 'counter', area: 'kettleYard', name, model: 'counter', x, z: YARD_COUNTER_Z, rot: 0,
     solid: { hw: 1.15, hd: 0.5 }, reach: 1.85, item: 'stew', cap: 12, serveTime: 0.55,
-    queueDir: { x: 0, z: 1 }, queueLen: 7, queueSpacing: 1.05, queueStart: { x, z: QUEUE_Z },
+    queueDir: { x: 0, z: 1 }, queueLen: 40, queueSpacing: 0.8, queueStart: { x, z: QUEUE_Z },
     emberSpot: { x: x + 1.7, z: YARD_COUNTER_Z - 1.6 },
     // Thawed villagers walk round the outside of the yard palisade to camp.
     exitPath: [
@@ -171,66 +171,66 @@ export const PADS: PadDef[] = [
   // ---- Kettle Yard ----
   { id: 'pad_pack1', area: 'kettleYard', x: 1.2, z: 12.4, label: 'Bigger pack', cost: 20, requires: [],
     effects: [{ type: 'capacity', add: 3 }], icon: { item: 'fish' } },
-  { id: 'pad_kettleB', area: 'kettleYard', x: 1.6, z: 10.0, label: 'Second kettle', cost: 45, requires: ['pad_pack1'],
+  { id: 'pad_kettleB', area: 'kettleYard', x: 1.6, z: 10.0, label: 'Second kettle', cost: 60, requires: ['pad_pack1'],
     effects: [{ type: 'unlock', id: 'kettleB' }], icon: { prop: 'kettle' } },
-  { id: 'pad_counterB', area: 'kettleYard', x: 3.2, z: 14.4, label: 'Second counter', cost: 80, requires: ['pad_kettleB'],
+  { id: 'pad_counterB', area: 'kettleYard', x: 3.2, z: 14.4, label: 'Second counter', cost: 120, requires: ['pad_kettleB'],
     effects: [{ type: 'unlock', id: 'counterB' }], icon: { prop: 'counter' } },
-  { id: 'pad_fisherYard', area: 'kettleYard', x: -4.0, z: 7.2, label: 'Hire a fisher', cost: 100, requires: ['pad_counterB'],
+  { id: 'pad_fisherYard', area: 'kettleYard', x: -4.0, z: 7.2, label: 'Hire a fisher', cost: 150, requires: ['pad_counterB'],
     requiresPop: 6, effects: [{ type: 'hire', helper: 'yardFisher' }], icon: { character: 'fisher' } },
-  { id: 'pad_porter', area: 'kettleYard', x: 4.4, z: 7.6, label: 'Hire a porter', cost: 130, requires: ['pad_fisherYard'],
+  { id: 'pad_porter', area: 'kettleYard', x: 4.4, z: 7.6, label: 'Hire a porter', cost: 210, requires: ['pad_fisherYard'],
     requiresPop: 10, effects: [{ type: 'hire', helper: 'porter' }], icon: { character: 'porter' } },
-  { id: 'pad_crateB', area: 'kettleYard', x: -4.4, z: 15.2, label: 'Cut another fishing hole', cost: 110, requires: ['pad_porter'],
+  { id: 'pad_crateB', area: 'kettleYard', x: -4.4, z: 15.2, label: 'Cut another fishing hole', cost: 180, requires: ['pad_porter'],
     effects: [{ type: 'unlock', id: 'streamHole2' }], icon: { prop: 'iceHole' } },
-  { id: 'pad_beltA', area: 'kettleYard', x: -0.8, z: 13.6, label: 'Stew conveyor', cost: 180, requires: ['pad_porter'],
+  { id: 'pad_beltA', area: 'kettleYard', x: -0.8, z: 13.6, label: 'Stew conveyor', cost: 290, requires: ['pad_porter'],
     effects: [{ type: 'unlock', id: 'beltA' }], icon: { prop: 'conveyor' } },
-  { id: 'pad_pack2', area: 'kettleYard', x: 1.2, z: 12.4, label: 'Bigger pack', cost: 170, requires: ['pad_beltA', 'pad_crateB'],
+  { id: 'pad_pack2', area: 'kettleYard', x: 1.2, z: 12.4, label: 'Bigger pack', cost: 280, requires: ['pad_beltA', 'pad_crateB'],
     effects: [{ type: 'capacity', add: 3 }], icon: { item: 'stew' } },
-  { id: 'pad_cook', area: 'kettleYard', x: 5.2, z: 10.6, label: 'Hire a cook', cost: 220, requires: ['pad_beltA'],
+  { id: 'pad_cook', area: 'kettleYard', x: 5.2, z: 10.6, label: 'Hire a cook', cost: 360, requires: ['pad_beltA'],
     requiresPop: 25, effects: [{ type: 'hire', helper: 'cook' }], icon: { character: 'cook' } },
-  { id: 'pad_hearth2', area: 'camp', x: 0, z: 3.4, label: 'Raise the Hearth', cost: 480, requires: ['pad_pack2', 'pad_cook'],
+  { id: 'pad_hearth2', area: 'camp', x: 0, z: 3.4, label: 'Raise the Hearth', cost: 560, requires: ['pad_pack2', 'pad_cook'],
     effects: [{ type: 'hearth', level: 2 }], icon: { prop: 'hearth', level: 2 } },
   // ---- Pinewood ----
-  { id: 'pad_sawmill', area: 'pinewood', x: -11.4, z: 3.6, label: 'Sawmill', cost: 210, requires: ['pad_hearth2'],
+  { id: 'pad_sawmill', area: 'pinewood', x: -11.4, z: 3.6, label: 'Sawmill', cost: 300, requires: ['pad_hearth2'],
     effects: [{ type: 'unlock', id: 'sawmill' }], icon: { prop: 'sawmill' } },
-  { id: 'pad_cabin1', area: 'camp', x: -6.3, z: -5.2, label: 'Cabin', cost: 180, materials: { plank: 8 }, requires: ['pad_sawmill'],
+  { id: 'pad_cabin1', area: 'camp', x: -6.3, z: -5.2, label: 'Cabin', cost: 240, materials: { plank: 8 }, requires: ['pad_sawmill'],
     effects: [{ type: 'unlock', id: 'cabin1' }, { type: 'mod', key: 'spawnRate', add: 0.25 }], icon: { prop: 'cabin' } },
-  { id: 'pad_pack3', area: 'pinewood', x: -17.0, z: 8.6, label: 'Sturdy pack', cost: 300, materials: { plank: 6 }, requires: ['pad_sawmill'],
+  { id: 'pad_pack3', area: 'pinewood', x: -17.0, z: 8.6, label: 'Sturdy pack', cost: 440, materials: { plank: 6 }, requires: ['pad_sawmill'],
     effects: [{ type: 'capacity', add: 4 }], icon: { item: 'log' } },
-  { id: 'pad_axe', area: 'pinewood', x: -14.4, z: 8.6, label: 'Sharper axe', cost: 250, requires: ['pad_pack3'],
+  { id: 'pad_axe', area: 'pinewood', x: -14.4, z: 8.6, label: 'Sharper axe', cost: 380, requires: ['pad_pack3'],
     effects: [{ type: 'mod', key: 'chopSpeed', mul: 1.6 }, { type: 'tool', tool: 'axe' }], icon: { prop: 'stump' } },
-  { id: 'pad_pots', area: 'kettleYard', x: 5.3, z: 12.6, label: 'Copper pots', cost: 390, materials: { plank: 10 }, requires: ['pad_cabin1'],
+  { id: 'pad_pots', area: 'kettleYard', x: 5.3, z: 12.6, label: 'Copper pots', cost: 500, materials: { plank: 10 }, requires: ['pad_cabin1'],
     effects: [{ type: 'mod', key: 'cookSpeed', mul: 1.6 }, { type: 'mod', key: 'pricePlus', add: 1 }, { type: 'tool', tool: 'kettle' }], icon: { prop: 'kettle', level: 2 } },
-  { id: 'pad_lumberjack', area: 'pinewood', x: -11.4, z: -2.8, label: 'Hire a lumberjack', cost: 480, requires: ['pad_cabin1', 'pad_pack3'],
+  { id: 'pad_lumberjack', area: 'pinewood', x: -11.4, z: -2.8, label: 'Hire a lumberjack', cost: 640, requires: ['pad_cabin1', 'pad_pack3'],
     requiresPop: 45, effects: [{ type: 'unlock', id: 'woodpile' }, { type: 'hire', helper: 'lumberjack' }], icon: { character: 'lumberjack' } },
-  { id: 'pad_boots', area: 'camp', x: 2.6, z: -1.8, label: 'Warm boots', cost: 380, requires: ['pad_pots'],
+  { id: 'pad_boots', area: 'camp', x: 2.6, z: -1.8, label: 'Warm boots', cost: 500, requires: ['pad_pots'],
     effects: [{ type: 'mod', key: 'moveSpeed', mul: 1.15 }], icon: { prop: 'sled' } },
-  { id: 'pad_cabin2', area: 'camp', x: 6.3, z: -5.2, label: 'Cabin', cost: 460, materials: { plank: 14 }, requires: ['pad_lumberjack'],
+  { id: 'pad_cabin2', area: 'camp', x: 6.3, z: -5.2, label: 'Cabin', cost: 620, materials: { plank: 14 }, requires: ['pad_lumberjack'],
     effects: [{ type: 'unlock', id: 'cabin2' }, { type: 'mod', key: 'spawnRate', add: 0.25 }], icon: { prop: 'cabin' } },
-  { id: 'pad_woodbelt', area: 'pinewood', x: -9.9, z: 0.4, label: 'Log conveyor', cost: 600, requires: ['pad_lumberjack'],
+  { id: 'pad_woodbelt', area: 'pinewood', x: -9.9, z: 0.4, label: 'Log conveyor', cost: 760, requires: ['pad_lumberjack'],
     effects: [{ type: 'unlock', id: 'woodbelt' }], icon: { prop: 'conveyor' } },
-  { id: 'pad_stoker', area: 'camp', x: -6.0, z: 1.2, label: 'Hire a stoker', cost: 690, requires: ['pad_woodbelt'],
+  { id: 'pad_stoker', area: 'camp', x: -6.0, z: 1.2, label: 'Hire a stoker', cost: 800, requires: ['pad_woodbelt'],
     requiresPop: 70, effects: [{ type: 'hire', helper: 'stoker' }], icon: { character: 'porter' } },
-  { id: 'pad_cabin3', area: 'camp', x: 6.3, z: 3.8, label: 'Cabin', cost: 830, materials: { plank: 20 }, requires: ['pad_cabin2', 'pad_boots'],
+  { id: 'pad_cabin3', area: 'camp', x: 6.3, z: 3.8, label: 'Cabin', cost: 1150, materials: { plank: 20 }, requires: ['pad_cabin2', 'pad_boots'],
     effects: [{ type: 'unlock', id: 'cabin3' }, { type: 'mod', key: 'spawnRate', add: 0.25 }, { type: 'mod', key: 'helperSpeed', mul: 1.2 }],
     icon: { prop: 'cabin' } },
-  { id: 'pad_hearth3', area: 'camp', x: 0, z: 3.4, label: 'Raise the Hearth', cost: 1550, materials: { plank: 30 },
+  { id: 'pad_hearth3', area: 'camp', x: 0, z: 3.4, label: 'Raise the Hearth', cost: 2050, materials: { plank: 30 },
     requires: ['pad_stoker', 'pad_cabin3'], effects: [{ type: 'hearth', level: 3 }], icon: { prop: 'hearth', level: 3 } },
 ];
 
 // ---- Camp ----
 const TENT_RING: [number, number][] = [
   [4.6, 250], [4.6, 290], [4.6, 215], [4.6, 325], [4.7, 180], [4.7, 0], [4.9, 148], [4.9, 32],
-  [7.4, 270], [7.2, 237], [7.2, 303], [7.4, 160], [7.4, 20],
+  [7.4, 270], [7.2, 237], [7.2, 303], [7.4, 160], [7.4, 340],
 ];
+/** Outer corner spots for the biggest milestones. */
+const TENT_EXTRA = [{ x: -7.8, z: -7.9 }, { x: 7.8, z: -7.9 }, { x: -7.3, z: 5.0 }];
 export const CAMP: CampDef = {
   hearth: { x: 0, z: 0 },
-  tentAt: [2, 5, 9, 14, 20, 27, 35, 44, 54, 65, 77, 90, 104],
+  tentAt: [2, 5, 9, 14, 20, 27, 35, 44, 54, 65, 77, 90, 104, 150, 220, 320],
   tentSpots: TENT_RING.map(([r, deg]) => {
     const a = (deg * Math.PI) / 180;
-    const x = Math.cos(a) * r;
-    const z = Math.sin(a) * r;
-    return { x, z, rot: Math.atan2(-x, -z) };
-  }),
+    return { x: Math.cos(a) * r, z: Math.sin(a) * r };
+  }).concat(TENT_EXTRA).map(({ x, z }) => ({ x, z, rot: Math.atan2(-x, -z) })),
   settleMin: 2.4,
   settleMax: 6.2,
 };
@@ -279,6 +279,8 @@ function forest(): DecorDef[] {
       const px = x + (r() - 0.5) * 2;
       const pz = z + (r() - 0.5) * 2;
       if (nearPlay(px, pz, 1.2)) continue;
+      // Keep the camera side (south of the play space) clear so trees never hide the action.
+      if ((nearPlay(px, pz - 9, 0) || nearPlay(px, pz - 15, 0)) && pz > -8) continue;
       // Thin out far away to save triangles, keep a dense belt near the play space.
       const near = nearPlay(px, pz, 7);
       if (!near && r() < 0.55) continue;

@@ -8,7 +8,7 @@ import { moveCircle, navNext, pushOut } from './collision';
 import { NavGrid } from './navgrid';
 import { wallSolids } from '../data/dressing';
 import type { Actor, Place, SimEvent } from './events';
-import { updateCustomers, updateHelpers, hireHelper } from './agents';
+import { queueSlot, updateCustomers, updateHelpers, hireHelper } from './agents';
 import { computeGuide, type GuideTarget } from './guide';
 import { deliverOrder, orderRoom, updateTotals } from './endless';
 import { finaleWarmRadius, setBeaconStage, updateFinale } from './finale';
@@ -21,6 +21,10 @@ import {
 
 export const STEP = 1 / 60;
 const MAX_EVENTS = 4000;
+/** Room reported for player drops: effectively unlimited, so a drop is never refused. */
+const PLAYER_ROOM = 9999;
+/** Processor output buffers hold at least this much before the processor pauses. */
+const MIN_OUTPUT_CAP = 60;
 const PLAYER: Actor = { kind: 'player' };
 
 export interface QuestProgress {
@@ -47,11 +51,16 @@ export class Sim {
   private rectCache: Rect[] | null = null;
   private padTickT = 0;
   private nav: NavGrid | null = null;
-  private allSolidsCache: Solid[] | null = null;
-  private allSolidsTick = -1;
-  private allSolidsBase: Solid[] | null = null;
   private navSolids: Solid[] | null = null;
   private navRects: Rect[] | null = null;
+  private allCache: Solid[] | null = null;
+  private allCacheBase: Solid[] | null = null;
+  private allCacheVer = -1;
+  /** Bumped whenever a node falls or regrows (invalidates allSolids). */
+  private nodeVer = 0;
+  private reachBuf: StationDef[] = [];
+  private reachDist: number[] = [];
+  private reachTick = -1;
 
   constructor(data: GameData, opts: { seed?: number; save?: string } = {}) {
     this.data = data;
@@ -69,7 +78,10 @@ export class Sim {
     this.startQuest(0, false);
     const c = this.stationDefs.get('counterA');
     if (c && c.type === 'counter') {
-      for (let i = 0; i < 3; i++) this.spawnCustomerAt(c, c.queueStart.x, c.queueStart.z + i * c.queueSpacing + 0.01);
+      for (let i = 0; i < 18; i++) {
+        const q = queueSlot(c, i);
+        this.spawnCustomerAt(c, q.x, q.z + 0.01);
+      }
     }
   }
 
@@ -147,6 +159,8 @@ export class Sim {
     this.state = st;
     this.solidCache = null;
     this.rectCache = null;
+    this.allCache = null;
+    this.reachTick = -1;
     this.refreshPads(false);
   }
 
@@ -250,17 +264,17 @@ export class Sim {
   /** Solids including currently standing trees. */
   allSolids(): Solid[] {
     const base = this.solids();
-    // Cached for the current tick (nodes only fall/regrow in updateInteract/updateStations; a one-step lag is harmless).
-    if (this.allSolidsCache && this.allSolidsTick === this.state.tick && this.allSolidsBase === base) return this.allSolidsCache;
+    // Cached until the static solids or any tree's standing state changes (no per-step garbage).
+    if (this.allCache && this.allCacheBase === base && this.allCacheVer === this.nodeVer) return this.allCache;
     const out = base.slice();
+    this.allCache = out;
+    this.allCacheBase = base;
+    this.allCacheVer = this.nodeVer;
     for (const d of this.data.stations) {
       if (d.type !== 'node' || !d.solid || !('r' in d.solid)) continue;
       const st = this.state.stations[d.id] as NodeState;
       if (st.alive) out.push({ kind: 'circle', x: d.x, z: d.z, r: d.solid.r });
     }
-    this.allSolidsCache = out;
-    this.allSolidsTick = this.state.tick;
-    this.allSolidsBase = base;
     return out;
   }
 
@@ -407,24 +421,22 @@ export class Sim {
     const d = this.stationDefs.get(id);
     if (!d) return 0;
     const st = this.state.stations[id];
-    // ---- SOFT-CAP RULE (mirrors the main-checkout anti-soft-lock hotfix) ----
-    // A player drop is never refused: any buffer that accepts the kind takes it with no hard cap.
-    // Caps are soft target levels, respected only by helpers and links (byHelper = true).
-    const SOFT = 999;
     switch (d.type) {
       case 'processor': {
         const need = this.data.recipes[d.recipe].inputs[item];
         if (!need) return 0;
-        if (!byHelper) return SOFT;
+        // The player is never refused (no soft-locks); caps are soft targets for helpers/links.
+        if (!byHelper) return PLAYER_ROOM;
         return Math.max(0, d.inputCap - ((st as ProcState).inputs[item] ?? 0));
       }
       case 'counter':
-        if (d.item !== item) return 0;
-        return byHelper ? Math.max(0, d.cap - (st as CounterState).stock) : SOFT;
+        if (d.item === item && !byHelper) return PLAYER_ROOM;
+        return d.item === item ? Math.max(0, d.cap - (st as CounterState).stock) : 0;
       case 'deposit':
+        // The Open Season notice board only takes what open orders still want.
         if (d.role === 'orders') return byHelper ? 0 : orderRoom(this, item);
-        if (!d.accepts.includes(item)) return 0;
-        return byHelper ? Math.max(0, d.cap - (st as DepositState).count) : SOFT;
+        if (d.accepts.includes(item) && !byHelper) return PLAYER_ROOM;
+        return d.accepts.includes(item) ? Math.max(0, d.cap - (st as DepositState).count) : 0;
       case 'pile':
         return byHelper && d.accepts && d.item === item ? Math.max(0, d.cap - (st as PileState).count) : 0;
       default:
@@ -585,6 +597,7 @@ export class Sim {
     st.hits++;
     if (st.hits >= def.hits) {
       st.alive = false;
+      this.nodeVer++;
       st.hits = 0;
       st.work = 0;
       st.regrow = def.regrow;
@@ -593,8 +606,14 @@ export class Sim {
   }
 
   private stationsInReach(): StationDef[] {
+    // Reused buffers, computed once per step (drop and pick share it): no per-step garbage.
+    if (this.reachTick === this.state.tick) return this.reachBuf;
+    this.reachTick = this.state.tick;
     const p = this.state.player;
-    const out: { d: StationDef; dist: number }[] = [];
+    const out = this.reachBuf;
+    const ds = this.reachDist;
+    out.length = 0;
+    ds.length = 0;
     for (const d of this.data.stations) {
       if (d.type === 'node') {
         const st = this.state.stations[d.id] as NodeState;
@@ -603,10 +622,19 @@ export class Sim {
       const dist = Math.hypot(d.x - p.x, d.z - p.z);
       if (dist > d.reach) continue;
       if (!this.isUsable(d.id)) continue;
-      out.push({ d, dist });
+      // Insertion sort by distance (only a handful of entries).
+      let i = out.length;
+      out.push(d);
+      ds.push(dist);
+      while (i > 0 && ds[i - 1] > dist) {
+        out[i] = out[i - 1];
+        ds[i] = ds[i - 1];
+        i--;
+      }
+      out[i] = d;
+      ds[i] = dist;
     }
-    out.sort((a, b) => a.dist - b.dist);
-    return out.map((o) => o.d);
+    return out;
   }
 
   /** One shelf transfer (set down the top item, or take back the most recently shelved one). */
@@ -652,10 +680,14 @@ export class Sim {
       }
     }
     const inReach = this.stationsInReach();
+    // Walking past a station only fills it up to its soft cap (so a pack meant for elsewhere isn't emptied on the
+    // way); standing still, it takes everything (never refused, so the player can't be stranded).
+    const walking = Math.hypot(p.vx, p.vz) > 1.6 && Math.hypot(this.moveX, this.moveZ) > 0.3;
     for (const d of inReach) {
       for (let i = p.stack.length - 1; i >= 0; i--) {
         const it = p.stack[i];
-        if (this.room(d.id, it) > 0) {
+        const room = walking ? (d.type === 'pile' ? 0 : this.room(d.id, it, true)) : this.room(d.id, it);
+        if (room > 0) {
           p.stack.splice(i, 1);
           this.put(d.id, it);
           this.emit({ type: 'drop', item: it, to: { kind: 'station', id: d.id }, by: PLAYER, height: i });
@@ -663,9 +695,9 @@ export class Sim {
         }
       }
     }
-    // Hand items back: standing still with a full pack (then keep going until done). SOFT-CAP RULE: any pile
-    // or processor output holding kind K takes K back, uncapped, so a full pack can never strand the player.
+    // Hand items back: standing still with a full pack (then keep going until done).
     const still = Math.hypot(this.moveX, this.moveZ) < 0.2;
+    // (Any pile or processor output holding that kind takes it back, uncapped.)
     for (const d of inReach) {
       if (d.type !== 'pile' && d.type !== 'processor') continue;
       const kind = d.type === 'pile' ? d.item : this.data.recipes[d.recipe].output;
@@ -673,9 +705,9 @@ export class Sim {
       const i = p.stack.lastIndexOf(kind);
       if (i < 0) continue;
       p.stack.splice(i, 1);
-      const hs = this.state.stations[d.id];
-      if (hs.kind === 'pile') hs.count++;
-      else if (hs.kind === 'processor') hs.output++;
+      const rs = this.state.stations[d.id];
+      if (rs.kind === 'pile') rs.count++;
+      else if (rs.kind === 'processor') rs.output++;
       p.returning = d.id;
       this.emit({ type: 'drop', item: kind, to: { kind: 'station', id: d.id }, by: PLAYER, height: i });
       return true;
@@ -695,7 +727,7 @@ export class Sim {
       const moving = Math.hypot(p.vx, p.vz) > 1.6 && Math.hypot(this.moveX, this.moveZ) > 0.3;
       if (moving && top !== it) continue;
       this.take(d.id);
-      if (d.type === 'pile') p.pickedFrom = d.id;
+      if (d.type === 'pile' || d.type === 'processor') p.pickedFrom = d.id;
       p.stack.push(it);
       this.addStat(`pickup.${it}`, 1);
       this.addStat('carried', 1);
@@ -911,6 +943,7 @@ export class Sim {
           ns.regrow -= dt;
           if (ns.regrow <= 0) {
             ns.alive = true;
+            this.nodeVer++;
             ns.hits = 0;
             this.emit({ type: 'nodeRegrow', node: d.id });
           }
@@ -931,8 +964,7 @@ export class Sim {
       if (hd && hd.role === 'operate' && hd.station === d.id && h.phase === 'work') helperOp = true;
     }
     st.operated = helperOp || playerNear;
-    // SOFT-CAP RULE: outputs get a generous buffer (60+) before the processor pauses.
-    let can = st.output + r.outputCount <= Math.max(d.outputCap, 60);
+    let can = st.output + r.outputCount <= Math.max(d.outputCap, MIN_OUTPUT_CAP);
     for (const k in r.inputs) {
       const kk = k as ItemKind;
       if ((st.inputs[kk] ?? 0) < (r.inputs[kk] ?? 0)) can = false;

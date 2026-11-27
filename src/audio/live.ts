@@ -17,7 +17,7 @@ export function createLiveAudio(): AudioApi & {
   let engine: Engine | null = null;
   let volumes = { sfx: 0.8, music: 0.5 };
   let wantMood: MusicMood | null = null;
-  const wantAmb = { wind: 0, fire: 0 };
+  const wantAmb = { wind: 0, fire: 0, crowd: 0, camp: 0 };
   let userSuspended = false;
   let hidden = false;
   let timer: ReturnType<typeof setInterval> | null = null;
@@ -134,7 +134,7 @@ export function createLiveAudio(): AudioApi & {
           engine = new Engine(ctx, ctx.destination, { sfx: volumes.sfx, music: volumes.music });
           hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
           addListeners();
-          if (wantAmb.wind > 0 || wantAmb.fire > 0) engine.setAmbience(wantAmb, 0.5);
+          if (wantAmb.wind > 0 || wantAmb.fire > 0 || wantAmb.crowd > 0 || wantAmb.camp > 0) engine.setAmbience(wantAmb, 0.5);
           if (wantMood) engine.music(wantMood);
         }
         tryResume();
@@ -164,9 +164,11 @@ export function createLiveAudio(): AudioApi & {
       }
     },
 
-    ambience(levels: { wind?: number; fire?: number }) {
-      if (levels.wind !== undefined && Number.isFinite(levels.wind)) wantAmb.wind = levels.wind;
-      if (levels.fire !== undefined && Number.isFinite(levels.fire)) wantAmb.fire = levels.fire;
+    ambience(levels: { wind?: number; fire?: number; crowd?: number; camp?: number }) {
+      for (const k of ['wind', 'fire', 'crowd', 'camp'] as const) {
+        const x = levels[k];
+        if (x !== undefined && Number.isFinite(x)) wantAmb[k] = x;
+      }
       if (!engine) return;
       try {
         engine.setAmbience(levels);

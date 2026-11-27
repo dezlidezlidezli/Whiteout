@@ -1,3 +1,4 @@
+import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
@@ -66,9 +67,23 @@ function frostkettlePwa(): Plugin {
   };
 }
 
+// Build identity shown in the app: major.minor from package.json + commit count, and the short commit id.
+function git(args: string): string {
+  try {
+    return execSync(`git ${args}`, { cwd: root, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+  } catch {
+    return '';
+  }
+}
+const pkg = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as { version: string };
+const [major, minor] = pkg.version.split('.');
+const appVersion = `${major}.${minor}.${git('rev-list --count HEAD') || '0'}`;
+const appBuild = git('rev-parse --short HEAD') || 'local';
+
 // Relative base so the build works at any path (GitHub Pages serves from /<repo>/).
 export default defineConfig({
   base: './',
+  define: { __APP_VERSION__: JSON.stringify(appVersion), __APP_BUILD__: JSON.stringify(appBuild) },
   plugins: [frostkettlePwa()],
   build: {
     target: 'es2022',

@@ -5,24 +5,35 @@ import { PALETTE } from './models';
 
 // ------------------------------------------------------------------ snowfall (GPU-animated points)
 
+export type SnowLevel = 0 | 1 | 2;
+
+/**
+ * World-space snowfall in a 36 m box that wraps around the (smoothed) camera focus. GPU-animated,
+ * one draw call. Flakes stay below ~8 m so none ever balloon in front of the camera; they fade at
+ * the wrap edges (no popping) and get quieter while the player walks.
+ */
 export class Snowfall {
   readonly points: THREE.Points;
   private mat: THREE.ShaderMaterial;
+  private geo: THREE.BufferGeometry;
+  private max: number;
+  private fade = 1;
 
-  constructor(parent: THREE.Object3D, count: number) {
-    const geo = new THREE.BufferGeometry();
-    const pos = new Float32Array(count * 3);
-    const rnd = new Float32Array(count);
+  constructor(parent: THREE.Object3D, max = 900) {
+    this.max = max;
+    this.geo = new THREE.BufferGeometry();
+    const pos = new Float32Array(max * 3);
+    const rnd = new Float32Array(max);
     let s = 12345;
     const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-    for (let i = 0; i < count; i++) {
-      pos[i * 3] = r() * 40 - 20;
-      pos[i * 3 + 1] = r() * 16;
-      pos[i * 3 + 2] = r() * 40 - 20;
+    for (let i = 0; i < max; i++) {
+      pos[i * 3] = r() * 36 - 18;
+      pos[i * 3 + 1] = r() * 8;
+      pos[i * 3 + 2] = r() * 36 - 18;
       rnd[i] = r();
     }
-    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    geo.setAttribute('aRnd', new THREE.BufferAttribute(rnd, 1));
+    this.geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    this.geo.setAttribute('aRnd', new THREE.BufferAttribute(rnd, 1));
     this.mat = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
@@ -30,8 +41,9 @@ export class Snowfall {
         uTime: { value: 0 },
         uOrigin: { value: new THREE.Vector3() },
         uSize: { value: 1 },
-        uWind: { value: 0.5 },
-        uColor: { value: new THREE.Color(0xf4f8ff) },
+        uWind: { value: 0.3 },
+        uAlpha: { value: 1 },
+        uColor: { value: new THREE.Color(0xf2f6ff) },
       },
       vertexShader: /* glsl */ `
         attribute float aRnd;
@@ -39,38 +51,49 @@ export class Snowfall {
         varying float vA;
         void main() {
           vec3 p = position;
-          float fall = 0.9 + aRnd * 0.9;
-          p.y = mod(p.y - uTime * fall, 16.0);
-          p.x += sin(uTime * (0.6 + aRnd) + aRnd * 30.0) * 0.6 + uTime * uWind * 1.4;
-          p.z += cos(uTime * (0.5 + aRnd) + aRnd * 17.0) * 0.4 + uTime * uWind * 0.6;
-          // Wrap around the camera target so the box follows the player.
-          p.x = mod(p.x - uOrigin.x + 20.0, 40.0) - 20.0 + uOrigin.x;
-          p.z = mod(p.z - uOrigin.z + 20.0, 40.0) - 20.0 + uOrigin.z;
+          float fall = 0.55 + aRnd * 0.6;
+          p.y = mod(p.y - uTime * fall, 8.0) + 0.2;
+          p.x += sin(uTime * (0.35 + aRnd * 0.4) + aRnd * 30.0) * 0.45 + uTime * uWind;
+          p.z += cos(uTime * (0.3 + aRnd * 0.4) + aRnd * 17.0) * 0.3 + uTime * uWind * 0.4;
+          // World-anchored, wrapping around the focus: flakes slide past as the camera pans.
+          vec2 rel = mod(p.xz - uOrigin.xz + 18.0, 36.0) - 18.0;
+          p.xz = rel + uOrigin.xz;
           vec4 mv = modelViewMatrix * vec4(p, 1.0);
           gl_Position = projectionMatrix * mv;
-          gl_PointSize = uSize * (2.0 + aRnd * 3.0) * (30.0 / -mv.z);
-          vA = 0.55 + aRnd * 0.45;
+          gl_PointSize = min(uSize * (1.0 + aRnd * 1.4) * (16.0 / -mv.z), uSize * 3.5);
+          float edge = 1.0 - smoothstep(13.0, 18.0, max(abs(rel.x), abs(rel.y)));
+          vA = (0.28 + aRnd * 0.32) * edge;
         }`,
       fragmentShader: /* glsl */ `
-        uniform vec3 uColor; varying float vA;
+        uniform vec3 uColor; uniform float uAlpha; varying float vA;
         void main() {
-          vec2 c = gl_PointCoord - 0.5;
-          float d = length(c);
+          float d = length(gl_PointCoord - 0.5);
           if (d > 0.5) discard;
-          gl_FragColor = vec4(uColor, smoothstep(0.5, 0.1, d) * vA * 0.85);
+          gl_FragColor = vec4(uColor, smoothstep(0.5, 0.0, d) * vA * uAlpha);
         }`,
     });
-    this.points = new THREE.Points(geo, this.mat);
+    this.points = new THREE.Points(this.geo, this.mat);
     this.points.frustumCulled = false;
     this.points.renderOrder = 10;
     parent.add(this.points);
+    this.setLevel(1);
   }
 
-  update(time: number, origin: THREE.Vector3, pixelRatio: number, wind: number): void {
-    this.mat.uniforms.uTime.value = time;
-    this.mat.uniforms.uOrigin.value.copy(origin);
-    this.mat.uniforms.uSize.value = pixelRatio;
-    this.mat.uniforms.uWind.value = wind;
+  setLevel(level: SnowLevel): void {
+    const n = [0, Math.round(this.max * 0.4), this.max][level];
+    this.geo.setDrawRange(0, n);
+    this.points.visible = n > 0;
+  }
+
+  update(time: number, dt: number, origin: THREE.Vector3, pixelRatio: number, wind: number, playerSpeed: number): void {
+    const want = 1 - Math.min(1, playerSpeed / 5) * 0.45;
+    this.fade += (want - this.fade) * (1 - Math.exp(-dt * 2));
+    const u = this.mat.uniforms;
+    u.uTime.value = time;
+    u.uOrigin.value.copy(origin);
+    u.uSize.value = pixelRatio;
+    u.uWind.value = wind;
+    u.uAlpha.value = this.fade;
   }
 }
 
@@ -216,6 +239,8 @@ export class Effects {
   private shards: ParticlePool;
   private puffs: ParticlePool;
   private glints: ParticlePool;
+  private steam: ParticlePool;
+  private smokeP: ParticlePool;
   private rings: { mesh: THREE.Mesh; t: number; max: number; size: number }[] = [];
   private ringGeo = new THREE.RingGeometry(0.86, 1, 64).rotateX(-Math.PI / 2);
   private parent: THREE.Object3D;
@@ -228,6 +253,10 @@ export class Effects {
     this.puffs = new ParticlePool(parent, new THREE.IcosahedronGeometry(0.25, 0), puffMat, 220, -0.6, 3.2);
     const glintMat = new THREE.MeshBasicMaterial({ color: PALETTE.ember, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false });
     this.glints = new ParticlePool(parent, new THREE.OctahedronGeometry(0.07, 0), glintMat, 200, 2.5, 1.2);
+    const steamMat = new THREE.MeshBasicMaterial({ color: 0xf2f6ff, transparent: true, opacity: 0.55, depthWrite: false, fog: true });
+    this.steam = new ParticlePool(parent, new THREE.IcosahedronGeometry(0.2, 1), steamMat, 120, -0.9, 1.5);
+    const smokeMat = new THREE.MeshBasicMaterial({ color: 0x8a90a8, transparent: true, opacity: 0.45, depthWrite: false, fog: true });
+    this.smokeP = new ParticlePool(parent, new THREE.IcosahedronGeometry(0.28, 1), smokeMat, 120, -0.5, 0.8);
   }
 
   /** The icy shell cracking off a thawing villager. */
@@ -245,7 +274,7 @@ export class Effects {
   }
 
   /** Soft snow puff (new building, footsteps on landing, tree fall). */
-  puff(x: number, y: number, z: number, n = 10, radius = 1, speed = 1.6): void {
+  puff(x: number, y: number, z: number, n = 10, radius = 1, speed = 1.6, scale = 1): void {
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + Math.random() * 0.5;
       const r = radius * (0.6 + Math.random() * 0.5);
@@ -253,9 +282,21 @@ export class Effects {
         x: x + Math.cos(a) * r * 0.5, y: y + Math.random() * 0.2, z: z + Math.sin(a) * r * 0.5,
         vx: Math.cos(a) * speed * (0.6 + Math.random()), vy: 0.4 + Math.random() * 0.9, vz: Math.sin(a) * speed * (0.6 + Math.random()),
         rx: Math.random() * 6, ry: Math.random() * 6, vr: 1 + Math.random() * 2,
-        life: 0, max: 0.7 + Math.random() * 0.5, size: 0.6 + Math.random() * 0.9, grow: 1.6,
+        life: 0, max: 0.7 + Math.random() * 0.5, size: (0.6 + Math.random() * 0.9) * scale, grow: 1.6,
       });
     }
+  }
+
+  /** Soft rising steam (kettles, breath) or chimney smoke. */
+  vapour(kind: 'steam' | 'smoke' | 'breath', x: number, y: number, z: number, dx = 0, dz = 0): void {
+    const pool = kind === 'smoke' ? this.smokeP : this.steam;
+    const small = kind === 'breath';
+    pool.spawn({
+      x: x + (Math.random() - 0.5) * 0.1, y, z: z + (Math.random() - 0.5) * 0.1,
+      vx: dx + (Math.random() - 0.5) * 0.25 + (kind === 'smoke' ? 0.25 : 0), vy: small ? 0.25 : 0.6 + Math.random() * 0.4, vz: dz + (Math.random() - 0.5) * 0.25,
+      rx: Math.random() * 6, ry: Math.random() * 6, vr: 0.6,
+      life: 0, max: small ? 0.8 : kind === 'smoke' ? 2.6 : 1.4, size: small ? 0.45 : kind === 'smoke' ? 0.9 : 0.7, grow: small ? 1.8 : 2.6,
+    });
   }
 
   /** Warm glints (pad complete, ember bursts). */
@@ -284,6 +325,8 @@ export class Effects {
     this.shards.update(dt);
     this.puffs.update(dt);
     this.glints.update(dt);
+    this.steam.update(dt);
+    this.smokeP.update(dt);
     for (let i = this.rings.length - 1; i >= 0; i--) {
       const r = this.rings[i];
       r.t += dt;

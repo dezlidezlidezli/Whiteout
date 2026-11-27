@@ -36,6 +36,8 @@ export interface PartOpts {
   /** colour for faces pointing +Z (faces, fronts) */
   front?: number;
   frontZ?: number;
+  /** colour for faces pointing -Z (back of heads etc.), threshold frontZ */
+  back?: number;
   /** colour for faces pointing down */
   bottom?: number;
   /** random vertex displacement in metres (coincident vertices move together) */
@@ -43,6 +45,8 @@ export interface PartOpts {
   seed?: number;
   /** per-face brightness variation (0..0.2) */
   shade?: number;
+  /** use the geometry's own per-vertex `color` attribute (linear RGB) instead of `color` */
+  vcol?: boolean;
   /** crowd tint mask (1 = takes instanceColor, 0 = keeps its colour) */
   mask?: number;
 }
@@ -91,6 +95,8 @@ export class Builder {
       }
     }
     g.dispose();
+    const vc = o.vcol && g.attributes.color ? (g.attributes.color.array as ArrayLike<number>) : null;
+    const vcs = g.attributes.color ? g.attributes.color.itemSize : 3;
     const base = _c.set(color);
     const topY = o.topY ?? 0.6;
     const shadeR = o.shade ? rng((o.seed ?? 7) * 31 + this.pos.length) : null;
@@ -102,10 +108,14 @@ export class Builder {
       if (o.top !== undefined && _n.y > topY) _c2.set(o.top);
       else if (o.bottom !== undefined && _n.y < -topY) _c2.set(o.bottom);
       else if (o.front !== undefined && _n.z > (o.frontZ ?? 0.6)) _c2.set(o.front);
+      else if (o.back !== undefined && _n.z < -(o.frontZ ?? 0.6)) _c2.set(o.back);
       if (shadeR) _c2.multiplyScalar(1 + (shadeR() - 0.5) * 2 * (o.shade ?? 0));
       for (let k = 0; k < 3; k++) {
         this.pos.push(p[(t + k) * 3], p[(t + k) * 3 + 1], p[(t + k) * 3 + 2]);
-        this.col.push(_c2.r, _c2.g, _c2.b);
+        if (vc) {
+          const m = shadeR ? _c2.r / Math.max(1e-6, base.r) : 1;
+          this.col.push(vc[(t + k) * vcs] * m, vc[(t + k) * vcs + 1] * m, vc[(t + k) * vcs + 2] * m);
+        } else this.col.push(_c2.r, _c2.g, _c2.b);
         this.msk.push(o.mask ?? 0);
       }
     }

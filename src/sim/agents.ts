@@ -137,9 +137,8 @@ export function queueSlotPos(c: CounterDef, slot: number): { x: number; z: numbe
 
 function slotPosRaw(c: CounterDef, slot: number): { x: number; z: number } {
   const path = c.queuePath;
-  if (!path || path.length < 2) {
-    return { x: c.queueStart.x + c.queueDir.x * c.queueSpacing * slot, z: c.queueStart.z + c.queueDir.z * c.queueSpacing * slot };
-  }
+  // Default: the packed crowd (queueSlot). A queuePath lays slots along a polyline instead.
+  if (!path || path.length < 2) return queueSlot(c, slot);
   let d = slot * c.queueSpacing;
   for (let i = 1; i < path.length; i++) {
     const a = path[i - 1];
@@ -152,6 +151,34 @@ function slotPosRaw(c: CounterDef, slot: number): { x: number; z: number } {
     d -= l;
   }
   return path[path.length - 1];
+}
+
+/**
+ * Where the n-th waiting Icebound stands: a hungry crowd fanning out behind the counter
+ * (front row of one, then rows of up to five), with a little deterministic jostle.
+ */
+export function queueSlot(c: CounterDef, slot: number): { x: number; z: number } {
+  if (slot === 0) return { x: c.queueStart.x, z: c.queueStart.z };
+  let row = 1;
+  let first = 1;
+  let cap = 3;
+  while (slot >= first + cap) {
+    first += cap;
+    row++;
+    cap = Math.min(5, 1 + row * 2);
+  }
+  const col = slot - first - (cap - 1) / 2 + (row % 2 ? 0.35 : -0.15);
+  const sp = c.queueSpacing;
+  const jx = ((slot * 0.618034) % 1 - 0.5) * sp * 0.7;
+  const jz = ((slot * 0.414214) % 1 - 0.5) * sp * 0.6;
+  // Rows bulge forward in the middle so the crowd reads as a blob pressing at the counter.
+  const along = row * sp * 0.82 + jz + Math.abs(col) * sp * 0.22;
+  const side = col * sp * (1 + row * 0.03) + jx;
+  // queueDir is the direction away from the counter; its perpendicular spreads the rows.
+  return {
+    x: c.queueStart.x + c.queueDir.x * along - c.queueDir.z * side,
+    z: c.queueStart.z + c.queueDir.z * along + c.queueDir.x * side,
+  };
 }
 
 function moveTo(o: { x: number; z: number }, tx: number, tz: number, step: number): boolean {

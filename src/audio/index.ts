@@ -22,7 +22,13 @@ export type SfxName =
   | 'fanfare' // finale
   | 'uiTap'
   | 'error'
-  | 'footstep';
+  | 'footstep'
+  | 'arrive' // thawed villager reaches camp / enters a tent (quiet, frequent)
+  | 'order' // caravan order completed on the notice board
+  | 'orderNew' // a new caravan order is posted
+  | 'upgrade' // repeatable upgrade bought (lighter than padComplete)
+  | 'beaconStage' // a Great Beacon stage completes
+  | 'dawn'; // finale dawn break: long warm swell (6-8 s) the finale music enters under
 
 export type MusicMood = 'title' | 'calm' | 'cozy' | 'storm' | 'finale';
 
@@ -39,8 +45,11 @@ export interface AudioApi {
   sfx(name: SfxName, opts?: SfxOpts): void;
   /** Cross-fades to the given mood; null fades music out. */
   music(mood: MusicMood | null): void;
-  /** Continuous ambience controls, 0..1. wind = blizzard intensity, fire = proximity to hearth/kettle. */
-  ambience(levels: { wind?: number; fire?: number }): void;
+  /**
+   * Continuous ambience controls, 0..1. wind = blizzard intensity, fire = proximity to hearth/kettle,
+   * crowd = near a big Icebound queue (cold murmur), camp = inside a populated camp (cosy life).
+   */
+  ambience(levels: { wind?: number; fire?: number; crowd?: number; camp?: number }): void;
   setVolumes(v: { sfx?: number; music?: number }): void;
   getVolumes(): { sfx: number; music: number };
   /** Pause/resume everything (app backgrounded). */
