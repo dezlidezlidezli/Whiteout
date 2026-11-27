@@ -21,7 +21,7 @@ async function open(browser, mech) {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
   const errors = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
+  page.on('pageerror', (e) => errors.push('pageerror: ' + e.message + ' @ ' + String(e.stack).split('\n').slice(1, 4).join(' <- ')));
   for (let a = 0; a < 5; a++) {
     try {
       await page.goto(URL + '?seed=4&fresh=1&skiptitle=1&mech=' + mech, { waitUntil: 'load' });

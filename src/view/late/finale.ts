@@ -156,7 +156,7 @@ export class FinaleDirector implements LatePart, MoodSource {
   private startedAt = 0;
 
   private start(fromEvent: boolean): void {
-    this.startedAt = this.ctx.time;
+    this.startedAt = performance.now();
     this.active = true;
     this.live = fromEvent;
     this.buildKeys();
@@ -185,7 +185,7 @@ export class FinaleDirector implements LatePart, MoodSource {
     if (!this.active || this.deps.credits.open) return;
     const t = e.target as HTMLElement | null;
     if (t && t.closest('.fk-sheet, .fk-sheet-back')) return;
-    if (this.ctx.time - this.startedAt < 2) return;
+    if (performance.now() - this.startedAt < 2000) return;
     const end = this.L + this.D + 6;
     if (this.camT < end - 1) this.camT = end - 1;
     this.showCredits();
@@ -360,7 +360,7 @@ export class FinaleDirector implements LatePart, MoodSource {
 
     if (this.active) {
       this.camT += sdt;
-      if (this.ctx.time - this.startedAt > 2 && !this.deps.credits.open && !this.creditsDone) this.skipEl.classList.add('fk-on');
+      if (performance.now() - this.startedAt > 2000 && !this.deps.credits.open && !this.creditsDone) this.skipEl.classList.add('fk-on');
       if (this.camT >= this.L + this.D + 8.6 && f.phase === 'done') this.showCredits();
     }
     const want = this.active ? 1 : 0;
