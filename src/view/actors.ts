@@ -95,6 +95,10 @@ export class Actors {
   /** Items currently mid-air towards a stack (hidden from its top). */
   readonly hidden = new Map<string, number>();
   cheerT = 0;
+  /** Mechanic presentations can drive the player's pose (plough push, wading shuffle, skating). */
+  playerAction: 'plough' | 'shuffle' | 'skate' | 'dig' | null = null;
+  /** Metres the player sinks (wading in deep snow). */
+  playerSink = 0;
 
   constructor(parent: THREE.Object3D, data: GameData) {
     this.parent = parent;
@@ -133,11 +137,11 @@ export class Actors {
     const speed = this.animSpeed < 0.05 ? 0 : this.animSpeed;
     if (rawSpeed > 0.3) this.playerYaw = lerpAngle(this.playerYaw, p.facing, 1 - Math.exp(-dt * 14));
     const r = this.player.root;
-    r.position.set(x, 0, z);
+    r.position.set(x, -this.playerSink, z);
     r.rotation.y = this.playerYaw;
     this.cheerT = Math.max(0, this.cheerT - dt);
     const workDef = p.working ? sim.stationDefs.get(p.working) : undefined;
-    const action = workDef ? nodeAction(workDef.model) : this.cheerT > 0 && speed < 0.5 ? 'cheer' : 'none';
+    const action = workDef ? nodeAction(workDef.model) : this.playerAction ?? (this.cheerT > 0 && speed < 0.5 ? 'cheer' : 'none');
     this.fishLines[0].update(action === 'fish' && workDef ? workDef : null, this.player.root, time);
     animateCharacter(this.player, { time, speed, carrying: p.stack.length > 0, action });
     r.updateMatrixWorld(true);

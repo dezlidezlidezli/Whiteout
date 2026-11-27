@@ -140,6 +140,33 @@ function assert(cond, msg) {
     await page.waitForTimeout(1800);
     await shot('flame-beacon-lit');
     assert(await page.evaluate(() => !!document.querySelector('.fk-ui.fk-cinema')), 'finale cinematic runs');
+    // ---------------------------------------------------------------- Lantern Festival (Open Season)
+    await fk(() => {
+      window.__fk.cheat.lateOpenSeason(false);
+      const s = window.__fk.sim.state;
+      // Make sure a festival order is on the board (they are drawn at random).
+      if (!s.orders.some((o) => o.festival)) {
+        s.orders.pop();
+        s.orders.push({ id: s.nextOrderId++, item: 'fish', n: window.__fk.sim.data.mech.festivalLamps.length, got: 0, reward: 900, festival: true });
+      }
+      s.player.stack = [];
+    });
+    // Wrap up the finale cinematic: skip to the thank-you card and continue into Open Season.
+    await page.touchscreen.tap(195, 600);
+    await page.waitForSelector('.fk-cr-go', { timeout: 20000 });
+    await page.waitForTimeout(800);
+    await page.click('.fk-cr-go', { force: true });
+    await page.waitForTimeout(1500);
+    assert(await page.evaluate(() => !!document.querySelector('.fk-ord.fk-ord-fest')), 'Lantern Festival order card shows a lamp');
+    r = await standAt(H.x + 1.4, H.z + 0.8, 1.2);
+    assert(r.held, 'flame taken for the festival');
+    const lamps = await fk(() => window.__fk.sim.data.mech.festivalLamps);
+    for (let i = 0; i < lamps.length - 1; i++) await standAt(lamps[i].x + 0.5, lamps[i].z + 0.4, 0.15, false);
+    const got = await fk(() => (window.__fk.sim.state.orders.find((o) => o.festival) || { got: -1 }).got);
+    assert(got >= lamps.length - 1, `festival lamps light the order (${got}/${lamps.length})`);
+    await fk(() => window.__fk.cheat.lateGo(window.__fk.sim.data.camp.hearth.x, window.__fk.sim.data.camp.hearth.z + 3));
+    await page.waitForTimeout(1800);
+    await shot('flame-festival');
     assert(errors.length === 0, 'no console errors' + (errors.length ? ': ' + errors.slice(0, 5).join(' | ') : ''));
     console.log('flame e2e: all good. Screenshots in', OUT);
   } finally {
