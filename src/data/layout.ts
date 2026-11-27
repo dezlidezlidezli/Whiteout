@@ -8,7 +8,7 @@ import { FOOTPRINT, FROST_WALL_HALF, segDist } from './declutter';
 import type { AreaId, CounterDef, DecorDef, GameData, Rect, StationDef, Vec2 } from './types';
 
 /** Current world-layout revision (see GameData.layoutRev). 2 = compact yards, 3 = village camp. */
-export const LAYOUT_REV = 3;
+export const LAYOUT_REV = 4;
 
 /** World offset of each area's authored coordinates. */
 export const AREA_OFFSET: Record<AreaId, Vec2> = {
@@ -100,6 +100,20 @@ export function placeAreas(d: GameData, lanes: Rect[]): { data: GameData; lanes:
 
 // ------------------------------------------------------------------ camp tents
 
+/** The Hearth level at which tent plot i is first needed (housing allows tentsPerLevel[level-1] tents). */
+export function tentLevel(d: GameData, i: number): number {
+  const per = d.camp.housing?.tentsPerLevel;
+  if (!per) return 1;
+  const k = per.findIndex((n) => n > i);
+  return k < 0 ? per.length + 1 : k + 1;
+}
+
+/** Has the frost wall of this area melted by the time the Hearth reaches `level`? */
+export function wallGoneBy(d: GameData, area: string, level: number): boolean {
+  const a = d.areas.find((x) => x.id === area);
+  return !!a && level > 0 && a.hearth <= level;
+}
+
 interface Disc { x: number; z: number; r: number }
 
 /** Greedy tent plots in the free camp ground: nearest the fire first, clear of everything built,
@@ -113,26 +127,57 @@ export function packTents(d: GameData, count: number): { x: number; z: number; r
   for (const o of d.decor) if (o.area === 'camp' && !o.id.startsWith('tree')) block.push({ x: o.x, z: o.z, r: fp(o.model) * (o.scale ?? 1) });
   for (const p of d.pads) if (p.area === 'camp') block.push({ x: p.x, z: p.z, r: FOOTPRINT.pad });
   for (const a of d.dressing) if (a.area === 'camp') for (const l of a.landmarks) block.push({ x: l.x, z: l.z, r: fp(l.prop) });
-  const out: { x: number; z: number; rot: number }[] = [];
   const cand: Vec2[] = [];
   for (let x = camp.x0 + 1; x <= camp.x1 - 1; x += 0.5) for (let z = camp.z0 + 1; z <= camp.z1 - 1; z += 0.5) cand.push({ x, z });
   const hd = (c: Vec2) => Math.hypot(c.x - d.camp.hearth.x, c.z - d.camp.hearth.z);
-  cand.sort((a, b) => hd(a) - hd(b) || a.x - b.x || a.z - b.z);
-  for (const c of cand) {
-    if (out.length >= count) break;
+  // Ground a tent may stand on at all. `level`: the Hearth level the plot is first needed at; frost walls
+  // of areas open by then have melted, so late plots only keep clear of the wall's ice itself.
+  const allowed = (c: Vec2, level: number) => {
     // The four paths radiating from the fire (2.2 m wide) and the mouth of the Kettle Yard.
-    if (Math.abs(c.x) < 1.1 + tent + 0.3 || Math.abs(c.z) < 1.1 + tent + 0.3) continue;
-    if (c.z > 7.0 && Math.abs(c.x) < 8.0) continue;
-    if (c.z > camp.z1 - tent - 0.6) continue;
-    let ok = true;
+    if (Math.abs(c.x) < 1.1 + tent + 0.3 || Math.abs(c.z) < 1.1 + tent + 0.3) return false;
+    if (c.z > 7.0 && Math.abs(c.x) < 8.0) return false;
+    if (c.z > camp.z1 - tent - 0.6) return false;
     for (const w of d.walls) {
-      for (let k = 0; k + 1 < w.points.length; k++) if (segDist(c.x, c.z, w.points[k], w.points[k + 1]) < tent + FROST_WALL_HALF + 2.0) ok = false;
+      const margin = wallGoneBy(d, w.area, level) ? 0.3 : 2.0;
+      for (let k = 0; k + 1 < w.points.length; k++) if (segDist(c.x, c.z, w.points[k], w.points[k + 1]) < tent + FROST_WALL_HALF + margin) return false;
     }
-    if (!ok) continue;
-    if (block.some((b) => Math.hypot(b.x - c.x, b.z - c.z) < b.r + tent + 0.35)) continue;
-    if (out.some((t) => Math.hypot(t.x - c.x, t.z - c.z) < 2 * tent + 0.35)) continue;
-    out.push({ x: c.x, z: c.z, rot: Math.atan2(-c.x, -c.z) });
+    return !block.some((b) => Math.hypot(b.x - c.x, b.z - c.z) < b.r + tent + 0.35);
+  };
+  const free = cand.filter((c) => allowed(c, 0));
+  // Greedy packing, nearest the fire first; a few deterministic tie-break variations are tried and the
+  // one that fits the most plots wins (then the one closest to the fire overall).
+  const pack = (key: (c: Vec2) => number): Vec2[] => {
+    const order = [...free].sort((a, b) => key(a) - key(b) || a.x - b.x || a.z - b.z);
+    const got: Vec2[] = [];
+    for (const c of order) {
+      if (got.length >= count) break;
+      if (got.some((t) => Math.hypot(t.x - c.x, t.z - c.z) < 2 * tent + 0.35)) continue;
+      got.push(c);
+    }
+    return got;
+  };
+  let best: Vec2[] = [];
+  let bestSum = Infinity;
+  for (let trial = 0; trial < 24; trial++) {
+    const r = lrng(1000 + trial);
+    const jit = new Map(free.map((c) => [c, r()] as const));
+    const got = pack(trial === 0 ? hd : (c) => hd(c) + jit.get(c)! * (0.5 + trial * 0.25));
+    const sum = got.reduce((a, c) => a + hd(c), 0);
+    if (got.length > best.length || (got.length === best.length && sum < bestSum - 1e-9)) {
+      best = got;
+      bestSum = sum;
+    }
   }
+  // Late plots (needed only once the frost walls nearby have melted) fill up the rest.
+  best.sort((a, b) => hd(a) - hd(b) || a.x - b.x || a.z - b.z);
+  const order = [...cand].sort((a, b) => hd(a) - hd(b) || a.x - b.x || a.z - b.z);
+  for (let i = best.length; i < count; i++) {
+    const lv = tentLevel(d, i);
+    const c = order.find((c) => allowed(c, lv) && !best.some((t) => Math.hypot(t.x - c.x, t.z - c.z) < 2 * tent + 0.35));
+    if (!c) break;
+    best.push(c);
+  }
+  const out = best.sort((a, b) => hd(a) - hd(b) || a.x - b.x || a.z - b.z).map((c) => ({ x: c.x, z: c.z, rot: Math.atan2(-c.x, -c.z) }));
   return out;
 }
 

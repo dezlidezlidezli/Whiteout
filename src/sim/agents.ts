@@ -5,7 +5,7 @@ import { pushOut, steer } from './collision';
 import { courier } from './courier';
 import { crankHelper } from './crank';
 import type { Sim } from './sim';
-import type { CounterState, CustomerState, HelperState, NodeState } from './state';
+import type { CounterState, CustomerState, HelperState, NodeState, ProcState } from './state';
 
 // ------------------------------------------------------------------ customers
 
@@ -449,14 +449,105 @@ function haulDeliver(sim: Sim, def: HelperDef, h: HelperState, dt: number): void
   }
 }
 
+/**
+ * Operators run one station by themselves: they keep its inputs stocked from their supply stations
+ * (`from`), work it at the boosted speed while standing at it, and, with `to`, carry its output there
+ * (e.g. a counter). The station is a whole chore taken off the player's hands.
+ */
 function operate(sim: Sim, def: HelperDef, h: HelperState, dt: number): void {
-  if (!def.station || !sim.isUsable(def.station)) {
+  const sid = def.station;
+  const sd = sid ? sim.stationDefs.get(sid) : undefined;
+  if (!sid || !sd || sd.type !== 'processor' || !sim.isUsable(sid)) {
+    h.stack.length = 0;
     idleAtHome(sim, def, h, dt);
     return;
   }
-  const sp = stationPos(sim, def.station);
+  const st = sim.state.stations[sid] as ProcState;
+  const r = sim.data.recipes[sd.recipe];
+  const cap = Math.max(1, capOf(sim, def));
+  const sp = stationPos(sim, sid);
+  // 1. Carrying: inputs go into the station, output to where it is served.
+  if (h.stack.length && h.phase !== 'load') {
+    const it = h.stack[h.stack.length - 1];
+    let target: string | null = it === r.output ? bestDest(sim, def, [it]) : sim.room(sid, it, true) > 0 ? sid : null;
+    if (!target && it !== r.output) target = sid; // never stuck holding inputs: the station always takes them back
+    if (!target) {
+      // Nowhere to serve right now: wait at the station, working, with the load.
+      if (walk(sim, def, h, sp.x, sp.z, sp.reach - 0.3, dt)) h.phase = 'work';
+      h.action = h.phase === 'work' ? 'cook' : 'none';
+      return;
+    }
+    const tp = stationPos(sim, target);
+    if (h.phase !== 'unload' || h.target !== target) {
+      h.phase = 'toDest';
+      h.target = target;
+      if (!walk(sim, def, h, tp.x, tp.z, tp.reach - 0.2, dt)) return;
+      h.phase = 'unload';
+      h.t = 0;
+    }
+    h.t += dt;
+    if (h.t >= def.transferTime) {
+      h.t = 0;
+      h.stack.pop();
+      sim.put(target, it);
+      sim.emit({ type: 'drop', item: it, to: { kind: 'station', id: target }, by: { kind: 'helper', id: def.id }, height: h.stack.length });
+      if (!h.stack.length) {
+        h.phase = 'idle';
+        h.target = null;
+      }
+    }
+    return;
+  }
+  // 2. Loading (from a supply, or the station's own output to serve).
+  if ((h.phase === 'toSource' || h.phase === 'load') && h.target) {
+    const src = h.target;
+    const want = src === sid ? r.output : sim.takeable(src);
+    const room = want && want !== r.output ? sim.room(sid, want, true) : cap;
+    if (!want || room <= 0 || !sim.isUsable(src)) {
+      h.phase = 'idle';
+      h.target = null;
+      return;
+    }
+    const ap = stationPos(sim, src);
+    if (h.phase === 'toSource') {
+      if (!walk(sim, def, h, ap.x, ap.z, ap.reach - 0.2, dt)) return;
+      h.phase = 'load';
+      h.t = 0;
+    }
+    h.t += dt;
+    if (h.t < def.transferTime) return;
+    h.t = 0;
+    const got = sim.takeable(src, want) ? sim.take(src) : null;
+    if (got) {
+      h.stack.push(got);
+      sim.emit({ type: 'pickup', item: got, from: { kind: 'station', id: src }, by: { kind: 'helper', id: def.id }, height: h.stack.length });
+    }
+    const full = h.stack.length >= cap || (want !== r.output && h.stack.length >= room);
+    if (!got || full) h.phase = h.stack.length ? 'toDest' : 'idle';
+    if (h.phase !== 'load') h.target = null;
+    return;
+  }
+  // 3. Choose the next chore: restock a short input, serve a good batch of output, else work the station.
+  for (const k in r.inputs) {
+    const kk = k as ItemKind;
+    const need = r.inputs[kk] ?? 0;
+    if ((st.inputs[kk] ?? 0) >= need * 2 || sim.room(sid, kk, true) <= 0) continue;
+    const src = (def.from ?? []).find((id) => sim.isUsable(id) && sim.takeable(id, kk));
+    if (src) {
+      h.phase = 'toSource';
+      h.target = src;
+      h.action = 'none';
+      return;
+    }
+  }
+  if (def.to && st.output >= Math.min(cap, 4) && bestDest(sim, def, [r.output])) {
+    h.phase = 'toSource';
+    h.target = sid;
+    h.action = 'none';
+    return;
+  }
   if (h.phase !== 'work') {
-    if (walk(sim, def, h, sp.x + 0.9, sp.z - 0.9, 0.25, dt)) h.phase = 'work';
+    if (walk(sim, def, h, sp.x, sp.z, sp.reach - 0.3, dt)) h.phase = 'work';
     return;
   }
   h.facing = Math.atan2(sp.x - h.x, sp.z - h.z);

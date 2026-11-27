@@ -43,7 +43,7 @@ export function courier(sim: Sim, def: HelperDef, h: HelperState, dt: number): v
         h.phase = fwd ? 'unload' : 'load';
         h.t = 0;
         h.stuckT = 0;
-        sim.emit({ type: 'courierArrive', helper: def.id, at: fwd ? 'dest' : 'source', items: h.stack.length });
+        sim.emit({ type: 'courierArrive', helper: def.id, at: fwd ? 'dest' : 'source', items: h.stack.length, item: h.stack[0] ?? def.item ?? null, count: h.stack.length });
         break;
       }
       wp += fwd ? 1 : -1;

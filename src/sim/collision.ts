@@ -67,16 +67,24 @@ export function moveCircle(p: P2, dx: number, dz: number, r: number, solids: rea
     // Pushing (nearly) head-on into a round solid barely moves: slide round it instead of snagging.
     const len = Math.hypot(dx, dz);
     const gain = ((p.x - ox) * dx + (p.z - oz) * dz) / (len || 1);
-    if (len > 1e-4 && gain < len * 0.35) {
-      let best = { x: p.x, z: p.z, g: gain };
-      for (const ang of [0.6, -0.6, 1.1, -1.1]) {
+    // Any contact that eats the step: keep the full stride by gliding along the solid's surface (the
+    // candidate that moves furthest while still going forward), so the player never visibly snags.
+    // Round solids only: pushing head-on into a flat wall stops, as it should.
+    const tx = ox + dx;
+    const tz = oz + dz;
+    const round = solids.some((s) => s.kind === 'circle' && Math.hypot(tx - s.x, tz - s.z) < r + s.r + 0.02);
+    if (round && len > 1e-4 && gain < len * 0.9) {
+      const score = (x: number, z: number, g: number) => (g < -len * 0.05 ? -1 : Math.hypot(x - ox, z - oz) + g * 0.5);
+      let best = { x: p.x, z: p.z, s: score(p.x, p.z, gain) };
+      for (const ang of [0.35, -0.35, 0.7, -0.7, 1.05, -1.05, 1.35, -1.35]) {
         const c = Math.cos(ang);
         const s = Math.sin(ang);
         const q = { x: ox + dx * c - dz * s, z: oz + dx * s + dz * c };
         pushOut(q, r, solids);
         if (!inRects(q.x, q.z, r, rects)) continue;
         const g = ((q.x - ox) * dx + (q.z - oz) * dz) / len;
-        if (g > best.g + 1e-6) best = { x: q.x, z: q.z, g };
+        const sc = score(q.x, q.z, g);
+        if (sc > best.s + 1e-6) best = { x: q.x, z: q.z, s: sc };
       }
       p.x = best.x;
       p.z = best.z;

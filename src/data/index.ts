@@ -5,6 +5,7 @@ import { DRESSING } from './dressing';
 import { MECH, mechDecor, mechStations } from './mechanics';
 import { ENDLESS, FINALE, LATE_DECOR, LATE_HELPERS, LATE_LANES, LATE_LINKS, LATE_PADS, LATE_STATIONS } from './late';
 import { growForest, LAYOUT_REV, packTents, placeAreas } from './layout';
+export { tentLevel, wallGoneBy } from './layout';
 import { ALL_MECHANICS, NO_MECHANICS, withMechanics } from './mechflags';
 import type { GameData } from './types';
 import { AREAS, CAMP, DECOR, HELPERS, LINKS, PADS, PLAYER_START, STATIONS, WALLS } from './world';
