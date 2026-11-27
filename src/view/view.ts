@@ -354,12 +354,20 @@ export class View {
   debugPadOutline(id: string): { sides: boolean[]; colors: number[][] } {
     const pv = this.pads.get(id);
     if (!pv) return { sides: [], colors: [] };
+    // Deterministic probe: camera settled on the player, pad at full size.
+    const pl = this.sim.state.player;
+    this.rig.snap(pl.x, pl.z);
+    for (let i = 0; i < 90; i++) this.rig.update(1 / 30, pl.x, pl.z, 0, 0, pl.stack.length);
+    const oldScale = pv.root.scale.x;
+    pv.root.scale.setScalar(1);
+    pv.root.updateMatrixWorld(true);
     this.renderer.render(this.scene, this.rig.camera);
+    pv.root.scale.setScalar(oldScale);
     const gl = this.renderer.getContext();
     const w = gl.drawingBufferWidth;
     const h = gl.drawingBufferHeight;
     const o = pv.root.position;
-    const k = pv.root.scale.x;
+    const k = 1;
     const out: boolean[] = [];
     const colors: number[][] = [];
     const px = new Uint8Array(4);

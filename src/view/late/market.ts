@@ -43,7 +43,8 @@ export class Market implements LatePart {
       tex.colorSpace = THREE.SRGBColorSpace;
       const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false }));
       sprite.scale.set(1.9, 0.62, 1);
-      sprite.renderOrder = 21;
+      sprite.renderOrder = 25;
+      (sprite.material as THREE.SpriteMaterial).depthTest = false;
       sprite.visible = false;
       v.scene.add(sprite);
       this.badges.push({ def: p, sprite, canvas, tex, key: '', pop: 0 });
@@ -230,7 +231,8 @@ export class Market implements LatePart {
     for (const bd of this.badges) {
       const ps = s.pads[bd.def.id];
       // Level badge once bought at least once (or while standing on it): the pad label already shows the price.
-      const show = !title && !!ps && ps.visible && !ps.done && bd === nearest;
+      // The pad label itself shows the level and price; the badge adds the "bought — step off" beat.
+      const show = !title && !!ps && ps.visible && !ps.done && bd === nearest && !!ps.hold;
       bd.sprite.visible = show;
       if (!show) continue;
       bd.pop = Math.max(0, bd.pop - dt * 2.5);
@@ -245,7 +247,7 @@ export class Market implements LatePart {
       const on = s.player.onPad === bd.def.id ? 0.15 : 0;
       const sc = 1 + bd.pop * 0.35 + on;
       bd.sprite.scale.set(1.9 * sc, 0.62 * sc, 1);
-      bd.sprite.position.set(bd.def.x, 2.5 + on * 0.5 + Math.sin(t * 2 + bd.def.x) * 0.03, bd.def.z - 0.9);
+      bd.sprite.position.set(bd.def.x, 2.95 + on * 0.3 + Math.sin(t * 2 + bd.def.x) * 0.03, bd.def.z - 0.9);
     }
   }
 

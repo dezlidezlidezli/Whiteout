@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import type { SimEvent } from '../../sim';
 import { itemName } from '../../ui/late/icons';
 import type { CharacterRig } from '../models';
-import { createProp } from '../models';
+import { createProp, getItemMesh, type ItemKind } from '../models';
 import { fxOf, hooksOf, sfxAt, type LateCtx, type LatePart } from './ctx';
 
 const SLED_SCALE = 0.72;
@@ -24,6 +24,7 @@ interface Sled {
   lastZ: number;
   speed: number;
   kickT: number;
+  load: Map<string, THREE.InstancedMesh>;
 }
 
 const _m = new THREE.Matrix4();
@@ -84,7 +85,7 @@ export class Couriers implements LatePart {
         sled.position.set(0, 0, -0.72);
         pivot.add(sled);
         pivot.position.set(0, 0, -0.3);
-        sl = { id, rig: null, pivot, sled, lastYaw: rig.root.rotation.y, swing: 0, lastX: h.x, lastZ: h.z, speed: 0, kickT: 0 };
+        sl = { id, rig: null, pivot, sled, lastYaw: rig.root.rotation.y, swing: 0, lastX: h.x, lastZ: h.z, speed: 0, kickT: 0, load: new Map() };
         this.sleds.set(id, sl);
       }
       if (sl.rig !== rig) {
@@ -122,6 +123,10 @@ export class Couriers implements LatePart {
         _m2.copy(_m).invert();
         anchor.position.copy(_v.applyMatrix4(_m2));
       }
+      // The load is packed flat on the sled (the generic stack would tower over a dog), so hide
+      // the carried stack and draw a neat pile on the bed instead.
+      (this.ctx.view['actors'].hidden as Map<string, number>).set(`helper:${id}`, h.stack.length);
+      this.drawLoad(sl, h.stack);
       // Snow kicked up by the runners.
       sl.kickT -= dt;
       if (sl.speed > 3 && sl.kickT <= 0) {
@@ -132,6 +137,41 @@ export class Couriers implements LatePart {
           fx.puff(_v.x, 0.08, _v.z, 1, 0.25, 0.5, 0.45);
         }
       }
+    }
+  }
+
+  private drawLoad(sl: Sled, stack: readonly ItemKind[]): void {
+    const counts = new Map<string, number>();
+    for (const it of stack) counts.set(it, (counts.get(it) ?? 0) + 1);
+    for (const [kind, im] of sl.load) if (!counts.has(kind)) im.count = 0;
+    let slot = 0;
+    for (const [kind, n] of counts) {
+      let im = sl.load.get(kind);
+      if (!im) {
+        const d = getItemMesh(kind as ItemKind);
+        im = new THREE.InstancedMesh(d.geometry, d.material, 32);
+        im.castShadow = true;
+        im.frustumCulled = false;
+        im.userData.h = d.stackHeight;
+        sl.sled.add(im);
+        sl.load.set(kind, im);
+      }
+      const hgt = im.userData.h as number;
+      const k = Math.min(32, n);
+      for (let i = 0; i < k; i++, slot++) {
+        // 2 across × 3 along, then the next layer up; a little jitter so it looks hand-packed.
+        const layer = Math.floor(slot / 6);
+        const c = slot % 6;
+        const x = (c % 2 ? 0.2 : -0.2) / SLED_SCALE;
+        const z = (-0.45 + Math.floor(c / 2) * 0.42) / SLED_SCALE;
+        const y = 0.34 / SLED_SCALE + (layer * hgt + hgt * 0.5) / SLED_SCALE;
+        _m.makeRotationY((c % 3) * 0.2 - 0.2 + layer * 0.3);
+        _m.setPosition(x, y, z);
+        _m2.makeScale(1 / SLED_SCALE, 1 / SLED_SCALE, 1 / SLED_SCALE);
+        im.setMatrixAt(i, _m.multiply(_m2));
+      }
+      im.count = k;
+      im.instanceMatrix.needsUpdate = true;
     }
   }
 
