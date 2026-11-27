@@ -23,6 +23,7 @@ import { wallSolids } from '../data';
 import { ConveyorView } from './conveyors';
 import { PloughView } from './plough';
 import { RescueView } from './rescue';
+import { SkateView } from './skate';
 import { clearSeeSubject, setSeeSubject } from './occlude';
 import { Sky } from './sky';
 
@@ -82,6 +83,7 @@ export class View {
   /** Mechanic presentations (constructed only when the mechanic is switched on in the data). */
   private plough: PloughView | null = null;
   private rescue: RescueView | null = null;
+  private skate: SkateView | null = null;
   private pads = new Map<string, PadVisual>();
   private actors: Actors;
   private crowd: Crowd;
@@ -206,6 +208,25 @@ export class View {
       });
       this.rescue.attach(this.actors.player.root);
     }
+    if (this.data.mechanics?.skate) {
+      // Rink beyond the dressed lake-ice floor (the east lot, skateable once ploughed).
+      let floorX1 = -Infinity;
+      for (const a of this.data.dressing) for (const f of a.floors) if (f.type === 'ice') floorX1 = Math.max(floorX1, f.x + f.w / 2);
+      const extend: { x0: number; x1: number; z0: number; z1: number }[] = [];
+      for (const r of this.data.mech.ice) {
+        const x0 = Math.max(r.x0, floorX1);
+        if (r.x1 - x0 > 0.5) extend.push({ x0, x1: r.x1, z0: r.z0, z1: r.z1 });
+      }
+      this.skate = new SkateView(this.scene, sim, {
+        puff: (x, y, z, n, r, sp, sc) => this.fx.puff(x, y, z, n, r, sp, sc),
+        ring: (x, z, size, color, dur) => this.fx.ring(x, z, size, color, dur),
+        glint: (x, y, z, n, sp) => this.fx.glint(x, y, z, n, sp),
+        float: (text, x, y, z, kind) => this.hooks.float(text, new THREE.Vector3(x, y, z), kind),
+        sfx: (name, opts) => this.sfx(name, opts ?? {}, 0.05),
+        groundAt: (x, z) => this.surface.heightAt(x, z),
+      }, extend);
+      this.skate.attach(this.actors.player.root);
+    }
     this.crowd = new Crowd(this.scene, this.data);
     this.crowd.groundAt = (x, z) => this.surface.heightAt(x, z);
     this.crowd.residentCap = quality >= 1 ? 44 : 30;
@@ -235,6 +256,7 @@ export class View {
     this.conveyors.sync(sim);
     this.actors.reset();
     this.rescue?.reset();
+    this.skate?.reset();
     this.flyers = [];
     this.hidden.clear();
     this.crowd.populate(sim.state.population, sim.warmRadius());
@@ -559,6 +581,11 @@ export class View {
     return [[0, -0.88], [0.88, 0], [0, 0.88], [-0.88, 0]].map(([dx, dz]) => this.project(new THREE.Vector3(o.x + dx * k, o.y + 0.12 * k, o.z + dz * k)));
   }
 
+  /** Debug/e2e: skating presentation state (null when the mechanic is off). */
+  debugSkate(): ReturnType<SkateView['debug']> | null {
+    return this.skate ? this.skate.debug() : null;
+  }
+
   /** Debug/e2e: rescue presentation state (null when the mechanic is off). */
   debugRescue(): ReturnType<RescueView['debug']> | null {
     return this.rescue ? this.rescue.debug() : null;
@@ -670,6 +697,7 @@ export class View {
   handleEvents(events: SimEvent[]): void {
     this.plough?.handleEvents(events);
     this.rescue?.handleEvents(this.sim, events);
+    this.skate?.handleEvents(this.sim, events);
     const s = this.sim.state;
     const p = s.player;
     let collectBudget = 24;
@@ -1006,11 +1034,16 @@ export class View {
       this.actors.playerAction = this.plough.action;
       this.actors.playerSink = this.plough.sink;
     }
+    if (this.skate) {
+      this.skate.update(sim, dt, px, pz);
+      if (this.skate.action) this.actors.playerAction = this.skate.action;
+      else if (!this.plough) this.actors.playerAction = null;
+    }
     this.actors.update(sim, this.items, alpha, t, dt);
     if (this.rescue) {
       // After the player rig is posed (the lantern stays upright in the hand); the dig pose applies next frame.
       this.rescue.update(sim, dt, t, px, pz, this.title);
-      this.actors.playerAction = this.rescue.action ?? this.plough?.action ?? null;
+      this.actors.playerAction = this.rescue.action ?? this.skate?.action ?? this.plough?.action ?? null;
     }
     this.crowd.update(sim, alpha, t, dt, px, pz);
     this.world.update(sim, t, dt);
@@ -1116,7 +1149,7 @@ export class View {
     }
     const camp = Math.max(0, 1 - distHearth / 12) * Math.min(1, s.population / 30);
     const whiteout = this.rescue?.whiteout ?? 0;
-    audio.ambience({ wind: Math.min(1, 0.2 + wind * 0.8 + whiteout * 0.35), fire, crowd, camp, plough: this.plough?.level ?? 0 });
+    audio.ambience({ wind: Math.min(1, 0.2 + wind * 0.8 + whiteout * 0.35), fire, crowd, camp, plough: this.plough?.level ?? 0, skate: this.skate?.level ?? 0 });
     // Rescue walks: the whiteout mood deep in the fringe of Areas 1–2 (the late areas pick their own).
     const fringe = !!this.rescue?.music && s.finale.phase === 'none' && /^(pinewood|frozenLake)$/.test(this.areaAt(px, pz) ?? '');
     const mood = this.title ? 'title' : fringe ? 'whiteout' : sim.cosy ? 'cozy' : 'calm';

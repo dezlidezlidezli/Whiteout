@@ -248,7 +248,7 @@ export class RescueView {
       rig.root.position.set(x, this.hooks.groundAt(x, z), z);
       this.parent.add(rig.root);
       const bubble = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.bubbleTex, depthTest: false, transparent: true, toneMapped: false, fog: false }));
-      bubble.scale.set(0.62, 0.54, 1);
+      bubble.scale.set(0.86, 0.75, 1);
       bubble.renderOrder = 56;
       bubble.visible = false;
       this.parent.add(bubble);

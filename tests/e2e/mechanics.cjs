@@ -1,5 +1,5 @@
 // Mechanic presentation e2e (Playwright, globally preinstalled). Runs each mechanic behind ?mech=
-// and asserts its visuals respond to play. Usage: node tests/e2e/mechanics.cjs [plough|rescue]
+// and asserts its visuals respond to play. Usage: node tests/e2e/mechanics.cjs [plough|rescue|skate]
 //   FK_URL=http://localhost:5173/ FK_SHOTS=/some/dir
 
 const { chromium } = require('playwright');
@@ -167,6 +167,48 @@ async function rescue(browser) {
   await page.close();
 }
 
+async function skate(browser) {
+  const { page, errors } = await open(browser, 'skate');
+  const shot = async (n) => {
+    await page.evaluate(() => { const p = __fk.sim.state.player; __fk.view.rig.snap(p.x, p.z - 1.2); });
+    await page.screenshot({ path: path.join(OUT, 'skate-' + n + '.png'), timeout: 90000 });
+  };
+  await page.evaluate(() => { __fk.cheat.hearth(3); __fk.cheat.quality(0); const q = __fk.sim.data.mech.skateLane[0]; __fk.cheat.teleport(q.x + 0.4, q.z - 0.2); });
+  await page.waitForTimeout(800);
+  // Glide south down the open lane and through a fish leap placed on the line.
+  await page.keyboard.down('s');
+  await page.waitForFunction(() => { const p = __fk.sim.state.player; return __fk.sim.state.skate.on && Math.hypot(p.vx, p.vz) > 3.2; }, null, { timeout: 8000 });
+  await page.evaluate(() => {
+    const p = __fk.sim.state.player;
+    const st = __fk.sim.state.skate;
+    st.leaps.push({ id: 9001, x: p.x + 0.2, z: p.z + 2.4, t: 1.0 });
+  });
+  await page.waitForTimeout(60);
+  const mid = await page.evaluate(() => __fk.view.debugSkate());
+  await shot('glide');
+  await page.waitForFunction(() => (__fk.sim.state.stats.fishLeaps ?? 0) >= 1, null, { timeout: 6000 }).catch(() => {});
+  await page.keyboard.up('s');
+  await page.waitForTimeout(150);
+  const after = await page.evaluate(() => ({ d: __fk.view.debugSkate(), leaps: __fk.sim.state.stats.fishLeaps ?? 0 }));
+  await shot('after');
+  assert(mid && mid.on && mid.blades, 'blades and skate pose on the ice (' + JSON.stringify(mid) + ')');
+  assert(mid.fishUp >= 1, 'a fish arcs out of the leap hole');
+  assert(after.leaps >= 1, 'skating through the leap scoops the fish');
+  assert(after.d.trail > 6, 'the blades carve trails (' + after.d.trail + ')');
+  assert(mid.level > 0.3, 'the blade hiss follows speed (' + mid.level.toFixed(2) + ')');
+  // A grip mat: normal footing, blades away.
+  await page.evaluate(() => { const g = __fk.sim.data.mech.gripMats[4]; __fk.cheat.teleport(g.x, g.z); });
+  await page.keyboard.down('a');
+  await page.waitForTimeout(150);
+  await page.keyboard.up('a');
+  await page.waitForTimeout(400);
+  const mat = await page.evaluate(() => __fk.view.debugSkate());
+  assert(!mat.on && !mat.blades, 'no skating on a grip mat');
+  const real = errors.filter((e) => !/GL Driver Message|GPU stall/i.test(e));
+  assert(real.length === 0, 'no console errors (' + real.slice(0, 3).join(' | ') + ')');
+  await page.close();
+}
+
 (async () => {
   const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   try {
@@ -181,6 +223,7 @@ async function rescue(browser) {
     };
     if (!only || only === 'plough') await run(plough);
     if (!only || only === 'rescue') await run(rescue);
+    if (!only || only === 'skate') await run(skate);
     console.log('mechanics OK');
   } finally {
     await browser.close();
