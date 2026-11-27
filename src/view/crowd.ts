@@ -34,6 +34,7 @@ const _e = new THREE.Euler();
 const _v = new THREE.Vector3();
 const _s = new THREE.Vector3();
 const _c = new THREE.Color();
+const _coat = new THREE.Color();
 
 export class Crowd {
   private frozen: THREE.InstancedMesh;
@@ -161,7 +162,7 @@ export class Crowd {
       const dx = c.x - c.px;
       const dz = c.z - c.pz;
       if (dx * dx + dz * dz > 1e-6) st.yaw = lerpAngle(st.yaw, Math.atan2(dx, dz), Math.min(1, dt * 10));
-      const coat = _c.setHex(COATS[Math.floor(c.look * COATS.length) % COATS.length]);
+      const coat = _coat.setHex(COATS[Math.floor(c.look * COATS.length) % COATS.length]);
       if (c.phase === 'queue') {
         const moving = dx * dx + dz * dz > 1e-6;
         // Per-person deterministic quirks so the huddle never looks like neat rows.

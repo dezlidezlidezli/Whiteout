@@ -450,3 +450,21 @@ describe('no soft-locks', () => {
     }
   });
 });
+
+describe('hearth fuel', () => {
+  it('stays Cosy without flicker while logs are queued', () => {
+    const sim = new Sim(GAME_DATA, { seed: 1 });
+    const st = sim.state.stations['hearth'] as unknown as { count: number };
+    st.count = 3;
+    sim.drainEvents();
+    let toggles = 0;
+    const dt = 1 / 60;
+    const total = Math.ceil((GAME_DATA.balance.fuelPerLog * 3 + 2) / dt);
+    for (let i = 0; i < total; i++) {
+      sim.step(dt);
+      for (const e of sim.drainEvents()) if (e.type === 'cosy') toggles++;
+    }
+    // One switch on when the first log catches, one off when the last burns out.
+    expect(toggles).toBe(2);
+  });
+});

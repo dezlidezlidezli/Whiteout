@@ -150,7 +150,9 @@ export function getScatterMesh(kind: _ScatterKind): ItemMeshDef { return _scatte
 // ---------------------------------------------------------------- mechanics helpers (additive API)
 import { deepSnowCell as _deepSnowCell, snowBankCell as _snowBankCell, iceSheet as _iceSheet, type IceSheetOpts as _IceSheetOpts } from './snowcells';
 export type { IceSheetOpts } from './snowcells';
-/** Instancable deep-snow cell (0.5 m footprint, ~0.45 m tall); opts.seed % 4 picks a shape variant. */
+/** Instancable deep-snow cell (0.5 m footprint, 0.35-0.55 m tall); opts.seed % 4 picks a shape variant.
+ *  Recommended instancing on the 0.5 m grid: random variant per cell, yaw in 90° steps, uniform scale 0.9-1.15,
+ *  XZ offsets up to ±0.12 m. Pillows overhang the footprint, so neighbours overlap and hide the seams. */
 export function getDeepSnowMesh(opts: ModelOpts = {}): CrowdMeshDef { return _deepSnowCell(opts.seed ?? 0); }
 /** Curled-off plough bank cell (~0.55 m along Z, lip curls to +X); opts.seed % 3 picks a variant. */
 export function getSnowBankMesh(opts: ModelOpts = {}): CrowdMeshDef { return _snowBankCell(opts.seed ?? 0); }

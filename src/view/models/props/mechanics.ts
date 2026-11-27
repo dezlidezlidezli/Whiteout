@@ -5,6 +5,9 @@ import { PALETTE as P } from '../palette';
 import { fishBody } from '../items';
 import { coals, flame, logBetween, snowMound, type PropSpec } from './common';
 
+/** Uniformly scaled copy of a builder (toy proportions for held items). */
+function scaleB(b: Builder, k: number): Builder { return new Builder().merge(b, { s: k }); }
+
 const ACC = [P.coatRust, P.porter, P.mustard, P.cook, P.lumberjack, P.villager] as const;
 
 // ================================================================ 1. snow plough
@@ -138,9 +141,9 @@ export function lanternHeld(): PropSpec {
   g.add(cone(0.03, 0.08, 5), 0xfff2c0, { p: [lx, ly, 0] });
   const lp: [number, number, number] = [lx, ly, 0];
   return {
-    layers: [{ name: 'body', b }, { name: 'glow', b: g, mat: 'glow', shadow: false }],
-    markers: { light: lp },
-    userData: { attach: 'handR', lightPos: lp, lightColor: 0xffc070, lightIntensity: 2.4, lightDistance: 9, glowRadius: 6 },
+    layers: [{ name: 'body', b: scaleB(b, 1.5) }, { name: 'glow', b: scaleB(g, 1.5), mat: 'glow', shadow: false }],
+    markers: { light: [lp[0] * 1.5, lp[1] * 1.5, 0] },
+    userData: { attach: 'handR', scale: 1.5, lightPos: [lp[0] * 1.5, lp[1] * 1.5, 0], lightColor: 0xffc070, lightIntensity: 2.4, lightDistance: 9, glowRadius: 6 },
   };
 }
 
@@ -261,8 +264,8 @@ export function fishLeap(): PropSpec {
   }
   fishBody(f, P.fish, P.fishDark, P.fishBelly, P.fishDark, { y: 0, lod: true });
   return {
-    layers: [{ name: 'body', b }, { name: 'splash', b: splash, shadow: false }, { name: 'fish', b: f, pos: [0, 0.05, 0] }],
-    userData: { radius: 0.6, decor: true, hint: 'arc fish: y = 1.2*sin(pi*u), rotate z along the arc' },
+    layers: [{ name: 'body', b: scaleB(b, 1.4) }, { name: 'splash', b: scaleB(splash, 1.5), shadow: false }, { name: 'fish', b: scaleB(f, 1.7), pos: [0, 0.07, 0] }],
+    userData: { radius: 0.85, decor: true, hint: 'arc fish: y = 1.2*sin(pi*u), rotate z along the arc' },
   };
 }
 
@@ -398,9 +401,9 @@ export function flameHeld(): PropSpec {
   flame(fl, 0.42, 0.13, 17, [0, 0, 0], 4);
   const lp: [number, number, number] = [0, py + 0.3, 0];
   return {
-    layers: [{ name: 'body', b }, { name: 'glow', b: g, mat: 'ember', shadow: false }, { name: 'flame', b: fl, mat: 'glow', pos: [0, py + 0.07, 0], shadow: false }],
-    markers: { light: lp },
-    userData: { attach: 'handR', lightPos: lp, lightColor: P.flame, lightIntensity: 1.6, lightDistance: 6 },
+    layers: [{ name: 'body', b: scaleB(b, 1.4) }, { name: 'glow', b: scaleB(g, 1.4), mat: 'ember', shadow: false }, { name: 'flame', b: scaleB(fl, 1.6), mat: 'glow', pos: [0, (py + 0.07) * 1.4, 0], shadow: false }],
+    markers: { light: [0, lp[1] * 1.4, 0] },
+    userData: { attach: 'handR', scale: 1.4, lightPos: [0, lp[1] * 1.4, 0], lightColor: P.flame, lightIntensity: 1.6, lightDistance: 6 },
   };
 }
 

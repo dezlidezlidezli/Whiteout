@@ -1,7 +1,7 @@
 // Articulated low-poly characters + procedural animation.
 import * as THREE from 'three';
 import { Builder, bevel, box, cone, cyl, ico, lathe, octa, prism, sphere, torus } from './geo';
-import { mats } from './materials';
+import { mats, RENDER_FLAGS } from './materials';
 import { PALETTE as P } from './palette';
 import type { CharacterAnimState, CharacterRig, CharacterRole, ModelOpts } from './index';
 
@@ -292,8 +292,11 @@ function buildHumanoid(role: Exclude<CharacterRole, 'dog'>, opts: ModelOpts): Ch
   const armL = group('armL', sx, SHOULDER, 0);
   const armR = group('armR', -sx, SHOULDER, 0);
   body.add(armL, armR);
-  armL.add(mesh(armGeo(role, st, 1), 'armLMesh'));
-  armR.add(mesh(armGeo(role, st, -1), 'armRMesh'));
+  const rescued = opts.variant === 'rescued';
+  if (!rescued) {
+    armL.add(mesh(armGeo(role, st, 1), 'armLMesh'));
+    armR.add(mesh(armGeo(role, st, -1), 'armRMesh'));
+  }
   const tg = toolGeo(st.tool);
   if (tg) {
     const tool = group('tool', 0, -ARM_LEN - 0.03, 0.02);
@@ -323,46 +326,95 @@ function buildHumanoid(role: Exclude<CharacterRole, 'dog'>, opts: ModelOpts): Ch
     m.visible = !!opts.skates;
     leg.add(m);
   }
-  if (opts.variant === 'rescued') addBlanket(body, head, opts.seed ?? 0);
+  if (rescued) { addBlanket(body, opts.seed ?? 0); rig.scale.setScalar(0.9); }
 
   const phase = ((opts.seed ?? 0) * 0.6180339) % 1 * Math.PI * 2;
   partsMap.set(root, { rig, body, head, armL, armR, legL, legR, quad: false, phase, tool: armR.getObjectByName('tool') });
   if (opts.variant === 'rescued') root.userData.variant = 'rescued';
   root.userData.radius = 0.35;
   const height = HIP + NECK + 0.24 + 0.27 + (st.hat === 'bobble' ? 0.25 : 0.12);
-  return { root, carryAnchor, height };
+  skinify(root, `h:${role}:${rescued ? 'r' + (Math.abs(opts.seed ?? 0) % BLANKETS.length) : 'n'}`);
+  return { root, carryAnchor, height: rescued ? height * 0.9 : height };
 }
 
-const BLANKETS: [number, number][] = [[0xb8423a, 0xe8d2a8], [0x3f6a8a, 0xd9c08a], [0x6a8a4a, 0xe4d4b0], [0x8a5a86, 0xe8c87a]];
-/** Rescued-follower look: a plaid blanket over head and shoulders, dusted with frost. */
-function addBlanket(body: THREE.Object3D, head: THREE.Object3D, seed: number) {
-  const [c1, c2] = BLANKETS[Math.abs(seed) % BLANKETS.length];
-  const cloak = cached(`blanket:${c1}`, () => {
+const BLANKETS: [number, number][] = [[0x9a5a44, 0xd8c09a], [0x6e6a8a, 0xd6c49a], [0x7a7048, 0xdcc8a4], [0x8a5a5a, 0xe0caa0]];
+/** Rescued-follower look: hunched under a lumpy, muted blanket with one stripe, mittens clutching it closed;
+ *  the head (and hat) pokes out of a rolled collar. Arms are hidden under the blanket. */
+function addBlanket(body: THREE.Object3D, seed: number) {
+  const idx = Math.abs(seed) % BLANKETS.length;
+  const [c1, c2] = BLANKETS[idx];
+  const g = cached(`blanket:${idx}`, () => {
     const b = new Builder();
-    // shawl draped over the shoulders, open at the front, hem at chest/waist height, frost on top
-    const prof: [number, number][] = [[0.47, 0.2], [0.45, 0.36], [0.41, 0.5], [0.3, 0.62], [0.16, 0.7]];
-    for (let i = 0; i < prof.length - 1; i++) {
-      const band = new THREE.LatheGeometry([prof[i], prof[i + 1]].map(([x, y]) => new THREE.Vector2(x, y)), 12, 0.7, Math.PI * 2 - 1.4);
-      b.add(band, i === 1 ? c2 : c1, { top: i >= 2 ? P.frost : undefined, topY: 0.8, jitter: 0.012, seed: i });
+    // lumpy drape over shoulders and back, uneven hem around the hips
+    b.add(ico(1, 1), c1, { p: [0, 0.36, -0.02], s: [0.44, 0.36, 0.4], jitter: 0.035, seed: idx + 3, top: 0xd8e6f2, topY: 0.88, shade: 0.06 });
+    b.add(ico(1, 1), c1, { p: [0, 0.18, -0.03], s: [0.46, 0.2, 0.42], jitter: 0.04, seed: idx + 7, shade: 0.06 });
+    // one simple stripe and a patch
+    b.add(cyl(0.455, 0.47, 0.06, 10, true), c2, { p: [0, 0.2, -0.03], s: [1, 1, 0.92], jitter: 0.012, seed: idx });
+    b.add(box(0.16, 0.14, 0.03), c2, { p: [-0.25, 0.4, -0.33], r: [0.4, -0.4, 0.1] });
+    // rolled collar behind the head
+    b.add(torus(0.17, 0.08, 4, 9), c1, { p: [0, 0.62, -0.02], r: [Math.PI / 2 + 0.2, 0, 0], s: [1.15, 1, 1] });
+    // the two front edges pulled together, mittens clutching them at the chest
+    for (const sx of [-1, 1]) b.add(box(0.2, 0.42, 0.05), c1, { p: [sx * 0.11, 0.32, 0.36], r: [-0.12, sx * 0.25, 0] });
+    for (const sx of [-1, 1]) b.add(sphere(0.085, 6, 5), P.mitten, { p: [sx * 0.07, 0.42, 0.4], s: [1, 1.1, 0.9] });
+    // frost crystals on the shoulders
+    for (let k = 0; k < 4; k++) b.add(octa(0.035), P.frost, { p: [Math.sin(1.4 + k) * 0.32, 0.6 - k * 0.03, Math.cos(1.4 + k) * 0.25 - 0.08] });
+    return b;
+  });
+  body.add(mesh(g, 'blanket'));
+}
+
+// ---------------------------------------------------------------- skinning: one draw call per character
+const skinCache = new Map<string, { geo: THREE.BufferGeometry }>();
+/** Merge every static vertex-coloured part into ONE SkinnedMesh whose bones are the existing named nodes
+ *  (rigid binding: each vertex follows exactly one node). Named nodes stay Object3Ds for the view. */
+function skinify(root: THREE.Object3D, key: string): void {
+  if (RENDER_FLAGS.unskinnedCharacters) return;
+  root.updateMatrixWorld(true);
+  const meshes: THREE.Mesh[] = [];
+  root.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && m.material === mats().std && m.visible) meshes.push(m); });
+  const bones: THREE.Object3D[] = [];
+  const parts = meshes.map((m) => {
+    let i = bones.indexOf(m.parent!);
+    if (i < 0) { bones.push(m.parent!); i = bones.length - 1; }
+    return { m, bi: i };
+  });
+  let entry = skinCache.get(key);
+  if (!entry) {
+    let n = 0;
+    for (const { m } of parts) n += m.geometry.attributes.position.count;
+    const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), col = new Float32Array(n * 3);
+    const si = new Uint16Array(n * 4), sw = new Float32Array(n * 4);
+    const v = new THREE.Vector3(), nm = new THREE.Matrix3();
+    let o = 0;
+    for (const { m, bi } of parts) {
+      const g = m.geometry;
+      const P2 = g.attributes.position, N = g.attributes.normal, C = g.attributes.color;
+      nm.getNormalMatrix(m.matrixWorld);
+      for (let k = 0; k < P2.count; k++, o++) {
+        v.fromBufferAttribute(P2, k).applyMatrix4(m.matrixWorld); pos.set([v.x, v.y, v.z], o * 3);
+        v.fromBufferAttribute(N, k).applyMatrix3(nm).normalize(); nor.set([v.x, v.y, v.z], o * 3);
+        col.set([C.getX(k), C.getY(k), C.getZ(k)], o * 3);
+        si[o * 4] = bi; sw[o * 4] = 1;
+      }
     }
-    // fringe along the hem and the two front corners hanging down
-    for (let k = 0; k < 12; k++) { const a = 0.85 + k * 0.42; b.add(box(0.02, 0.07, 0.02), c2, { p: [Math.sin(a) * 0.47, 0.16, Math.cos(a) * 0.47] }); }
-    for (const sx of [-1, 1]) b.add(prism([[-0.09, 0], [0.09, 0], [0, -0.26]], 0.03), c1, { p: [sx * 0.24, 0.36, 0.36], r: [-0.2, sx * 0.5, 0] });
-    return b;
-  });
-  const hood = cached(`hood:${c1}`, () => {
-    const b = new Builder();
-    b.add(new THREE.LatheGeometry([[0.31, -0.05], [0.31, 0.1], [0.25, 0.26], [0.12, 0.35], [0.0, 0.37]].map(([x, y]) => new THREE.Vector2(x, y)), 12, 1.0, Math.PI * 2 - 2.0), c1, { top: P.snow, topY: 0.95 });
-    b.add(new THREE.LatheGeometry([[0.315, -0.07], [0.315, -0.01]].map(([x, y]) => new THREE.Vector2(x, y)), 12, 1.0, Math.PI * 2 - 2.0), c2);
-    for (let k = 0; k < 4; k++) b.add(octa(0.03), P.frost, { p: [Math.sin(2 + k) * 0.3, 0.15 + k * 0.05, Math.cos(2 + k) * 0.3] });
-    return b;
-  });
-  const cl = mesh(cloak, 'blanket');
-  body.add(cl);
-  const hd = mesh(hood, 'hood');
-  hd.position.set(0, 0.2, -0.03);
-  hd.rotation.x = -0.15;
-  head.add(hd);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
+    geo.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4));
+    geo.computeBoundingSphere();
+    entry = { geo };
+    skinCache.set(key, entry);
+  }
+  for (const { m } of parts) m.removeFromParent();
+  const sm = new THREE.SkinnedMesh(entry.geo, mats().std);
+  sm.name = 'skin';
+  sm.castShadow = true;
+  sm.receiveShadow = true;
+  sm.frustumCulled = false;
+  root.add(sm);
+  sm.bind(new THREE.Skeleton(bones as THREE.Bone[]));
 }
 
 // ---------------------------------------------------------------- dog
@@ -418,6 +470,7 @@ function buildDog(opts: ModelOpts): CharacterRig {
   const phase = ((opts.seed ?? 0) * 0.6180339) % 1 * Math.PI * 2;
   partsMap.set(root, { rig, body, head, armL: legL, armR: legR, legL, legR, legBL, legBR, tail, quad: true, phase });
   root.userData.radius = 0.4;
+  skinify(root, 'dog');
   return { root, carryAnchor, height: 0.85 };
 }
 
@@ -511,7 +564,7 @@ export function animate(rigDef: CharacterRig, s: CharacterAnimState): void {
     aLz = mix(aLz, -0.18, cw); aRz = mix(aRz, 0.18, cw);
     lean -= 0.16 * cw;
   }
-  if (p.tool) p.tool.visible = cw < 0.5;
+  if (p.tool) p.tool.scale.setScalar(cw < 0.5 ? 1 : 1e-4); // tool is skinned: stow it by scaling its node
 
   // ---- actions (each blended by its own smoothed weight)
   for (const a of ACTIONS) {

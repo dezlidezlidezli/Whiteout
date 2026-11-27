@@ -55,6 +55,7 @@ const _w = new THREE.Vector3();
 const _tmp = new THREE.Vector3();
 
 export class View {
+  private lastCosyToast = -1e9;
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
   readonly rig: CameraRig;
@@ -571,7 +572,11 @@ export class View {
           this.hooks.toast('A new tent goes up!', 'info');
           break;
         case 'cosy':
-          if (e.on) this.hooks.toast('Camp is Cosy: embers ×2', 'info');
+          // Announce Cosy at most once every few minutes; the HUD pill shows the state.
+          if (e.on && performance.now() - this.lastCosyToast > 240000) {
+            this.lastCosyToast = performance.now();
+            this.hooks.toast('Camp is Cosy: embers ×2', 'info');
+          }
           break;
         default:
           break;

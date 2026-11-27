@@ -40,8 +40,10 @@ function snowField(w: number, d: number, swath: [number, number][], half: number
   const rnd = () => { h = (h * 16807) % 2147483647; return h / 2147483647; };
   for (let x = -w / 2; x <= w / 2; x += 0.5) for (let z = -d / 2; z <= d / 2; z += 0.5) {
     if (distTo(x, z) < half) continue;
-    const m = new THREE.Matrix4().makeRotationY(Math.floor(rnd() * 4) * Math.PI / 2);
-    m.setPosition(x + (rnd() - 0.5) * 0.08, 0, z + (rnd() - 0.5) * 0.08);
+    // recommended jitter: yaw in 90° steps, scale 0.9-1.15, offsets up to ±0.12 m
+    const sc = 0.9 + rnd() * 0.25;
+    const m = new THREE.Matrix4().makeRotationY(Math.floor(rnd() * 4) * Math.PI / 2).scale(new THREE.Vector3(sc, sc, sc));
+    m.setPosition(x + (rnd() - 0.5) * 0.24, 0, z + (rnd() - 0.5) * 0.24);
     lists[Math.floor(rnd() * 4)].push(m);
   }
   kinds.forEach((k, i) => {

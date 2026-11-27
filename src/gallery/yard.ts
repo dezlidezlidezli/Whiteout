@@ -177,6 +177,24 @@ const gateAt = 4 * wz + 3 * wx - 3 * cornerLoss; // centre of the front edge
   tpos.forEach(([x, z], i) => { m.makeRotationY(Math.PI + i); m.setPosition(x, 0, z); tim.setMatrixAt(i, m); tim.setColorAt(i, col.set(coats[i])); });
   for (const im of [fim, tim]) { im.castShadow = true; im.receiveShadow = true; scene.add(im); }
 
+  // ---- stress: 8 helpers walking about + a 100-strong crowd (for draw-call / triangle measurements)
+  if (q.has('stress')) {
+    const roles = ['porter', 'cook', 'lumberjack', 'fisher', 'miner', 'villager', 'porter', 'dog'] as const;
+    roles.forEach((r, i) => {
+      const h = createCharacter(r, { seed: i });
+      h.root.position.set(-4 + (i % 4) * 2.6, 0, -2 + Math.floor(i / 4) * 3);
+      animateCharacter(h, { time: 1 + i, speed: 2, carrying: i % 2 === 0 });
+      scene.add(h.root);
+    });
+    const n = 100;
+    const fim2 = new THREE.InstancedMesh(fr.geometry, fr.material, n / 2), tim2 = new THREE.InstancedMesh(th.geometry, th.material, n / 2);
+    for (let i = 0; i < n / 2; i++) {
+      m.makeRotationY(Math.PI); m.setPosition(-5 + (i % 10) * 1.1, 0, wz + 6 + Math.floor(i / 10) * 1.0); fim2.setMatrixAt(i, m); fim2.setColorAt(i, col.set(FROZEN_TINTS[i % 6]));
+      m.setPosition(-5 + (i % 10) * 1.1, 0, -wz - 4 - Math.floor(i / 10) * 1.0); tim2.setMatrixAt(i, m); tim2.setColorAt(i, col.set(coats[i % 6]));
+    }
+    for (const im of [fim2, tim2]) { im.castShadow = true; im.receiveShadow = true; scene.add(im); }
+  }
+
   // ---- game camera
   const pitch = THREE.MathUtils.degToRad(Number(q.get('pitch') ?? 50));
   const dist = Number(q.get('dist') ?? 27);
@@ -185,5 +203,11 @@ const gateAt = 4 * wz + 3 * wx - 3 * cornerLoss; // centre of the front edge
   camera.position.set(target.x, target.y + Math.sin(pitch) * dist, target.z + Math.cos(pitch) * dist);
   camera.lookAt(target);
   renderer.render(scene, camera);
+  renderer.info.autoReset = false;
+  renderer.info.reset();
+  renderer.render(scene, camera);
+  let meshes = 0;
+  scene.traverse((o) => { if ((o as THREE.Mesh).isMesh && o.visible) meshes++; });
+  (window as unknown as { __stats: unknown }).__stats = { calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, meshes, shadowIncluded: true };
   (window as unknown as { __ready: boolean }).__ready = true;
 }

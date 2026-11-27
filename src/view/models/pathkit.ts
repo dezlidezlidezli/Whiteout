@@ -105,7 +105,7 @@ export function conveyorPath(points: XZ[], o: ConveyorPathOpts = {}): ConveyorPa
   beltGeo.deleteAttribute('color');
   const tex = beltTexture().clone();
   tex.needsUpdate = true;
-  const beltMat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.8, metalness: 0 });
+  const beltMat = new THREE.MeshLambertMaterial({ map: tex });
   beltMat.name = 'fk-belt';
   const obj = group('conveyorPath', path);
   obj.add(mesh(b.build(), 'frame', mats().std));
