@@ -1,6 +1,6 @@
 // Articulated low-poly characters + procedural animation.
 import * as THREE from 'three';
-import { Builder, bevel, box, cone, cyl, ico, lathe, octa, sphere, torus } from './geo';
+import { Builder, bevel, box, cone, cyl, ico, lathe, octa, prism, sphere, torus } from './geo';
 import { mats } from './materials';
 import { PALETTE as P } from './palette';
 import type { CharacterAnimState, CharacterRig, CharacterRole, ModelOpts } from './index';
@@ -339,32 +339,28 @@ function addBlanket(body: THREE.Object3D, head: THREE.Object3D, seed: number) {
   const [c1, c2] = BLANKETS[Math.abs(seed) % BLANKETS.length];
   const cloak = cached(`blanket:${c1}`, () => {
     const b = new Builder();
-    const prof: [number, number][] = [[0.43, -0.02], [0.41, 0.14], [0.39, 0.3], [0.36, 0.46], [0.26, 0.6], [0.14, 0.68]];
+    // shawl draped over the shoulders, open at the front, hem at chest/waist height, frost on top
+    const prof: [number, number][] = [[0.47, 0.2], [0.45, 0.36], [0.41, 0.5], [0.3, 0.62], [0.16, 0.7]];
     for (let i = 0; i < prof.length - 1; i++) {
-      const band = new THREE.LatheGeometry([prof[i], prof[i + 1]].map(([x, y]) => new THREE.Vector2(x, y)), 12, 0.55, Math.PI * 2 - 1.1);
-      b.add(band, i % 2 ? c2 : c1, { top: i >= 3 ? P.frost : undefined, topY: 0.75 });
+      const band = new THREE.LatheGeometry([prof[i], prof[i + 1]].map(([x, y]) => new THREE.Vector2(x, y)), 12, 0.7, Math.PI * 2 - 1.4);
+      b.add(band, i === 1 ? c2 : c1, { top: i >= 2 ? P.frost : undefined, topY: 0.8, jitter: 0.012, seed: i });
     }
-    // plaid stripes running down + fringe at the hem
-    for (let k = 0; k < 6; k++) {
-      const a = 0.9 + k * 0.85;
-      b.add(box(0.03, 0.62, 0.02), c2, { p: [Math.sin(a) * 0.405, 0.3, Math.cos(a) * 0.405], r: [0, a, 0] });
-    }
-    for (let k = 0; k < 10; k++) { const a = 0.7 + k * 0.5; b.add(box(0.02, 0.06, 0.02), c2, { p: [Math.sin(a) * 0.43, -0.05, Math.cos(a) * 0.43] }); }
-    // the corners held together in front
-    b.add(sphere(0.07, 6, 4), c1, { p: [0.0, 0.42, 0.33], s: [1.2, 1, 0.7] });
+    // fringe along the hem and the two front corners hanging down
+    for (let k = 0; k < 12; k++) { const a = 0.85 + k * 0.42; b.add(box(0.02, 0.07, 0.02), c2, { p: [Math.sin(a) * 0.47, 0.16, Math.cos(a) * 0.47] }); }
+    for (const sx of [-1, 1]) b.add(prism([[-0.09, 0], [0.09, 0], [0, -0.26]], 0.03), c1, { p: [sx * 0.24, 0.36, 0.36], r: [-0.2, sx * 0.5, 0] });
     return b;
   });
   const hood = cached(`hood:${c1}`, () => {
     const b = new Builder();
-    b.add(new THREE.LatheGeometry([[0.31, 0.0], [0.31, 0.12], [0.25, 0.28], [0.12, 0.37], [0.0, 0.39]].map(([x, y]) => new THREE.Vector2(x, y)), 12, 0.75, Math.PI * 2 - 1.5), c1, { top: P.snow, topY: 0.7 });
-    b.add(new THREE.LatheGeometry([[0.315, -0.02], [0.315, 0.04]].map(([x, y]) => new THREE.Vector2(x, y)), 12, 0.75, Math.PI * 2 - 1.5), c2);
+    b.add(new THREE.LatheGeometry([[0.31, -0.05], [0.31, 0.1], [0.25, 0.26], [0.12, 0.35], [0.0, 0.37]].map(([x, y]) => new THREE.Vector2(x, y)), 12, 1.0, Math.PI * 2 - 2.0), c1, { top: P.snow, topY: 0.95 });
+    b.add(new THREE.LatheGeometry([[0.315, -0.07], [0.315, -0.01]].map(([x, y]) => new THREE.Vector2(x, y)), 12, 1.0, Math.PI * 2 - 2.0), c2);
     for (let k = 0; k < 4; k++) b.add(octa(0.03), P.frost, { p: [Math.sin(2 + k) * 0.3, 0.15 + k * 0.05, Math.cos(2 + k) * 0.3] });
     return b;
   });
   const cl = mesh(cloak, 'blanket');
   body.add(cl);
   const hd = mesh(hood, 'hood');
-  hd.position.set(0, 0.12, -0.02);
+  hd.position.set(0, 0.2, -0.03);
   hd.rotation.x = -0.15;
   head.add(hd);
 }

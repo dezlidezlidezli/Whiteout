@@ -14,10 +14,16 @@ export function plough(level = 1): PropSpec {
   const b = new Builder();
   const W = L2 ? 2.4 : 1.6, G = 0.85; // blade width, grip height above the ground
   const bz = 1.05, by = -G; // blade bottom front
-  // curved mouldboard: planks on a quarter-cylinder, concave side forward
-  const mould = new THREE.CylinderGeometry(0.42, 0.42, W, 10, 1, true, Math.PI, Math.PI / 2);
-  b.add(mould, L2 ? P.iron : P.woodLight, { p: [0, by + 0.42, bz - 0.42], r: [0, 0, Math.PI / 2], shade: 0.04, seed: 2 });
-  for (let i = 0; i < 4; i++) b.add(box(W + 0.02, 0.02, 0.03), L2 ? P.steel : P.woodDark, { p: [0, by + 0.07 + i * 0.12, bz - 0.42 + Math.sqrt(Math.max(0, 0.42 ** 2 - (0.42 - 0.07 - i * 0.12) ** 2)) - 0.0], r: [0, 0, 0] });
+  // curved mouldboard: a thick quarter-arc slab, concave side facing forward-up, planked
+  const arc = (R: number, a: number) => [R * Math.cos(a), 0.42 + R * Math.sin(a)] as [number, number];
+  const outer: [number, number][] = [], inner: [number, number][] = [];
+  for (let k = 0; k <= 6; k++) { const a = -Math.PI / 2 - (k / 6) * (Math.PI / 2) * 0.85; outer.push(arc(0.48, a)); inner.push(arc(0.42, a)); }
+  b.add(prism([...outer, ...inner.reverse()], W), L2 ? P.iron : P.woodLight, { p: [0, by, bz], r: [0, -Math.PI / 2, 0], shade: 0.05, seed: 2 });
+  for (let k = 1; k < 6; k += 1) {
+    const a = -Math.PI / 2 - (k / 6) * (Math.PI / 2) * 0.85;
+    const [u, y] = arc(0.415, a);
+    b.add(box(W - 0.04, 0.012, 0.02), L2 ? P.steel : P.wood, { p: [0, by + y, bz + u], r: [a + Math.PI / 2, 0, 0] });
+  }
   b.add(box(W + 0.06, 0.06, 0.08), L2 ? P.steel : P.iron, { p: [0, by + 0.03, bz - 0.02] }); // cutting edge
   b.add(box(W + 0.04, 0.07, 0.1), L2 ? P.iron : P.woodDark, { p: [0, by + 0.44, bz - 0.44] }); // top beam
   // side cheeks / runners

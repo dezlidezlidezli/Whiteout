@@ -19,10 +19,11 @@ export function deepSnowCell(seed = 0): CrowdMeshDef {
   if (d) return d;
   const r = rng(v * 17 + 3);
   const b = new Builder();
-  const h = 0.3 + v * 0.015;
+  const h = 0.34 + v * 0.012;
   b.add(box(0.52, h, 0.52), SIDE, { p: [0, h / 2, 0], top: P.snow, topY: 0.7, bottom: SIDE_LOW });
-  b.add(box(0.53, 0.1, 0.53), SIDE_LOW, { p: [0, 0.05, 0] });
-  b.add(ico(0.3, 1), P.snow, { p: [(r() - 0.5) * 0.06, h - 0.03, (r() - 0.5) * 0.06], s: [0.95 + r() * 0.1, 0.5 + r() * 0.12, 0.95 + r() * 0.1], jitter: 0.035, seed: v + 1, bottom: SIDE, topY: 0.15 });
+  b.add(box(0.53, 0.12, 0.53), SIDE_LOW, { p: [0, 0.06, 0] });
+  // broad, low pillow that overhangs into the neighbours so the field reads as one soft drift
+  b.add(ico(0.36, 1), P.snow, { p: [(r() - 0.5) * 0.08, h - 0.08, (r() - 0.5) * 0.08], s: [1.0 + r() * 0.1, 0.32 + r() * 0.1, 1.0 + r() * 0.1], r: [0, r() * 3, 0], jitter: 0.03, seed: v + 1, bottom: SIDE, topY: 0.15 });
   if (v >= 2) b.add(ico(0.14, 0), P.snow, { p: [(r() - 0.5) * 0.2, h + 0.1, (r() - 0.5) * 0.2], s: [1.2, 0.6, 1], jitter: 0.02, seed: v + 9 });
   if (v === 3) b.add(box(0.05, 0.04, 0.05), 0xffffff, { p: [0.1, h + 0.13, -0.05], r: [0.4, 0.6, 0] }); // sparkle crystal
   const geometry = b.build();
@@ -91,7 +92,7 @@ export function iceSheet(width: number, depth: number, o: IceSheetOpts = {}): TH
   // frosty dust patches
   for (let k = 0; k < Math.round((width * depth) / 30); k++) {
     const x = (r() - 0.5) * width * 0.8, z = (r() - 0.5) * depth * 0.8;
-    b.add(new THREE.CylinderGeometry(0.6 + r(), 0.6 + r(), 0.006, 9), 0xe2f4fa, { p: [x, 0.033, z], s: [1.6, 1, 1], r: [0, r() * 3, 0], jitter: 0.08, seed: k });
+    b.add(new THREE.CylinderGeometry(0.4 + r() * 0.5, 0.4 + r() * 0.5, 0.006, 9), 0xcdeaf3, { p: [x, 0.033, z], s: [1.6, 1, 1], r: [0, r() * 3, 0], jitter: 0.08, seed: k });
   }
   if (o.edge ?? true) {
     const hw = width / 2, hd = depth / 2;

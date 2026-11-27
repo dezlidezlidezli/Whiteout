@@ -158,8 +158,14 @@ export function mechanicsEntries(): MechEntry[] {
     const o = createProp(name, opts); o.rotation.y = ry; o.scale.setScalar(1);
     E.push({ label, obj: o });
   };
-  one('plough', { level: 1 }, 'plough L1 (grip origin)', 0.6);
-  one('plough', { level: 2 }, 'plough L2 · 2.4 m iron edge', 0.6);
+  for (const lv of [1, 2]) {
+    const g = new THREE.Group();
+    const o = createProp('plough', { level: lv });
+    o.position.y = o.userData.gripHeight as number; // origin is the grip: lift onto the ground
+    o.rotation.y = 0.6;
+    g.add(o);
+    E.push({ label: lv === 1 ? 'plough L1 (grip origin)' : 'plough L2 · 2.4 m iron edge', obj: g });
+  }
   {
     const g = new THREE.Group();
     for (let v = 0; v < 4; v++) { const d = getDeepSnowMesh({ seed: v }); const m = new THREE.Mesh(d.geometry, d.material); m.position.x = (v - 1.5) * 0.7; m.castShadow = true; g.add(m); }

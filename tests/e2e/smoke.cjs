@@ -77,7 +77,8 @@ function assert(cond, msg) {
   await touch('touchMove', [[140, 560, 1], [380, 200, 2]]);
   await page.waitForTimeout(300);
   const m2 = await fk(() => __fk.sim.getMove());
-  assert(Math.hypot(m1.x - m2.x, m1.z - m2.z) < 0.02 && Math.hypot(m2.x, m2.z) > 0.5, 'second finger ignored (stick vector unchanged)');
+  assert(Math.hypot(m1.x - m2.x, m1.z - m2.z) < 0.02 && Math.hypot(m2.x, m2.z) > 0.5,
+    'second finger ignored (stick vector unchanged: ' + JSON.stringify([m1, m2]) + ')');
   await touch('touchEnd', [[380, 200, 2]]);
   await touch('touchEnd', []);
   await page.waitForTimeout(400);
