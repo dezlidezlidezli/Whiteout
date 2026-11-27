@@ -16,6 +16,7 @@ import { ItemBatcher } from './items';
 import { PALETTE } from './models';
 import { PadVisual } from './pads';
 import { WorldView } from './world';
+import { DressingView } from './dressing';
 import { Sky } from './sky';
 
 export type Quality = 0 | 1 | 2;
@@ -67,6 +68,7 @@ export class View {
   private sun: THREE.DirectionalLight;
   private hemi: THREE.HemisphereLight;
   private world: WorldView;
+  private dressing: DressingView;
   private pads = new Map<string, PadVisual>();
   private actors: Actors;
   private crowd: Crowd;
@@ -142,6 +144,7 @@ export class View {
     this.ground = createGround();
     this.scene.add(this.ground.mesh);
     this.world = new WorldView(this.scene, this.data, quality);
+    this.dressing = new DressingView(this.scene, this.data);
     this.world.onAppear = (x, z, size) => {
       this.fx.puff(x, 0.1, z, Math.round(10 + size * 6), size, 1.8 + size);
       this.fx.ring(x, z, 1.6 + size, 0xffd9a0, 0.6);
@@ -692,6 +695,7 @@ export class View {
     this.actors.update(sim, this.items, alpha, t, dt);
     this.crowd.update(sim, alpha, t, dt, px, pz);
     this.world.update(sim, t, dt);
+    this.dressing.update(sim);
     for (const pv of this.pads.values()) {
       pv.update(sim, t, dt, p.onPad === pv.def.id);
       if (this.title) pv.root.visible = false; // nothing in-world competes with the title buttons
