@@ -508,6 +508,266 @@ const dawn: SfxFn = (v) => {
   return 7.4;
 };
 
+// ----- signature mechanics ---------------------------------------------------------------------
+
+/** Bell note: clean fundamental + a short glassy partial. */
+function bell(v: Voice, at: number, f: number, d: number, g: number, rev = 0.35): void {
+  tone(v, { at, f, a: 0.002, d, g, rev });
+  tone(v, { at, f: f * 2.756, a: 0.001, d: d * 0.25, g: g * 0.22 });
+}
+
+const ploughFind: SfxFn = (v) => {
+  tone(v, { f: 95, f2: 50, glide: 0.12, a: 0.003, d: 0.22, g: 0.8 });
+  noise(v, { filter: 'lowpass', f: 300, q: 0.7, a: 0.004, d: 0.18, g: 0.7 });
+  const b = 1318.5 * v.p; // E6
+  [0, 4, 7].forEach((s, i) => bell(v, 0.1 + i * 0.06, b * semis(s), 0.35, 0.09, 0.4));
+  return 0.6;
+};
+
+const zoneCleared: SfxFn = (v) => {
+  noise(v, { filter: 'bandpass', f: 350, f2: 4200, glide: 0.5, q: 1.3, a: 0.25, d: 0.3, g: 0.3, rev: 0.3 });
+  const b = 784 * v.p; // G5
+  [0, 2, 4, 7, 9, 12].forEach((s, i) => bell(v, 0.25 + i * 0.065, b * semis(s), 0.5, 0.12));
+  bell(v, 0.7, b * 2, 1.0, 0.1, 0.5);
+  bell(v, 0.7, b * semis(16), 0.9, 0.07, 0.5);
+  return 1.7;
+};
+
+const dig: SfxFn = (v) => {
+  const { rng } = v;
+  // scoop: soft low push + a short crunchy grain cluster
+  noise(v, { filter: 'lowpass', f: 700, q: 0.8, a: 0.01, d: 0.08, g: 0.5 });
+  for (let i = 0; i < 4; i++) {
+    noise(v, { at: 0.02 + rng() * 0.07, filter: 'bandpass', f: rand(rng, 1200, 2600) * v.p, q: 1.2, a: 0.002, d: rand(rng, 0.01, 0.03), g: rand(rng, 0.25, 0.45) });
+  }
+  noise(v, { at: 0.08, filter: 'highpass', f: 2500, q: 0.6, a: 0.02, d: 0.1, g: 0.06 });
+  return 0.2;
+};
+
+const rescued: SfxFn = (v) => {
+  // breathy in-breath swell
+  noise(v, { filter: 'bandpass', f: 700, f2: 1500, glide: 0.4, q: 2, a: 0.32, d: 0.35, g: 0.22, rev: 0.3 });
+  // warm hum rising underneath
+  tone(v, { type: 'triangle', f: 220 * v.p, f2: 262 * v.p, glide: 0.4, a: 0.25, d: 0.6, g: 0.12, rev: 0.3 });
+  // hopeful chime: up a fourth, then a soft octave shimmer
+  const b = 784 * v.p; // G5
+  bell(v, 0.45, b, 0.7, 0.18, 0.4);
+  bell(v, 0.62, b * semis(5), 1.0, 0.18, 0.45);
+  tone(v, { at: 0.62, f: b * semis(5) * 0.5, a: 0.03, d: 0.9, g: 0.07, rev: 0.4 });
+  return 1.8;
+};
+
+const followerWait: SfxFn = (v) => {
+  const f = 659.3 * v.p;
+  tone(v, { f, a: 0.003, d: 0.08, g: 0.3 });
+  tone(v, { at: 0.1, f: f * semis(4), f2: f * semis(7), glide: 0.08, a: 0.003, d: 0.14, g: 0.3 });
+  return 0.28;
+};
+
+const followerHome: SfxFn = (v) => {
+  const b = 523.25 * v.p; // C5
+  bell(v, 0, b * semis(7), 0.3, 0.16);
+  bell(v, 0.09, b * semis(4), 0.35, 0.16);
+  bell(v, 0.18, b, 0.8, 0.2, 0.45);
+  tone(v, { at: 0.18, type: 'triangle', f: b * 0.5, a: 0.02, d: 0.7, g: 0.1, rev: 0.3 });
+  return 1.05;
+};
+
+const lanternOn: SfxFn = (v) => {
+  tone(v, { f: 3100 * v.p, a: 0.001, d: 0.06, g: 0.12 });
+  tone(v, { f: 4730 * v.p, a: 0.001, d: 0.04, g: 0.06 });
+  noise(v, { at: 0.04, filter: 'bandpass', f: 300, f2: 1300, glide: 0.2, q: 1.2, a: 0.06, d: 0.3, g: 0.45 });
+  tone(v, { at: 0.05, type: 'triangle', f: 392 * v.p, a: 0.05, d: 0.35, g: 0.08, rev: 0.3 });
+  return 0.5;
+};
+
+/** Soft "brass": two detuned saws through a per-note opening lowpass. */
+function brass(v: Voice, at: number, f: number, len: number, g: number): void {
+  const ac = v.ac;
+  const t = v.t + at;
+  const lp = ac.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.Q.value = 0.8;
+  lp.frequency.setValueAtTime(450, t);
+  lp.frequency.exponentialRampToValueAtTime(2200, t + 0.08);
+  lp.frequency.exponentialRampToValueAtTime(1000, t + 0.3 + len * 0.6);
+  lp.connect(v.out);
+  if (v.rev) {
+    const s = ac.createGain();
+    s.gain.value = 0.35;
+    lp.connect(s);
+    s.connect(v.rev);
+  }
+  for (const dt of [-6, 6]) tone(v, { at, type: 'sawtooth', f, detune: dt, a: 0.04, hold: len, d: 0.5, g, dest: lp });
+  tone(v, { at, f, a: 0.04, hold: len, d: 0.5, g: g * 1.1 });
+}
+
+const allFound: SfxFn = (v) => {
+  const C = 523.25 * v.p * 0.5; // C4
+  // melody (bells) over a plagal IV -> I "amen" swell
+  const mel: [number, number][] = [
+    [0, 12], [0.22, 16], [0.44, 19], [0.66, 21], [0.95, 19], [1.25, 24],
+  ];
+  for (const [at, s] of mel) bell(v, at, C * semis(s), at > 1.2 ? 1.6 : 0.6, 0.13, 0.45);
+  [5, 9, 12].forEach((s) => brass(v, 0.2, C * semis(s - 12), 0.8, 0.035)); // F major
+  [0, 4, 7, 12].forEach((s) => brass(v, 1.25, C * semis(s - 12), 1.1, 0.035)); // C major
+  tone(v, { at: 1.25, f: C * 0.5, a: 0.05, hold: 0.8, d: 0.8, g: 0.12 });
+  [28, 31, 36].forEach((s, i) => bell(v, 1.5 + i * 0.15, C * semis(s), 0.9, 0.05, 0.6));
+  return 3.1;
+};
+
+const fishLeapSpawn: SfxFn = (v) => {
+  const f = 950 * v.p;
+  tone(v, { f, f2: f * 1.8, glide: 0.025, a: 0.001, d: 0.05, g: 0.35 });
+  noise(v, { filter: 'bandpass', f: 2400, q: 1.5, a: 0.001, d: 0.02, g: 0.12 });
+  return 0.08;
+};
+
+const fishLeapCatch: SfxFn = (v) => {
+  tone(v, { f: 420, f2: 150, glide: 0.04, a: 0.0015, d: 0.06, g: 0.4 });
+  noise(v, { filter: 'bandpass', f: 1500, q: 1.2, a: 0.001, d: 0.05, g: 0.3 });
+  bell(v, 0.035, 784 * v.p, 0.35, 0.2, 0.25);
+  return 0.42;
+};
+
+const skateBounce: SfxFn = (v) => {
+  const ac = v.ac;
+  const lp = ac.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 900;
+  lp.connect(v.out);
+  tone(v, { type: 'triangle', f: 190 * v.p, f2: 150 * v.p, glide: 0.05, a: 0.002, d: 0.12, g: 0.6, dest: lp });
+  tone(v, { f: 140 * v.p, f2: 105 * v.p, glide: 0.06, a: 0.002, d: 0.12, g: 0.5 });
+  noise(v, { filter: 'bandpass', f: 600, q: 1.2, a: 0.001, d: 0.03, g: 0.25 });
+  return 0.18;
+};
+
+const crankNotch: SfxFn = (v) => {
+  const { rng } = v;
+  noise(v, { filter: 'bandpass', f: rand(rng, 2200, 2800) * v.p, q: 4, a: 0.0008, d: 0.01, g: 0.7 });
+  tone(v, { f: rand(rng, 900, 1100) * v.p, a: 0.001, d: 0.012, g: 0.12 });
+  noise(v, { filter: 'lowpass', f: 500, q: 0.7, a: 0.001, d: 0.015, g: 0.2 });
+  return 0.04;
+};
+
+const crankTurn: SfxFn = (v) => {
+  const ac = v.ac;
+  const t = v.t;
+  // rope creak: wobbling low saw through a resonant band
+  const bp = ac.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.value = 750 * v.p;
+  bp.Q.value = 6;
+  bp.connect(v.out);
+  const cg = ac.createGain();
+  cg.gain.value = 0;
+  cg.gain.setValueAtTime(0, t);
+  cg.gain.linearRampToValueAtTime(0.45, t + 0.08);
+  cg.gain.linearRampToValueAtTime(0, t + 0.32);
+  cg.connect(bp);
+  const saw = ac.createOscillator();
+  saw.type = 'sawtooth';
+  saw.frequency.setValueAtTime(95, t);
+  saw.frequency.linearRampToValueAtTime(120, t + 0.3);
+  const lfo = ac.createOscillator();
+  lfo.frequency.value = 14;
+  const lg = ac.createGain();
+  lg.gain.value = 8;
+  lfo.connect(lg);
+  lg.connect(saw.frequency);
+  saw.connect(cg);
+  saw.start(t);
+  lfo.start(t);
+  saw.stop(t + 0.34);
+  lfo.stop(t + 0.34);
+  // low wooden thunk as the bar comes round
+  tone(v, { at: 0.28, f: 120, f2: 70, glide: 0.06, a: 0.002, d: 0.14, g: 0.7 });
+  noise(v, { at: 0.28, filter: 'lowpass', f: 500, q: 0.8, a: 0.002, d: 0.06, g: 0.4 });
+  return 0.5;
+};
+
+const liftArrive: SfxFn = (v) => {
+  const { rng } = v;
+  // cage clank: inharmonic metal partials
+  const f = rand(rng, 560, 620) * v.p;
+  tone(v, { f, a: 0.001, d: 0.3, g: 0.16 });
+  tone(v, { f: f * 2.38, a: 0.001, d: 0.18, g: 0.1 });
+  tone(v, { f: f * 3.73, a: 0.001, d: 0.09, g: 0.06 });
+  noise(v, { filter: 'bandpass', f: 1800, q: 1.5, a: 0.001, d: 0.04, g: 0.4 });
+  tone(v, { f: 150, f2: 90, glide: 0.05, a: 0.002, d: 0.1, g: 0.4 });
+  // ore rattle: a tumble of small stone clicks
+  for (let i = 0; i < 9; i++) {
+    const at = 0.1 + Math.pow(rng(), 1.4) * 0.4;
+    noise(v, { at, filter: 'bandpass', f: rand(rng, 900, 2200), q: 3, a: 0.001, d: rand(rng, 0.01, 0.03), g: rand(rng, 0.15, 0.35) });
+  }
+  return 0.65;
+};
+
+const bellows: SfxFn = (v) => {
+  noise(v, { filter: 'bandpass', f: 380 * v.p, f2: 900 * v.p, glide: 0.18, q: 1.1, a: 0.14, d: 0.3, g: 0.6 });
+  noise(v, { at: 0.2, filter: 'bandpass', f: 900 * v.p, f2: 300 * v.p, glide: 0.25, q: 1.1, a: 0.02, d: 0.25, g: 0.3 });
+  return 0.5;
+};
+
+const flameTaken: SfxFn = (v) => {
+  noise(v, { filter: 'lowpass', f: 200, f2: 1300, glide: 0.15, q: 1.5, a: 0.04, d: 0.35, g: 0.6 });
+  const b = 329.6 * v.p; // E4
+  tone(v, { at: 0.05, type: 'triangle', f: b, a: 0.08, d: 0.6, g: 0.14, rev: 0.3 });
+  tone(v, { at: 0.08, type: 'triangle', f: b * 1.5, a: 0.08, d: 0.55, g: 0.1, rev: 0.3 });
+  tone(v, { at: 0.1, f: b * 4, a: 0.02, d: 0.4, g: 0.04, rev: 0.4 });
+  return 0.75;
+};
+
+const flameLow: SfxFn = (v) => {
+  const ac = v.ac;
+  const t = v.t;
+  // fluttering gutter: low noise with a wavering tremolo
+  const trem = ac.createGain();
+  trem.gain.value = 0.5;
+  trem.connect(v.out);
+  const lfo = ac.createOscillator();
+  lfo.frequency.setValueAtTime(11, t);
+  lfo.frequency.linearRampToValueAtTime(7, t + 0.6);
+  const lg = ac.createGain();
+  lg.gain.value = 0.45;
+  lfo.connect(lg);
+  lg.connect(trem.gain);
+  lfo.start(t);
+  lfo.stop(t + 0.75);
+  noise(v, { filter: 'lowpass', f: 900, f2: 400, glide: 0.6, q: 1, a: 0.08, hold: 0.2, d: 0.4, g: 0.8, dest: trem });
+  return 0.75;
+};
+
+const flameOut: SfxFn = (v) => {
+  noise(v, { filter: 'bandpass', f: 900, f2: 400, glide: 0.15, q: 0.9, a: 0.01, d: 0.18, g: 0.45 });
+  const b = 659.3 * v.p; // E5 -> C5, soft and kind
+  tone(v, { at: 0.12, f: b, a: 0.01, d: 0.25, g: 0.18, rev: 0.3 });
+  tone(v, { at: 0.3, f: b * semis(-4), a: 0.01, d: 0.45, g: 0.18, rev: 0.35 });
+  return 0.8;
+};
+
+const brazierLit: SfxFn = (v) => {
+  noise(v, { filter: 'lowpass', f: 150, f2: 1600, glide: 0.15, q: 2, a: 0.06, d: 0.6, g: 0.9 });
+  tone(v, { f: 80, f2: 45, glide: 0.3, a: 0.02, d: 0.5, g: 0.6 });
+  const b = 261.6 * v.p; // C4
+  [0, 4, 7, 12, 16].forEach((s, i) => {
+    tone(v, { at: 0.18 + i * 0.07, type: 'triangle', f: b * semis(s), a: 0.03, d: 1.1, g: 0.11, rev: 0.35 });
+  });
+  [24, 28, 31].forEach((s, i) => bell(v, 0.5 + i * 0.08, b * semis(s), 0.7, 0.06, 0.5));
+  return 1.75;
+};
+
+const trailComplete: SfxFn = (v) => {
+  const C = 261.6 * v.p; // C4
+  brass(v, 0, C * semis(7), 0.15, 0.05);
+  brass(v, 0.2, C * semis(12), 1.1, 0.05);
+  brass(v, 0.2, C * semis(4), 1.1, 0.035);
+  brass(v, 0.2, C * semis(-12), 1.1, 0.04);
+  tone(v, { f: 98, f2: 88, glide: 0.3, a: 0.004, d: 0.5, g: 0.35 });
+  [24, 28, 31, 36].forEach((s, i) => bell(v, 0.3 + i * 0.1, C * semis(s), 0.8, 0.05, 0.5));
+  return 2.1;
+};
+
 // ---------------------------------------------------------------------------------------------
 
 export const SFX: Record<SfxName, SfxSpec> = {
@@ -538,6 +798,26 @@ export const SFX: Record<SfxName, SfxSpec> = {
   upgrade: { fn: upgrade, level: 1, minGap: 0.12, poly: 2, cents: 0 },
   beaconStage: { fn: beaconStage, level: 0.55, minGap: 1.0, poly: 1, cents: 0, duck: 0.5 },
   dawn: { fn: dawn, level: 0.8, minGap: 5.0, poly: 1, cents: 0, duck: 0.7 },
+  ploughFind: { fn: ploughFind, level: 1, minGap: 0.15, poly: 2, cents: 20 },
+  zoneCleared: { fn: zoneCleared, level: 1, minGap: 1.0, poly: 1, cents: 0, duck: 0.4 },
+  dig: { fn: dig, level: 1, minGap: 0.12, poly: 2, cents: 80 },
+  rescued: { fn: rescued, level: 1, minGap: 0.5, poly: 2, cents: 0, duck: 0.3 },
+  followerWait: { fn: followerWait, level: 1, minGap: 0.3, poly: 2, cents: 30 },
+  followerHome: { fn: followerHome, level: 1, minGap: 0.2, poly: 2, cents: 0 },
+  lanternOn: { fn: lanternOn, level: 1, minGap: 0.3, poly: 1, cents: 10 },
+  allFound: { fn: allFound, level: 1, minGap: 3.0, poly: 1, cents: 0, duck: 0.8 },
+  fishLeapSpawn: { fn: fishLeapSpawn, level: 1, minGap: 0.08, poly: 2, cents: 60 },
+  fishLeapCatch: { fn: fishLeapCatch, level: 1, minGap: 0.06, poly: 3, cents: 5 },
+  skateBounce: { fn: skateBounce, level: 1, minGap: 0.15, poly: 2, cents: 60 },
+  crankNotch: { fn: crankNotch, level: 1, minGap: 0.05, poly: 3, cents: 40 },
+  crankTurn: { fn: crankTurn, level: 1, minGap: 0.3, poly: 2, cents: 30 },
+  liftArrive: { fn: liftArrive, level: 1, minGap: 0.3, poly: 2, cents: 20 },
+  bellows: { fn: bellows, level: 1, minGap: 0.2, poly: 2, cents: 60 },
+  flameTaken: { fn: flameTaken, level: 1, minGap: 0.3, poly: 1, cents: 0 },
+  flameLow: { fn: flameLow, level: 1, minGap: 1.0, poly: 1, cents: 30 },
+  flameOut: { fn: flameOut, level: 1, minGap: 0.5, poly: 1, cents: 0 },
+  brazierLit: { fn: brazierLit, level: 1, minGap: 0.5, poly: 1, cents: 0, duck: 0.5 },
+  trailComplete: { fn: trailComplete, level: 1, minGap: 2.0, poly: 1, cents: 0, duck: 0.7 },
 };
 
 export const SFX_NAMES = Object.keys(SFX) as SfxName[];

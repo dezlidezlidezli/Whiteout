@@ -40,10 +40,13 @@ interface MoodDef {
   reverb: number;
   /** Probability that a chord change goes home to degree 0 (resolution). */
   home: number;
+  /** Probability that a melody step moves upward (default 0.5). */
+  upBias?: number;
 }
 
 const MAJOR = [0, 2, 4, 5, 7, 9, 11];
 const MINOR = [0, 2, 3, 5, 7, 8, 10];
+const DORIAN = [0, 2, 3, 5, 7, 9, 10];
 
 const MAJOR_GRAPH: Record<number, number[]> = {
   0: [3, 3, 5, 5, 1, 4],
@@ -196,6 +199,63 @@ export const MOODS: Record<MusicMood, MoodDef> = {
     gain: 1,
     reverb: 0.55,
     home: 0.45,
+  },
+  // rescue walks in the storm fringe: hushed, searching, distant bells, lots of space
+  whiteout: {
+    bpm: 52,
+    root: 64, // E dorian
+    scale: DORIAN,
+    graph: { 0: [3, 3, 6, 4], 3: [0, 6, 0], 4: [0, 3], 6: [0, 3] },
+    start: 0,
+    barsPerChord: 2,
+    mel: 'bell',
+    melLo: 71,
+    melHi: 88,
+    phrase: [2, 3],
+    rest: [10, 22],
+    durs: [2, 3, 4],
+    melGain: 0.1,
+    motif: 0.5,
+    pad: 0.06,
+    padCut: 520,
+    padType: 'triangle',
+    bass: 0,
+    arp: 0,
+    arpInst: 'bell',
+    arpOct: 0,
+    pulse: 0,
+    gain: 1,
+    reverb: 0.85,
+    home: 0.15,
+  },
+  // the Trail of Light climb: slow, rising, resolute
+  peak: {
+    bpm: 64,
+    root: 62, // D major
+    scale: MAJOR,
+    graph: { 0: [3, 4, 5], 3: [4, 4, 0], 4: [5, 0, 0], 5: [3, 3, 4] },
+    start: 0,
+    barsPerChord: 2,
+    mel: 'kalimba',
+    melLo: 66,
+    melHi: 86,
+    phrase: [4, 6],
+    rest: [4, 9],
+    durs: [2, 2, 3, 4],
+    melGain: 0.17,
+    motif: 0.5,
+    pad: 0.065,
+    padCut: 1300,
+    padType: 'sawtooth',
+    bass: 0.12,
+    arp: 0.1,
+    arpInst: 'musicbox',
+    arpOct: 1,
+    pulse: 0.08,
+    gain: 1,
+    reverb: 0.55,
+    home: 0.2,
+    upBias: 0.62,
   },
 };
 
@@ -448,7 +508,7 @@ export class MoodPlayer {
     } else {
       const r = rng();
       const scaleStep = r < 0.55 ? 1 : r < 0.8 ? 2 : r < 0.88 ? 0 : 3;
-      const dir = rng() < 0.5 ? -1 : 1;
+      const dir = rng() < (def.upBias ?? 0.5) ? 1 : -1;
       m = this.moveInScale(m, dir * scaleStep);
     }
     const last = this.phraseLeft === 1;

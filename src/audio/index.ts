@@ -28,9 +28,30 @@ export type SfxName =
   | 'orderNew' // a new caravan order is posted
   | 'upgrade' // repeatable upgrade bought (lighter than padComplete)
   | 'beaconStage' // a Great Beacon stage completes
-  | 'dawn'; // finale dawn break: long warm swell (6-8 s) the finale music enters under
+  | 'dawn' // finale dawn break: long warm swell (6-8 s) the finale music enters under
+  // --- signature mechanics (docs/MECHANICS.md)
+  | 'ploughFind' // plough uncovers a find
+  | 'zoneCleared' // a deep-snow zone reaches 100 %
+  | 'dig' // digging a buried villager out (repeatable scoops)
+  | 'rescued' // villager dug free: tender breathy swell + hopeful chime
+  | 'followerWait' // follower left outside the glow stops and waits
+  | 'followerHome' // follower reaches warmth
+  | 'lanternOn'
+  | 'allFound' // all lost villagers found (~3 s)
+  | 'fishLeapSpawn'
+  | 'fishLeapCatch' // pass pitch: ladderPitch(combo)
+  | 'skateBounce'
+  | 'crankNotch' // up to ~12/s
+  | 'crankTurn' // one full capstan turn
+  | 'liftArrive'
+  | 'bellows'
+  | 'flameTaken'
+  | 'flameLow' // occasional gentle warning
+  | 'flameOut'
+  | 'brazierLit'
+  | 'trailComplete';
 
-export type MusicMood = 'title' | 'calm' | 'cozy' | 'storm' | 'finale';
+export type MusicMood = 'title' | 'calm' | 'cozy' | 'storm' | 'finale' | 'whiteout' | 'peak';
 
 export interface SfxOpts {
   /** Playback pitch multiplier, 1 = normal. */
@@ -47,9 +68,22 @@ export interface AudioApi {
   music(mood: MusicMood | null): void;
   /**
    * Continuous ambience controls, 0..1. wind = blizzard intensity, fire = proximity to hearth/kettle,
-   * crowd = near a big Icebound queue (cold murmur), camp = inside a populated camp (cosy life).
+   * crowd = near a big Icebound queue (cold murmur), camp = inside a populated camp (cosy life),
+   * plough = pushing the plough (ramp it up while pushing; it brightens with level),
+   * skate = skating speed (blade hiss), forge = forge blast level, flame = carried flame level,
+   * gust = standing in a wind gap (whistling layer on top of wind).
    */
-  ambience(levels: { wind?: number; fire?: number; crowd?: number; camp?: number }): void;
+  ambience(levels: {
+    wind?: number;
+    fire?: number;
+    crowd?: number;
+    camp?: number;
+    plough?: number;
+    skate?: number;
+    forge?: number;
+    flame?: number;
+    gust?: number;
+  }): void;
   setVolumes(v: { sfx?: number; music?: number }): void;
   getVolumes(): { sfx: number; music: number };
   /** Pause/resume everything (app backgrounded). */

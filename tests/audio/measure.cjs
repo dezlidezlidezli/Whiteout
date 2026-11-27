@@ -35,6 +35,26 @@ const EXPECT = {
   upgrade: [700, 3500, 0.2, 1.2, 'normal'],
   beaconStage: [60, 900, 1.2, 4.0, 'big'],
   dawn: [150, 2000, 5.5, 9.5, 'big'],
+  ploughFind: [150, 2500, 0.2, 1.2, 'normal'],
+  zoneCleared: [500, 3500, 0.8, 2.5, 'big'],
+  dig: [500, 3500, 0.05, 0.4, 'normal'],
+  rescued: [300, 2500, 0.8, 2.6, 'normal'],
+  followerWait: [500, 2500, 0.1, 0.5, 'quiet'],
+  followerHome: [300, 2500, 0.4, 1.8, 'normal'],
+  lanternOn: [300, 3500, 0.15, 0.9, 'normal'],
+  allFound: [250, 2500, 2.2, 4.5, 'big'],
+  fishLeapSpawn: [700, 4000, 0.02, 0.2, 'quiet'],
+  fishLeapCatch: [300, 3000, 0.1, 0.9, 'normal'],
+  skateBounce: [100, 1200, 0.05, 0.4, 'normal'],
+  crankNotch: [800, 4000, 0.005, 0.1, 'quiet'],
+  crankTurn: [100, 1500, 0.2, 0.8, 'normal'],
+  liftArrive: [300, 3000, 0.2, 1.0, 'normal'],
+  bellows: [250, 1500, 0.2, 0.8, 'normal'],
+  flameTaken: [150, 1500, 0.3, 1.4, 'normal'],
+  flameLow: [100, 1200, 0.3, 1.2, 'quiet'],
+  flameOut: [250, 1500, 0.3, 1.4, 'normal'],
+  brazierLit: [100, 1500, 0.8, 2.6, 'big'],
+  trailComplete: [200, 2500, 1.2, 3.5, 'big'],
 };
 
 const f1 = (x) => (Number.isFinite(x) ? x.toFixed(1) : String(x));
@@ -117,9 +137,14 @@ const f3 = (x) => (Number.isFinite(x) ? x.toFixed(3) : String(x));
     ['pickup', 60, 60],
     ['padTick', 60, 40],
     ['footstep', 40, 20],
+    ['crankNotch', 48, 12, true],
+    ['crankNotch', 60, 20, true],
+    ['fishLeapCatch', 12, 3],
+    ['dig', 16, 6, true],
+    ['bellows', 12, 4, true],
   ];
-  for (const [n, count, rate] of streaks) {
-    const m = await lab(([n, c, r]) => window.__audioLab.streak(n, c, r), [n, count, rate]);
+  for (const [n, count, rate, flat] of streaks) {
+    const m = await lab(([n, c, r, fl]) => window.__audioLab.streak(n, c, r, fl), [n, count, rate, !!flat]);
     console.log(
       `${(n + ' x' + count + ' @' + rate + '/s').padEnd(24)} peak ${f1(m.peakDb)}  loud ${f1(m.loudDb)}  clipped ${m.clipped}  tail ${m.tail.toExponential(1)}`,
     );
@@ -153,26 +178,51 @@ const f3 = (x) => (Number.isFinite(x) ? x.toFixed(3) : String(x));
   // ---- ambience
   console.log('\nAmbience (6 s)');
   const ambs = [
-    [1, 0, 0, 0],
-    [0.3, 0, 0, 0],
-    [0, 1, 0, 0],
-    [0, 0, 1, 0],
-    [0, 0, 0, 1],
-    [1, 1, 1, 1],
+    { wind: 1 },
+    { wind: 0.3 },
+    { fire: 1 },
+    { crowd: 1 },
+    { camp: 1 },
+    { plough: 1 },
+    { plough: 0.3 },
+    { skate: 1 },
+    { skate: 0.3 },
+    { forge: 1 },
+    { forge: 0.3 },
+    { flame: 1 },
+    { flame: 0.3 },
+    { gust: 1 },
+    { wind: 1, gust: 1 },
+    { wind: 1, fire: 1, crowd: 1, camp: 1 },
+    { wind: 1, gust: 1, flame: 1, skate: 1, plough: 1, forge: 1 },
   ];
-  for (const [w, f, cr, cp] of ambs) {
-    const m = await lab(([w, f, cr, cp]) => window.__audioLab.ambience(w, f, cr, cp), [w, f, cr, cp]);
-    console.log(`wind ${w} fire ${f} crowd ${cr} camp ${cp}: peak ${f1(m.peakDb)} rms ${f1(m.rmsDb)} cent ${Math.round(m.centroid)} active ${m.activeFrac.toFixed(2)}`);
-    const tag = `ambience w${w} f${f} crowd${cr} camp${cp}`;
+  // [centroid lo, hi] per bed when it plays alone at level 1
+  const AMB_CENT = { wind: [300, 1500], fire: [300, 2000], crowd: [120, 900], camp: [150, 1500], plough: [600, 3500], skate: [1500, 7000], forge: [100, 1500], flame: [150, 1500], gust: [400, 1800] };
+  const brightness = {};
+  for (const lv of ambs) {
+    const m = await lab((lv) => window.__audioLab.ambience(lv), lv);
+    const keys = Object.keys(lv);
+    const tag = 'ambience ' + keys.map((k) => `${k}=${lv[k]}`).join(' ');
+    console.log(`${tag.padEnd(58)} peak ${f1(m.peakDb)} rms ${f1(m.rmsDb)} cent ${Math.round(m.centroid)} active ${m.activeFrac.toFixed(2)}`);
+    const sum = keys.reduce((a, k) => a + lv[k], 0);
+    const maxLv = Math.max(...keys.map((k) => lv[k]));
     if (m.peakDb < -50) fail(`${tag} silent`);
     if (m.peakDb > -3 || m.clipped) fail(`${tag} too hot`);
     if (m.rmsDb > median - 4) fail(`${tag} louder than sfx`);
     if (m.dc > 0.02) fail(`${tag} DC ${f3(m.dc)}`);
-    if (Math.max(w, f, cr, cp) === 1 && m.activeFrac < 0.9) fail(`${tag} drops out (${m.activeFrac.toFixed(2)})`);
-    // the beds sit under everything; a single bed should be at least 8 dB under the sfx
-    if (w + f + cr + cp === 1 && m.rmsDb > median - 8) fail(`${tag} too loud for a background bed`);
-    if (cr && !w && !f && (m.centroid < 120 || m.centroid > 900)) fail(`${tag} centroid ${Math.round(m.centroid)} (want low murmur)`);
-    if (cp && !w && !f && (m.centroid < 150 || m.centroid > 1500)) fail(`${tag} centroid ${Math.round(m.centroid)} (want soft, distant)`);
+    if (m.spike > 12) fail(`${tag} click (spike ${f1(m.spike)})`);
+    if (maxLv === 1 && m.activeFrac < 0.9) fail(`${tag} drops out (${m.activeFrac.toFixed(2)})`);
+    if (keys.length === 1 && sum === 1 && m.rmsDb > median - 8) fail(`${tag} too loud for a background bed`);
+    if (keys.length === 1 && sum === 1) {
+      const [lo, hi] = AMB_CENT[keys[0]];
+      if (m.centroid < lo || m.centroid > hi) fail(`${tag} centroid ${Math.round(m.centroid)} outside ${lo}-${hi}`);
+    }
+    if (keys.length === 1) (brightness[keys[0]] = brightness[keys[0]] || {})[lv[keys[0]]] = m.centroid;
+  }
+  // level-tracking beds must get brighter as their level rises
+  for (const k of ['plough', 'skate', 'forge', 'flame']) {
+    const b = brightness[k];
+    if (b && b[1] <= b[0.3] * 1.1) fail(`ambience ${k} does not brighten with level (${Math.round(b[0.3])} -> ${Math.round(b[1])} Hz)`);
   }
 
   // ---- live playback after a real click (retried if the dev server reloads the page mid-way)

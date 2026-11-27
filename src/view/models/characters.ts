@@ -1,6 +1,6 @@
 // Articulated low-poly characters + procedural animation.
 import * as THREE from 'three';
-import { Builder, bevel, box, cone, cyl, ico, lathe, sphere, torus } from './geo';
+import { Builder, bevel, box, cone, cyl, ico, lathe, octa, sphere, torus } from './geo';
 import { mats } from './materials';
 import { PALETTE as P } from './palette';
 import type { CharacterAnimState, CharacterRig, CharacterRole, ModelOpts } from './index';
@@ -309,12 +309,64 @@ function buildHumanoid(role: Exclude<CharacterRole, 'dog'>, opts: ModelOpts): Ch
 
   const carryAnchor = group('carryAnchor', 0, 0.42, 0.42);
   body.add(carryAnchor);
+  // grip anchors for held props (lanternHeld, flameHeld, plough handles...)
+  armL.add(group('handL', 0, -ARM_LEN - 0.03, 0.02));
+  armR.add(group('handR', 0, -ARM_LEN - 0.03, 0.02));
+  // skate blades (hidden unless opts.skates; the view may toggle skateL / skateR)
+  const blade = cached('skate', () => new Builder()
+    .add(box(0.04, 0.03, 0.34), P.steel, { p: [0, -HIP - 0.04, 0.04], top: 0xe4ecf4 })
+    .add(box(0.03, 0.06, 0.03), P.iron, { p: [0, -HIP - 0.01, -0.06] })
+    .add(box(0.03, 0.06, 0.03), P.iron, { p: [0, -HIP - 0.01, 0.12] })
+    .add(cyl(0.02, 0.02, 0.04, 6), P.steel, { p: [0, -HIP - 0.035, 0.22], r: [0, 0, Math.PI / 2] }));
+  for (const [leg, n] of [[legL, 'skateL'], [legR, 'skateR']] as const) {
+    const m = mesh(blade, n);
+    m.visible = !!opts.skates;
+    leg.add(m);
+  }
+  if (opts.variant === 'rescued') addBlanket(body, head, opts.seed ?? 0);
 
   const phase = ((opts.seed ?? 0) * 0.6180339) % 1 * Math.PI * 2;
   partsMap.set(root, { rig, body, head, armL, armR, legL, legR, quad: false, phase, tool: armR.getObjectByName('tool') });
+  if (opts.variant === 'rescued') root.userData.variant = 'rescued';
   root.userData.radius = 0.35;
   const height = HIP + NECK + 0.24 + 0.27 + (st.hat === 'bobble' ? 0.25 : 0.12);
   return { root, carryAnchor, height };
+}
+
+const BLANKETS: [number, number][] = [[0xb8423a, 0xe8d2a8], [0x3f6a8a, 0xd9c08a], [0x6a8a4a, 0xe4d4b0], [0x8a5a86, 0xe8c87a]];
+/** Rescued-follower look: a plaid blanket over head and shoulders, dusted with frost. */
+function addBlanket(body: THREE.Object3D, head: THREE.Object3D, seed: number) {
+  const [c1, c2] = BLANKETS[Math.abs(seed) % BLANKETS.length];
+  const cloak = cached(`blanket:${c1}`, () => {
+    const b = new Builder();
+    const prof: [number, number][] = [[0.43, -0.02], [0.41, 0.14], [0.39, 0.3], [0.36, 0.46], [0.26, 0.6], [0.14, 0.68]];
+    for (let i = 0; i < prof.length - 1; i++) {
+      const band = new THREE.LatheGeometry([prof[i], prof[i + 1]].map(([x, y]) => new THREE.Vector2(x, y)), 12, 0.55, Math.PI * 2 - 1.1);
+      b.add(band, i % 2 ? c2 : c1, { top: i >= 3 ? P.frost : undefined, topY: 0.75 });
+    }
+    // plaid stripes running down + fringe at the hem
+    for (let k = 0; k < 6; k++) {
+      const a = 0.9 + k * 0.85;
+      b.add(box(0.03, 0.62, 0.02), c2, { p: [Math.sin(a) * 0.405, 0.3, Math.cos(a) * 0.405], r: [0, a, 0] });
+    }
+    for (let k = 0; k < 10; k++) { const a = 0.7 + k * 0.5; b.add(box(0.02, 0.06, 0.02), c2, { p: [Math.sin(a) * 0.43, -0.05, Math.cos(a) * 0.43] }); }
+    // the corners held together in front
+    b.add(sphere(0.07, 6, 4), c1, { p: [0.0, 0.42, 0.33], s: [1.2, 1, 0.7] });
+    return b;
+  });
+  const hood = cached(`hood:${c1}`, () => {
+    const b = new Builder();
+    b.add(new THREE.LatheGeometry([[0.31, 0.0], [0.31, 0.12], [0.25, 0.28], [0.12, 0.37], [0.0, 0.39]].map(([x, y]) => new THREE.Vector2(x, y)), 12, 0.75, Math.PI * 2 - 1.5), c1, { top: P.snow, topY: 0.7 });
+    b.add(new THREE.LatheGeometry([[0.315, -0.02], [0.315, 0.04]].map(([x, y]) => new THREE.Vector2(x, y)), 12, 0.75, Math.PI * 2 - 1.5), c2);
+    for (let k = 0; k < 4; k++) b.add(octa(0.03), P.frost, { p: [Math.sin(2 + k) * 0.3, 0.15 + k * 0.05, Math.cos(2 + k) * 0.3] });
+    return b;
+  });
+  const cl = mesh(cloak, 'blanket');
+  body.add(cl);
+  const hd = mesh(hood, 'hood');
+  hd.position.set(0, 0.12, -0.02);
+  hd.rotation.x = -0.15;
+  head.add(hd);
 }
 
 // ---------------------------------------------------------------- dog
@@ -401,7 +453,7 @@ interface AnimState {
   carry: number;         // 0..1
   act: Record<string, number>; // 0..1 per action
 }
-const ACTIONS = ['chop', 'mine', 'fish', 'cook', 'cheer', 'shiver'] as const;
+const ACTIONS = ['chop', 'mine', 'fish', 'cook', 'cheer', 'shiver', 'plough', 'skate', 'crank', 'carryFlame', 'dig', 'shuffle'] as const;
 /** frame-rate independent exponential approach */
 const approach = (cur: number, target: number, rate: number, dt: number) => cur + (target - cur) * (1 - Math.exp(-rate * dt));
 const mix = (a: number, b: number, w: number) => a + (b - a) * w;
@@ -435,7 +487,7 @@ export function animate(rigDef: CharacterRig, s: CharacterAnimState): void {
   const k = clamp(sp / 5, 0, 1.3);
   // walk weight ramps in continuously from zero speed (no threshold snap)
   const walkW = clamp(sp / 1.2, 0, 1);
-  const gaitRate = 7 + sp * 1.5;
+  const gaitRate = (7 + sp * 1.5) * (1 - 0.35 * (st.act.shuffle ?? 0)) * (1 - 0.5 * (st.act.skate ?? 0));
   st.gait = (st.gait + dt * gaitRate) % (Math.PI * 200);
   const ph = st.gait + p.phase;
   const sw = Math.sin(ph);
@@ -514,6 +566,69 @@ export function animate(rigDef: CharacterRig, s: CharacterAnimState): void {
         sx = mix(sx, 1 + sq2 * 0.6, w); sy = mix(sy, 1 - sq2, w);
         headRx = mix(headRx, -0.25, w);
         lean = mix(lean, -0.05, w);
+        break;
+      }
+      case 'plough': {
+        // leaning into the handles, both hands forward and low, short powerful steps
+        aLx = mix(aLx, -0.95 + sw * 0.04 * walkW, w); aRx = mix(aRx, -0.95 - sw * 0.04 * walkW, w);
+        aLz = mix(aLz, -0.12, w); aRz = mix(aRz, 0.12, w);
+        lean += 0.32 * w;
+        headRx = mix(headRx, -0.15, w);
+        bodyRy = mix(bodyRy, sw * 0.05 * walkW, w);
+        break;
+      }
+      case 'skate': {
+        // long gliding pushes: legs stroke out sideways, big counter arm swing, low lean
+        const g = Math.sin(ph * 0.55);
+        lLx = mix(lLx, Math.max(0, g) * 0.35, w); lRx = mix(lRx, Math.max(0, -g) * 0.35, w);
+        lLz = mix(lLz, Math.max(0, g) * 0.45, w); lRz = mix(lRz, -Math.max(0, -g) * 0.45, w);
+        aLx = mix(aLx, -g * 0.9, w); aRx = mix(aRx, g * 0.9, w);
+        aLz = mix(aLz, 0.35, w); aRz = mix(aRz, -0.35, w);
+        bodyRz = mix(bodyRz, -g * 0.12, w); bodyRy = mix(bodyRy, g * 0.15, w);
+        rigY = mix(rigY, Math.abs(g) * 0.03 * walkW, w);
+        lean += 0.25 * w;
+        break;
+      }
+      case 'crank': {
+        // pushing a bar at chest height, braced forward
+        aLx = mix(aLx, -1.45, w); aRx = mix(aRx, -1.45, w);
+        aLz = mix(aLz, -0.25, w); aRz = mix(aRz, 0.25, w);
+        lean += 0.38 * w;
+        headRx = mix(headRx, -0.25, w);
+        break;
+      }
+      case 'carryFlame': {
+        // right arm holds the staff high, left arm out for balance, careful short steps
+        aRx = mix(aRx, -2.85 + Math.sin(t * 1.7) * 0.04, w); aRz = mix(aRz, 0.12, w);
+        aLx = mix(aLx, -0.35 + sw * 0.1 * walkW, w); aLz = mix(aLz, 0.55, w);
+        lLx = mix(lLx, lLx * 0.6, w); lRx = mix(lRx, lRx * 0.6, w);
+        rigY = mix(rigY, rigY * 0.4, w);
+        lean = mix(lean, 0.02, w);
+        headRx = mix(headRx, -0.2, w);
+        break;
+      }
+      case 'dig': {
+        // scoop low, lift, toss over the shoulder
+        const u = (t % 0.9) / 0.9;
+        const scoop = u < 0.5 ? ease(u / 0.5) : 1 - ease((u - 0.5) / 0.5);
+        const ax = mix(-0.6, -2.3, scoop);
+        aLx = mix(aLx, ax, w); aRx = mix(aRx, ax, w);
+        aLz = mix(aLz, -0.25, w); aRz = mix(aRz, 0.25, w);
+        lean += (0.5 - scoop * 0.55) * w;
+        bodyRy = mix(bodyRy, scoop * 0.4, w);
+        lLx = mix(lLx, -0.25, w); lRx = mix(lRx, 0.3, w);
+        break;
+      }
+      case 'shuffle': {
+        // tired, cold shuffle: tiny steps, hunched, arms hugging the blanket closed
+        lLx = mix(lLx, lLx * 0.35, w); lRx = mix(lRx, lRx * 0.35, w);
+        rigY = mix(rigY, rigY * 0.3, w);
+        aLx = mix(aLx, -0.95, w); aRx = mix(aRx, -0.95, w);
+        aLz = mix(aLz, -0.6, w); aRz = mix(aRz, 0.6, w);
+        bodyRz = mix(bodyRz, sw * 0.09 * walkW, w);
+        headRx = mix(headRx, 0.3, w);
+        sx = mix(sx, 1.02, w); sy = mix(sy, 0.95, w);
+        lean += 0.28 * w;
         break;
       }
       case 'shiver': {

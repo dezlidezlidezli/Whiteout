@@ -4,6 +4,7 @@
 // until unlock() is called, and every method is a silent no-op without a context.
 import type { AudioApi, MusicMood, SfxName, SfxOpts } from './index';
 import { Engine } from './engine';
+import type { AmbienceLevels } from './ambience';
 
 type Ctor = typeof AudioContext;
 
@@ -17,7 +18,7 @@ export function createLiveAudio(): AudioApi & {
   let engine: Engine | null = null;
   let volumes = { sfx: 0.8, music: 0.5 };
   let wantMood: MusicMood | null = null;
-  const wantAmb = { wind: 0, fire: 0, crowd: 0, camp: 0 };
+  const wantAmb: Required<AmbienceLevels> = { wind: 0, fire: 0, crowd: 0, camp: 0, plough: 0, skate: 0, forge: 0, flame: 0, gust: 0 };
   let userSuspended = false;
   let hidden = false;
   let timer: ReturnType<typeof setInterval> | null = null;
@@ -134,7 +135,7 @@ export function createLiveAudio(): AudioApi & {
           engine = new Engine(ctx, ctx.destination, { sfx: volumes.sfx, music: volumes.music });
           hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden';
           addListeners();
-          if (wantAmb.wind > 0 || wantAmb.fire > 0 || wantAmb.crowd > 0 || wantAmb.camp > 0) engine.setAmbience(wantAmb, 0.5);
+          if (Object.values(wantAmb).some((x) => x > 0)) engine.setAmbience(wantAmb, 0.5);
           if (wantMood) engine.music(wantMood);
         }
         tryResume();
@@ -164,8 +165,8 @@ export function createLiveAudio(): AudioApi & {
       }
     },
 
-    ambience(levels: { wind?: number; fire?: number; crowd?: number; camp?: number }) {
-      for (const k of ['wind', 'fire', 'crowd', 'camp'] as const) {
+    ambience(levels: AmbienceLevels) {
+      for (const k of Object.keys(wantAmb) as (keyof AmbienceLevels)[]) {
         const x = levels[k];
         if (x !== undefined && Number.isFinite(x)) wantAmb[k] = x;
       }

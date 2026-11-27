@@ -2,6 +2,7 @@
 // engine graph (buses, reverb, limiter) into an AudioBuffer for objective measurement.
 import type { MusicMood, SfxName, SfxOpts } from './index';
 import { Engine } from './engine';
+import type { AmbienceLevels } from './ambience';
 
 /**
  * Browser compressors start in a fully-compressed state and settle within ~0.3 s of silence, so
@@ -55,6 +56,6 @@ export function renderMusic(mood: MusicMood, seconds = 20, o: RenderOpts = {}): 
   }, o);
 }
 
-export function renderAmbience(levels: { wind?: number; fire?: number; crowd?: number; camp?: number }, seconds = 6, o: RenderOpts = {}): Promise<AudioBuffer> {
+export function renderAmbience(levels: AmbienceLevels, seconds = 6, o: RenderOpts = {}): Promise<AudioBuffer> {
   return renderWith(seconds, (e) => e.setAmbience(levels, 0.02), o);
 }

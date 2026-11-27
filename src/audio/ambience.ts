@@ -13,16 +13,28 @@ export interface AmbienceLevels {
   fire?: number;
   crowd?: number;
   camp?: number;
+  plough?: number;
+  skate?: number;
+  forge?: number;
+  flame?: number;
+  gust?: number;
 }
 
-type BedName = 'wind' | 'fire' | 'crowd' | 'camp';
+type BedName = 'wind' | 'fire' | 'crowd' | 'camp' | 'plough' | 'skate' | 'forge' | 'flame' | 'gust';
 
-/** Output gain at level 1, curve exponent, smoothing multiplier. */
-const BEDS: Record<BedName, [number, number, number]> = {
+/** Output gain at level 1, curve exponent, smoothing multiplier, optional [lo, hi] Hz brightness
+ *  lowpass that opens with the level (plough brightens as it is held, skate hiss follows speed,
+ *  forge roar brightens with blast, the carried flame dims as it gutters). */
+const BEDS: Record<BedName, [number, number, number, [number, number]?]> = {
   wind: [0.32, 1.4, 1],
   fire: [0.5, 1.2, 0.6],
   crowd: [0.3, 1.2, 1],
   camp: [0.3, 1.2, 1],
+  plough: [0.3, 1.0, 0.4, [900, 5000]],
+  skate: [0.26, 1.0, 0.25, [2200, 9000]],
+  forge: [0.4, 0.8, 0.8, [450, 3500]],
+  flame: [0.4, 1.0, 0.4, [500, 3000]],
+  gust: [0.32, 1.2, 0.5],
 };
 
 interface Loop {
@@ -35,7 +47,8 @@ export class Ambience {
   private out: GainNode;
   private noise: AudioBuffer;
   private gains: Partial<Record<BedName, GainNode>> = {};
-  private lv: Record<BedName, number> = { wind: 0, fire: 0, crowd: 0, camp: 0 };
+  private tone: Partial<Record<BedName, BiquadFilterNode>> = {};
+  private lv: Record<BedName, number> = { wind: 0, fire: 0, crowd: 0, camp: 0, plough: 0, skate: 0, forge: 0, flame: 0, gust: 0 };
 
   constructor(ac: BaseAudioContext, dest: AudioNode, noise: AudioBuffer) {
     this.ac = ac;
@@ -54,8 +67,10 @@ export class Ambience {
       let g = this.gains[name];
       if (this.lv[name] > 0 && !g) g = this.start(name, now);
       if (g) {
-        const [gain, curve, sm] = BEDS[name];
+        const [gain, curve, sm, bright] = BEDS[name];
         ramp(g.gain, gain * Math.pow(this.lv[name], curve), now, smooth * sm);
+        const lp = this.tone[name];
+        if (lp && bright) ramp(lp.frequency, bright[0] * Math.pow(bright[1] / bright[0], this.lv[name]), now, smooth * sm * 2);
       }
     }
   }
@@ -69,11 +84,84 @@ export class Ambience {
     g.gain.value = 0;
     g.connect(this.out);
     this.gains[name] = g;
-    if (name === 'wind') this.startWind(g, now);
-    else if (name === 'fire') this.playLoop(makeLoop(this.ac, 5, 99, fillFire), g, now);
-    else if (name === 'crowd') this.playLoop(makeLoop(this.ac, 7, 41, fillCrowd), g, now);
-    else this.playLoop(makeLoop(this.ac, 9, 17, fillCamp), g, now);
+    // optional brightness lowpass in front of the bed gain
+    let input: AudioNode = g;
+    const bright = BEDS[name][3];
+    if (bright) {
+      const lp = this.ac.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.Q.value = 0.5;
+      lp.frequency.value = bright[0];
+      lp.connect(g);
+      this.tone[name] = lp;
+      input = lp;
+    }
+    const ac = this.ac;
+    switch (name) {
+      case 'wind':
+        this.startWind(input, now);
+        break;
+      case 'gust':
+        this.startGust(input, now);
+        break;
+      case 'fire':
+        this.playLoop(makeLoop(ac, 5, 99, fillFire), input, now);
+        break;
+      case 'crowd':
+        this.playLoop(makeLoop(ac, 7, 41, fillCrowd), input, now);
+        break;
+      case 'camp':
+        this.playLoop(makeLoop(ac, 9, 17, fillCamp), input, now);
+        break;
+      case 'plough':
+        this.playLoop(makeLoop(ac, 6, 23, fillPlough), input, now);
+        break;
+      case 'skate':
+        this.playLoop(makeLoop(ac, 8, 31, fillSkate), input, now);
+        break;
+      case 'forge':
+        this.playLoop(makeLoop(ac, 6, 57, fillForge), input, now);
+        break;
+      case 'flame':
+        this.playLoop(makeLoop(ac, 5, 63, fillFlame), input, now);
+        break;
+    }
     return g;
+  }
+
+  /** Wind gap: two resonant whistles sweeping faster than the base wind, over a gusty band. */
+  private startGust(g: AudioNode, now: number): void {
+    const ac = this.ac;
+    const lfo = (freq: number, depth: number, target: AudioParam) => {
+      const o = ac.createOscillator();
+      o.frequency.value = freq;
+      const d = ac.createGain();
+      d.gain.value = depth;
+      o.connect(d);
+      d.connect(target);
+      o.start(now);
+    };
+    const band = (rate: number, f: number, q: number, level: number, sweepHz: number, sweep: number, ampHz: number, offset: number) => {
+      const src = ac.createBufferSource();
+      src.buffer = this.noise;
+      src.loop = true;
+      src.playbackRate.value = rate;
+      const bp = ac.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = f;
+      bp.Q.value = q;
+      const amp = ac.createGain();
+      amp.gain.value = level;
+      src.connect(bp);
+      bp.connect(amp);
+      amp.connect(g);
+      lfo(sweepHz, sweep, bp.frequency);
+      lfo(ampHz, level * 0.6, amp.gain);
+      src.start(now, offset);
+    };
+    band(0.6, 600, 1.0, 0.7, 0.19, 200, 0.31, 0.2);
+    band(1, 780, 14, 1.6, 0.23, 260, 0.17, 0.9);
+    band(0.9, 1350, 16, 1.0, 0.29, 380, 0.41, 1.6);
   }
 
   private playLoop(loop: Loop, dest: AudioNode, now: number): void {
@@ -96,7 +184,7 @@ export class Ambience {
     }
   }
 
-  private startWind(g: GainNode, now: number): void {
+  private startWind(g: AudioNode, now: number): void {
     const ac = this.ac;
     // body: broad band of noise, centre slowly wandering
     const src = ac.createBufferSource();
@@ -310,6 +398,90 @@ function fillCamp(d: Float32Array, sr: number, r: Rng): void {
   // soft distant fire pops
   const pops = Math.floor(secs * 2.5);
   for (let i = 0; i < pops; i++) addCrackle(d, sr, r, Math.floor(r() * (secs - 0.05) * sr), 0.003 + r() * 0.006, 0.06 + r() * 0.08);
+}
+
+/** Plough: dense soft shushing snow grains with an occasional packed-snow crunch. */
+function fillPlough(d: Float32Array, sr: number, r: Rng): void {
+  const secs = d.length / sr;
+  // continuous broadband shush (lightly lowpassed noise)
+  let a = 0;
+  const k = Math.min(1, (2 * Math.PI * 2500) / sr);
+  for (let i = 0; i < d.length; i++) {
+    a += k * (r() * 2 - 1 - a);
+    const sway = 0.75 + 0.25 * Math.sin((2 * Math.PI * 0.6 * i) / sr);
+    d[i] = a * 0.35 * sway;
+  }
+  // scraping grains
+  const grains = Math.floor(secs * 18);
+  for (let i = 0; i < grains; i++) {
+    const dur = 0.05 + r() * 0.15;
+    addNoiseGrain(d, sr, r, Math.floor(r() * (secs - dur) * sr), dur, 700 + r() * 2300, 1 + r(), 0.4 + r() * 0.5);
+  }
+  const crunches = Math.floor(secs * 4);
+  for (let i = 0; i < crunches; i++) addCrackle(d, sr, r, Math.floor(r() * (secs - 0.05) * sr), 0.004 + r() * 0.01, 0.15 + r() * 0.2);
+}
+
+/** Skating: steady blade hiss with slow carving swishes. */
+function fillSkate(d: Float32Array, sr: number, r: Rng): void {
+  const secs = d.length / sr;
+  let prev = 0;
+  for (let i = 0; i < d.length; i++) {
+    const x = r() * 2 - 1;
+    d[i] = (x - prev) * 0.25; // first-difference = bright hiss
+    prev = x;
+  }
+  // carving swishes: slow swelling band sweeps
+  let t = 0.3 + r() * 0.5;
+  while (t < secs - 1) {
+    const dur = 0.45 + r() * 0.4;
+    addNoiseGrain(d, sr, r, Math.floor(t * sr), dur, 1800 + r() * 2500, 1.5, 1.2 + r() * 0.6);
+    t += dur + 0.8 + r() * 1.6;
+  }
+  // tiny ice ticks
+  const ticks = Math.floor(secs * 1.5);
+  for (let i = 0; i < ticks; i++) addCrackle(d, sr, r, Math.floor(r() * (secs - 0.05) * sr), 0.002 + r() * 0.003, 0.2);
+}
+
+/** Forge: deep roaring breath + a few sparks. */
+function fillForge(d: Float32Array, sr: number, r: Rng): void {
+  const secs = d.length / sr;
+  let a = 0;
+  let b = 0;
+  let c = 0;
+  const k1 = Math.min(1, (2 * Math.PI * 500) / sr);
+  const k2 = Math.min(1, (2 * Math.PI * 140) / sr);
+  for (let i = 0; i < d.length; i++) {
+    const x = r() * 2 - 1;
+    a += k1 * (x - a);
+    b += k2 * (x - b);
+    c += k2 * (b - c);
+    const tt = i / sr;
+    const breathe = 0.75 + 0.25 * Math.sin(2 * Math.PI * 0.33 * tt + Math.sin(tt * 1.7));
+    d[i] = (a * 0.6 + c * 6) * breathe;
+  }
+  const sparks = Math.floor(secs * 5);
+  for (let i = 0; i < sparks; i++) addCrackle(d, sr, r, Math.floor(r() * (secs - 0.05) * sr), 0.002 + r() * 0.006, 0.15 + r() * 0.25);
+}
+
+/** Carried flame: close, soft fluttering with tiny crackles. */
+function fillFlame(d: Float32Array, sr: number, r: Rng): void {
+  const secs = d.length / sr;
+  let a = 0;
+  let b = 0;
+  const k = Math.min(1, (2 * Math.PI * 600) / sr);
+  // random-walk flutter rate around 9 Hz
+  let ph = 0;
+  let rate = 9;
+  for (let i = 0; i < d.length; i++) {
+    a += k * (r() * 2 - 1 - a);
+    b += k * (a - b);
+    if (i % 256 === 0) rate = Math.min(14, Math.max(6, rate + (r() - 0.5) * 0.8));
+    ph += (2 * Math.PI * rate) / sr;
+    const flutter = 0.6 + 0.4 * Math.sin(ph) * Math.sin(ph * 0.37 + 1);
+    d[i] = b * 3 * flutter;
+  }
+  const crackles = Math.floor(secs * 6);
+  for (let i = 0; i < crackles; i++) addCrackle(d, sr, r, Math.floor(r() * (secs - 0.05) * sr), 0.002 + r() * 0.005, 0.1 + r() * 0.2);
 }
 
 function clamp01(x: number): number {
