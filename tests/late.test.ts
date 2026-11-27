@@ -2,13 +2,16 @@
 // sled-dog couriers, spare shelves, the soft-cap (never soft-lock) rule, dressing data and save migration.
 
 import { describe, expect, it } from 'vitest';
-import { GAME_DATA, ITEM_KINDS, wallSolids } from '../src/data';
+import { ALL_MECHANICS, GAME_DATA as SHIPPED_DATA, withMechanics, ITEM_KINDS, wallSolids } from '../src/data';
 import type { CounterDef, ItemKind, Vec2 } from '../src/data';
 import { Sim } from '../src/sim';
 import type { CounterState, NodeState, PileState, ProcState } from '../src/sim';
 import { queueSlotPos } from '../src/sim/agents';
 import { inRects } from '../src/sim/collision';
 import { buildReach } from './reach';
+
+/** Every signature mechanic on (the shipped data has them off until the view draws them). */
+const GAME_DATA = withMechanics(SHIPPED_DATA, ALL_MECHANICS);
 
 const fresh = (seed = 1) => new Sim(GAME_DATA, { seed });
 function tp(sim: Sim, x: number, z: number): void {

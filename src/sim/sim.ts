@@ -133,11 +133,13 @@ export class Sim {
     this.updateLinks(dt);
     updateHelpers(this, dt);
     updateCustomers(this, dt);
-    updatePlough(this, dt);
-    updateRescue(this, dt);
-    updateSkate(this, dt);
-    updateCrank(this, dt);
-    updateFlame(this, dt);
+    // Switched-off mechanics (data.mechanics) never run: their state just waits in the save.
+    const mx = this.data.mechanics;
+    if (mx.plough) updatePlough(this, dt);
+    if (mx.rescue) updateRescue(this, dt);
+    if (mx.skate) updateSkate(this, dt);
+    if (mx.crank) updateCrank(this, dt);
+    if (mx.flame) updateFlame(this, dt);
     updateFinale(this, dt);
     updateTotals(this, dt);
     this.updateQuest();

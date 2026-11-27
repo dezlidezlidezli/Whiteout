@@ -1,6 +1,6 @@
 // The five signature mechanics (docs/MECHANICS.md), housing, the kettle slide, and save v3.
 import { describe, expect, it } from 'vitest';
-import { GAME_DATA } from '../src/data';
+import { ALL_MECHANICS, GAME_DATA as SHIPPED_DATA, withMechanics } from '../src/data';
 import { Sim } from '../src/sim';
 import type { PileState, ProcState } from '../src/sim';
 import { crankInfo, procBoost } from '../src/sim/crank';
@@ -8,6 +8,9 @@ import { isWarm } from '../src/sim/flame';
 import { deepSnowZones, forEachDeepCell } from '../src/sim/plough';
 import { followers } from '../src/sim/rescue';
 import { isIce } from '../src/sim/skate';
+
+/** Every signature mechanic on (the shipped data has them off until the view draws them). */
+const GAME_DATA = withMechanics(SHIPPED_DATA, ALL_MECHANICS);
 
 const M = GAME_DATA.mech;
 const fresh = (seed = 1) => new Sim(GAME_DATA, { seed });
@@ -91,8 +94,11 @@ describe('rescue walks', () => {
     unlockTo(sim, 'pad_lantern');
     expect(sim.state.rescue.lantern).toBe(1);
     const v = M.villagers.find((x) => x.id === 'lv_pine1')!;
+    sim.drainEvents();
     tp(sim, v.x + 0.8, v.z);
     stand(sim, 2);
+    expect(sim.drainEvents().some((e) => e.type === 'lanternOn')).toBe(true);
+    expect(sim.state.rescue.lit).toBe(true);
     expect(sim.state.rescue.status.lv_pine1).toBe('following');
     expect(followers(sim)).toHaveLength(1);
     // Walk away fast (teleport): outside the glow they stop and wait.
@@ -117,6 +123,9 @@ describe('rescue walks', () => {
     expect(sim.state.population).toBe(pop + 1);
     expect(sim.state.stats.rescued).toBe(1);
     expect(isWarm(sim, h.x + 1, h.z)).toBe(true);
+    tp(sim, h.x + 1, h.z);
+    sim.step();
+    expect(sim.state.rescue.lit).toBe(false);
   });
   it('24 named lost villagers, each with a line of flavour', () => {
     expect(M.villagers).toHaveLength(24);

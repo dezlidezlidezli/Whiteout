@@ -19,6 +19,8 @@ export interface RescueState {
   dig: { id: string; t: number } | null;
   areaDone: Record<string, true>;
   all: boolean;
+  /** Lantern currently glowing (player outside warmth); drives lanternOn/lanternOff. */
+  lit?: boolean;
 }
 
 export function createRescue(): RescueState {
@@ -60,6 +62,14 @@ export function updateRescue(sim: Sim, dt: number): void {
   const p = sim.state.player;
   const glow = glowRadius(sim);
   const maxF = m.maxFollowers[Math.min(r.lantern, m.maxFollowers.length - 1)];
+
+  // The lantern glows whenever the player is out in the cold (warmth makes it unnecessary).
+  // Half a metre of hysteresis either side of the warmth edge so it does not flicker.
+  const lit = r.lit ? !isWarm(sim, p.x, p.z, 0.5) : !isWarm(sim, p.x, p.z, -0.5);
+  if (lit !== !!r.lit) {
+    r.lit = lit;
+    sim.emit({ type: lit ? 'lanternOn' : 'lanternOff' });
+  }
 
   // Dig out the nearest buried villager the player stands by (automatic, ~1.5 s).
   let near: LostVillagerDef | null = null;

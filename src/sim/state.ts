@@ -1,4 +1,5 @@
 import type { AreaId, GameData, ItemCounts, ItemKind, ModKey } from '../data/types';
+import { anchorQuest } from '../data/mechflags';
 import { createCrank, type CrankState } from './crankstate';
 import { createFlame, type FlameState } from './flame';
 import { createPlough, type PloughState } from './plough';
@@ -381,9 +382,21 @@ export function normalizeState(s: SimState, data: GameData): void {
   s.season = s.season ?? 1;
   s.totals = { ...createTotals(), ...(s.totals ?? {}) };
   // Quest chain re-anchoring: keep the player on the same quest even if quests were inserted before it.
+  // A quest of a mechanic switched off here moves on to the next quest that exists.
   if (s.quest.id) {
-    const i = data.quests.findIndex((q) => q.id === s.quest.id);
+    const i = anchorQuest(data, s.quest.id);
     if (i >= 0) s.quest.index = i;
   }
+  // Switched-off mechanics let go of anything in hand (saves move freely between configurations).
+  if (!data.mechanics.flame) {
+    s.flame.held = false;
+    s.orders = s.orders.filter((o) => !o.festival);
+  }
+  if (!data.mechanics.skate) {
+    s.skate.on = false;
+    s.skate.leaps = [];
+  }
+  if (!data.mechanics.plough) s.plough.pushing = false;
+  if (!data.mechanics.crank) for (const id in s.crank) s.crank[id].blast = 0;
   s.quest.id = data.quests[s.quest.index]?.id;
 }

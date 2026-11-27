@@ -30,6 +30,8 @@ export function startFinale(sim: Sim): void {
 
 export function updateFinale(sim: Sim, dt: number): void {
   const s = sim.state;
+  // Without the carried flame (mechanic switched off) the finished Beacon lights itself, as it used to.
+  if (s.finale.phase === 'none' && s.beacon >= 4 && !sim.data.mechanics.flame) startFinale(sim);
   const f = s.finale;
   if (f.phase === 'none' || f.phase === 'done') return;
   const def = sim.data.finale;

@@ -412,4 +412,15 @@ export interface GameData {
   layoutRev: number;
   /** Signature mechanics (plough, rescue, skate, crank, flame). */
   mech: import('./mechanics').MechDef;
+  /** Which signature mechanics are switched on (see withMechanics in ./mechflags.ts). A disabled mechanic's
+   * pads, quests, stations, decor, helpers and zones are absent from this data, so it is inert and invisible. */
+  mechanics: MechanicFlags;
+}
+
+export interface MechanicFlags {
+  plough: boolean;
+  rescue: boolean;
+  skate: boolean;
+  crank: boolean;
+  flame: boolean;
 }

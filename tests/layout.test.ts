@@ -1,9 +1,12 @@
 // Layout audit: nothing in the world may visibly stand inside something else, inside a frost wall or a
 // palisade, on a conveyor or a walk lane, or hidden behind a tall building from the fixed camera.
 // Footprints here are VISUAL radii (how big the model looks), not collision solids.
-import { describe, expect, it } from 'vitest';
-import { FLAT_DECOR, FOOTPRINT, FROST_WALL_HALF, GAME_DATA as D, NATURAL_DECOR, TOLERANCE, segDist, wallSolids } from '../src/data';
-import type { Vec2 } from '../src/data';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { ALL_MECHANICS, FLAT_DECOR, FOOTPRINT, FROST_WALL_HALF, GAME_DATA, NATURAL_DECOR, TOLERANCE, segDist, wallSolids, withMechanics } from '../src/data';
+import type { GameData, Vec2 } from '../src/data';
+
+/** The configuration under audit (both the shipped one, mechanics off, and every mechanic on). */
+let D: GameData = GAME_DATA;
 
 const R = (m: string, fallback = 0.8) => FOOTPRINT[m] ?? fallback;
 /** Buildings that need 1.5 m of clear ground to pads/counters/conveyors and hide what stands behind them. */
@@ -176,7 +179,14 @@ export function bareEdges(): string[] {
   return bad;
 }
 
-describe('world layout', () => {
+const CONFIGS: [string, GameData][] = [
+  ['shipped (mechanics off)', GAME_DATA],
+  ['all mechanics on', withMechanics(GAME_DATA, ALL_MECHANICS)],
+];
+for (const [name, data] of CONFIGS) describe(`world layout: ${name}`, () => {
+  beforeAll(() => {
+    D = data;
+  });
   it('every edge of the walkable world is drawn (no invisible walls); every gate has an arch and a path', () => {
     const bare = bareEdges();
     if (bare.length) (globalThis as any).process?.stdout?.write?.(`BARE ${bare.length}\n${bare.slice(0, 60).join('\n')}\nEND\n`);

@@ -1,8 +1,11 @@
 // Headless bot: plays the campaign through the public sim API only and records time-to-milestone.
 // It plays all five areas to the finale, then `endlessMinutes` of Open Season.
 
-import { GAME_DATA, type GameData } from '../src/data';
+import { ALL_MECHANICS, GAME_DATA as SHIPPED_DATA, withMechanics, type GameData } from '../src/data';
 import { Autopilot, Sim, STEP } from '../src/sim';
+
+/** Every signature mechanic on (the shipped data has them off until the view draws them). */
+const GAME_DATA = withMechanics(SHIPPED_DATA, ALL_MECHANICS);
 
 export interface Milestone {
   t: number;
