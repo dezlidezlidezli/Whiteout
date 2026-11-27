@@ -16,7 +16,7 @@ export const AREAS: AreaDef[] = [
   { id: 'camp', name: 'Camp', rects: [{ x0: -19.4, x1: 19.4, z0: -18, z1: 12 }], hearth: 1, focus: { x: 0, z: 0 } },
   { id: 'kettleYard', name: 'Kettle Yard', rects: [{ x0: -6.5, x1: 6.5, z0: 5.5, z1: 16.2 }], hearth: 1, focus: { x: 0, z: 11 } },
   { id: 'pinewood', name: 'Pinewood', rects: [{ x0: -27.5, x1: -7.6, z0: -10, z1: 10.4 }, { x0: -8.4, x1: -4.6, z0: -3, z1: 3 }], hearth: 2, focus: { x: -14, z: 0 } },
-  { id: 'frozenLake', name: 'Frozen Lake', rects: [{ x0: 7.6, x1: 35, z0: -10, z1: 7.8 }, { x0: 4.6, x1: 8.4, z0: -3, z1: 3 }], hearth: 3, focus: { x: 18, z: 0 } },
+  { id: 'frozenLake', name: 'Frozen Lake', rects: [{ x0: 7.6, x1: 35, z0: -16.4, z1: 7.8 }, { x0: 4.6, x1: 8.4, z0: -3, z1: 3 }], hearth: 3, focus: { x: 20, z: -4 } },
   { id: 'ironridge', name: 'Ironridge', rects: [{ x0: -16.4, x1: 8.8, z0: -34, z1: -7.6 }, { x0: -3, x1: 3, z0: -8.4, z1: -4.2 }], hearth: 4, focus: { x: 0, z: -16 } },
   { id: 'beaconPeak', name: 'Beacon Peak', rects: [{ x0: -8, x1: 8, z0: -60, z1: -25 }], hearth: 5, focus: { x: 0, z: -40 } },
 ];

@@ -2,13 +2,16 @@
 // Open Season (endless) market. Appended to the base world arrays in ./index.ts.
 //
 // Every work loop is a compact walled yard (palisades/floors in dressing.ts); neighbours ~3–5 m apart.
-//   Frozen Lake  x 7.6..23, z -10..7.8   ice holes north-east, a row of racks + smokehouses, counters in the
-//                                        south palisade; the Icebound crowd masses on the shore beyond (z > 8).
+//   Frozen Lake  x 7.6..35, z -16.4..7.8 a big rounded rink in the middle (holes ring its north and east rims),
+//                                        the south shore boardwalk with racks + smokehouses and the counters in its
+//                                        fence (the Icebound crowd masses beyond, z > 8), the market on the east
+//                                        shore, the deep-snow lot in the north-east corner, the open lake north.
 //   Ironridge    x -10..8.8, z -26..-7.6 ore veins west, forge centre, Great Kitchen east, feast counters in the
 //                                        east palisade; crowds mass outside it (x > 9).
 //   Beacon Peak  x -6.5..6.5, z -38..-25 the Great Beacon at the summit.
-//   Market       x 9..15, z -10..-2      Open Season upgrade + decoration pads (west lakeshore, by the board).
+//   Market       x 28..34, z -7..1       Open Season upgrade pads on the east shore, by the notice board.
 
+import { LAKE_HOLES } from './mechanics';
 import type {
   CounterDef, DecorDef, EndlessDef, FinaleDef, HelperDef, LinkDef, PadDef, Rect, StationDef, Vec2,
 } from './types';
@@ -62,16 +65,13 @@ function grid<T>(xs: number[], zs: number[], skip: (x: number, z: number) => boo
 
 // Thawed villagers walk round the outside of the palisade to camp.
 const LAKE_EXIT_A: Vec2[] = [{ x: 10.8, z: 8.9 }, { x: 7.4, z: 8.9 }, { x: 6.0, z: 6.0 }, { x: 4.0, z: 4.8 }];
-const LAKE_EXIT_B: Vec2[] = [{ x: 23.8, z: 8.9 }, { x: 35.6, z: 8.9 }, { x: 35.6, z: -10.6 }, { x: 9.6, z: -10.6 }, { x: 3.0, z: -3.0 }];
+const LAKE_EXIT_B: Vec2[] = [{ x: 23.8, z: 8.9 }, { x: 35.8, z: 8.9 }, { x: 35.8, z: -17.0 }, { x: 6.0, z: -17.0 }, { x: 6.0, z: -3.6 }, { x: 3.0, z: -1.6 }];
 
-const ICE_HOLES: StationDef[] = grid(
-  [19.0, 22.0, 25.0], [-8.8, -6.2, -3.6], () => false,
-  (gx, gz, i) => ({
-    id: `hole${i}`, type: 'node', area: 'frozenLake', name: 'Ice hole', model: 'iceHole',
-    x: gx + ((i % 2) ? 0.2 : 0), z: gz, rot: i * 1.3, solid: { r: 0.55 }, reach: 1.5,
-    tag: 'iceHole', item: 'fish', hitTime: 0.5, yieldPerHit: 3, hits: 3, regrow: 12, groundCap: 8, speedMod: 'fishSpeed',
-  }),
-);
+const ICE_HOLES: StationDef[] = LAKE_HOLES.map((h, i) => ({
+  id: `hole${i}`, type: 'node', area: 'frozenLake', name: 'Ice hole', model: 'iceHole',
+  x: h.x, z: h.z, rot: i * 1.3, solid: { r: 0.55 }, reach: 1.5,
+  tag: 'iceHole', item: 'fish', hitTime: 0.5, yieldPerHit: 3, hits: 3, regrow: 12, groundCap: 8, speedMod: 'fishSpeed',
+}));
 
 const LAKE_STATIONS: StationDef[] = [
   ...ICE_HOLES,
@@ -162,7 +162,7 @@ export const ORDER_BOARD = 'orderBoard';
 const CAMP_STATIONS: StationDef[] = [
   {
     // Always standing; only takes items while caravan orders are open (after the finale).
-    id: ORDER_BOARD, type: 'deposit', area: 'frozenLake', name: 'Notice board', model: 'noticeBoard', x: 16.6, z: -5.0,
+    id: ORDER_BOARD, type: 'deposit', area: 'frozenLake', name: 'Notice board', model: 'noticeBoard', x: 29.2, z: 4.6,
     rot: 0, solid: { r: 0.5 }, reach: 2.0, accepts: ['fish', 'stew', 'log', 'plank', 'smokedFish', 'ore', 'ingot', 'feast'],
     cap: 9999, role: 'orders',
   },
@@ -214,11 +214,11 @@ export const LATE_HELPERS: HelperDef[] = [
     speed: 3.4, nodeTag: 'pine', to: ['woodpile'], transferTime: 0.14,
   },
   {
-    id: 'fisher', name: 'Fisher', role: 'harvest', model: 'fisher', home: { x: 17.4, z: -0.6 }, capacity: 8,
+    id: 'fisher', name: 'Fisher', role: 'harvest', model: 'fisher', home: { x: 16.0, z: -0.1 }, capacity: 8,
     speed: 3.4, nodeTag: 'iceHole', to: ['fishRack'], transferTime: 0.12,
   },
   {
-    id: 'lakePorter', name: 'Porter', role: 'haul', model: 'porter', home: { x: 14.0, z: -0.4 }, capacity: 8, speed: 3.6,
+    id: 'lakePorter', name: 'Porter', role: 'haul', model: 'porter', home: { x: 11.4, z: 0.0 }, capacity: 8, speed: 3.6,
     from: ['fishRack'], to: ['smokehouseA'], item: 'fish', transferTime: 0.14,
   },
   {
@@ -299,9 +299,9 @@ export const LATE_PADS: PadDef[] = [
     effects: [{ type: 'unlock', id: 'logRack' }, { type: 'hire', helper: 'sledDog' }], icon: { character: 'dog' } },
   { id: 'pad_lakePorter', area: 'frozenLake', x: 16.6, z: 4.0, label: 'Hire a porter', cost: 1350, requires: ['pad_fisher'],
     effects: [{ type: 'hire', helper: 'lakePorter' }], icon: { character: 'porter' } },
-  { id: 'pad_auger', area: 'frozenLake', x: 16.6, z: -1.8, label: 'Ice auger', cost: 1350, materials: { plank: 12 }, requires: ['pad_fisher'],
+  { id: 'pad_auger', area: 'frozenLake', x: 26.0, z: 4.6, label: 'Ice auger', cost: 1350, materials: { plank: 12 }, requires: ['pad_fisher'],
     effects: [{ type: 'mod', key: 'fishSpeed', mul: 1.6 }, { type: 'tool', tool: 'auger' }], icon: { prop: 'iceHole' } },
-  { id: 'pad_pack4', area: 'frozenLake', x: 10.6, z: -1.4, label: 'Fur-lined pack', cost: 1800, materials: { smokedFish: 10 },
+  { id: 'pad_pack4', area: 'frozenLake', x: 28.8, z: 1.8, label: 'Fur-lined pack', cost: 1800, materials: { smokedFish: 10 },
     requires: ['pad_courier'], effects: [{ type: 'capacity', add: 4 }], icon: { item: 'smokedFish' } },
   { id: 'pad_smokehouseB', area: 'frozenLake', x: 21.6, z: 1.4, label: 'Second smokehouse', cost: 2050, materials: { plank: 16 },
     requires: ['pad_courier', 'pad_lakePorter'], effects: [{ type: 'unlock', id: 'smokehouseB' }], icon: { prop: 'smokehouse' } },
@@ -311,7 +311,7 @@ export const LATE_PADS: PadDef[] = [
     effects: [{ type: 'hire', helper: 'smoker' }], icon: { character: 'cook' } },
   { id: 'pad_lakeBeltB', area: 'frozenLake', x: 19.4, z: 5.6, label: 'Smoked fish conveyor', cost: 2650, requires: ['pad_lakeCounterB'],
     effects: [{ type: 'unlock', id: 'lakeBeltB' }], icon: { prop: 'conveyor' } },
-  { id: 'pad_cabin4', area: 'frozenLake', x: 27.2, z: 6.4, label: 'Lakeside lodge', cost: 2450, materials: { plank: 24 },
+  { id: 'pad_cabin4', area: 'frozenLake', x: 33.0, z: 5.4, label: 'Lakeside lodge', cost: 2450, materials: { plank: 24 },
     requires: ['pad_pack4'], effects: [{ type: 'unlock', id: 'cabin4' }, { type: 'mod', key: 'spawnRate', add: 0.25 }],
     icon: { prop: 'cabin' } },
   { id: 'pad_hearth4', area: 'camp', ...HEARTH_SPOT, label: 'Raise the Hearth', cost: 4600, materials: { plank: 40, smokedFish: 30 },
@@ -353,7 +353,7 @@ export const LATE_PADS: PadDef[] = [
   { id: 'pad_cabin5', area: 'ironridge', x: -8.4, z: -28.0, label: "Miners' lodge", cost: 2500, materials: { plank: 24 },
     requires: ['pad_feastCounterA'], effects: [{ type: 'unlock', id: 'cabin5' }, { type: 'mod', key: 'spawnRate', add: 0.25 }],
     icon: { prop: 'cabin' } },
-  { id: 'pad_hearth5', area: 'camp', ...HEARTH_SPOT, label: 'Raise the Hearth', cost: 5700, materials: { plank: 30, ingot: 20, feast: 12 },
+  { id: 'pad_hearth5', area: 'camp', ...HEARTH_SPOT, label: 'Raise the Hearth', cost: 5200, materials: { plank: 26, ingot: 18, feast: 10 },
     requires: ['pad_feastBelt', 'pad_kitchenDog', 'pad_pack6', 'pad_cabin5', 'pad_oreBelt', 'pad_lumberjack3'],
     effects: [{ type: 'hearth', level: 5 }], icon: { prop: 'hearth', level: 5 } },
 
@@ -377,13 +377,13 @@ export const LATE_PADS: PadDef[] = [
   { id: 'pad_beacon4', area: 'beaconPeak', ...BEACON_PAD, label: 'Light the Great Beacon', cost: 4350, requires: ['pad_feastBeltB'],
     effects: [{ type: 'beacon', stage: 4 }], icon: { prop: 'beacon', level: 4 } },
 
-  // ---- Open Season (after the finale): repeatable upgrades (market, west lakeshore) ----
+  // ---- Open Season (after the finale): repeatable upgrades (market, east lakeshore) ----
   ...openSeasonPads(),
 ];
 
 function openSeasonPads(): PadDef[] {
   // Labels must not overlap: 3 m apart. Upgrades at the lake market, decorations in the camp's north band.
-  const spot = (i: number) => (i < 6 ? { x: 10.0 + (i % 2) * 3.0, z: -9.4 + Math.floor(i / 2) * 3.0 } : null);
+  const spot = (i: number) => (i < 6 ? { x: 29.4 + (i % 2) * 3.0, z: -6.0 + Math.floor(i / 2) * 3.0 } : null);
   // Decorations: the strips beside the camp paths, where tents can never stand.
   const camp = (i: number) => [{ x: -2.4, z: -10.4 }, { x: 2.4, z: -10.4 }, { x: -10.4, z: -2.4 }, { x: 10.4, z: -2.4 }, { x: -10.4, z: 2.4 }, { x: 10.4, z: 2.4 }][i - 6];
   const req = ['pad_beacon4'];
@@ -413,10 +413,10 @@ function openSeasonPads(): PadDef[] {
 
 export const LATE_DECOR: DecorDef[] = [
   // Lake
-  { id: 'cabin4', area: 'frozenLake', model: 'cabin', x: 27.2, z: 6.4, rot: -2.6, scale: 0.72, unlockedBy: 'pad_cabin4', solid: { hw: 0.94, hd: 0.8 } },
+  { id: 'cabin4', area: 'frozenLake', model: 'cabin', x: 33.0, z: 5.4, rot: 0, scale: 0.72, unlockedBy: 'pad_cabin4', solid: { hw: 0.94, hd: 0.8 } },
   { id: 'lakeLantern1', area: 'frozenLake', model: 'lantern', x: 10.6, z: 7.4 },
   { id: 'lakeLantern2', area: 'frozenLake', model: 'lantern', x: 15.2, z: 7.4 },
-  { id: 'lakeSled', area: 'frozenLake', model: 'sled', x: 28.0, z: -0.4, rot: 1.2, solid: { r: 0.6 } },
+  { id: 'lakeSled', area: 'frozenLake', model: 'sled', x: 34.0, z: 2.0, rot: 1.2, solid: { r: 0.6 } },
   // Ironridge
   { id: 'cabin5', area: 'ironridge', model: 'cabin', x: -8.4, z: -28.0, rot: 1.2, scale: 0.72, unlockedBy: 'pad_cabin5', solid: { hw: 0.94, hd: 0.8 } },
   { id: 'ridgeLantern1', area: 'ironridge', model: 'lantern', x: -1.0, z: -26.0 },

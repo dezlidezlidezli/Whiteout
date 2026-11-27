@@ -167,8 +167,11 @@ describe('ice skating', () => {
     expect(isIce(sim, a.x, a.z)).toBe(true);
     const g = M.gripMats[0];
     expect(isIce(sim, g.x, g.z)).toBe(false);
+    const l = Math.hypot(b.x - a.x, b.z - a.z);
+    const ux = (b.x - a.x) / l;
+    const uz = (b.z - a.z) / l;
     tp(sim, a.x, a.z);
-    walk(sim, 0, 1, 0.6);
+    walk(sim, ux, uz, 0.6);
     expect(sim.state.skate.on).toBe(true);
     const v0 = Math.hypot(sim.state.player.vx, sim.state.player.vz);
     expect(v0).toBeGreaterThan(3);
@@ -178,15 +181,14 @@ describe('ice skating', () => {
     // A leap right ahead is scooped while skating through it.
     tp(sim, a.x, a.z);
     sim.state.player.stack = [];
-    sim.setMove(0, 1);
+    sim.setMove(ux, uz);
     sim.advance(0.6);
     const p = sim.state.player;
-    sim.state.skate.leaps.push({ id: 99, x: p.x, z: p.z + 1.5, t: 0 });
+    sim.state.skate.leaps.push({ id: 99, x: p.x + ux * 1.5, z: p.z + uz * 1.5, t: 0 });
     sim.drainEvents();
     sim.advance(0.6);
     expect(sim.drainEvents().some((e) => e.type === 'fishLeapCatch')).toBe(true);
     expect(sim.state.player.stack).toContain('fish');
-    void b;
   });
 });
 

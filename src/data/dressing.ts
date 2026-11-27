@@ -99,23 +99,32 @@ export const DRESSING: AreaDressing[] = [
   {
     area: 'frozenLake',
     floors: [
-      { type: 'packedEarth', ...box(7.6, 15.6, -10, -2.2) },
-      { type: 'ice', ...box(17.4, 29, -10, -2.0) },
-      { type: 'planks', ...box(8.4, 23.8, 0.0, 3.0) },
+      // West strip by the gate, the south-shore boardwalk, the east-shore market.
+      { type: 'packedEarth', ...box(7.6, 9.6, -16.4, -0.4) },
+      { type: 'planks', ...box(7.6, 27.6, -0.4, 3.0) },
       { type: 'planks', ...box(11.6, 23.8, 5.2, 7.8) },
+      { type: 'packedEarth', ...box(27.6, 35, -8.2, 7.8) },
+      // The rink (= mech.ice): a rounded sheet made of three boxes.
+      { type: 'ice', ...box(10.4, 26.4, -14.4, -1.2) },
+      { type: 'ice', ...box(9.6, 27.2, -13.2, -2.4) },
+      { type: 'ice', ...box(11.6, 25.2, -15.4, -0.6) },
     ],
     walls: [
       // Counters fill the two gaps in the south palisade; open to the camp (west).
-      { kind: 'palisade', points: [[4.6, -3.2], [7.4, -3.2], [7.4, -10.2], [35.2, -10.2], [35.2, 8.0]] },
+      // The far (north) side of the rink is open lake: an ice shelf, not a wall.
+      { kind: 'palisade', points: [[4.6, -3.2], [7.4, -3.2], [7.4, -16.6], [10.0, -16.6]] },
+      { kind: 'palisade', points: [[27.6, -16.6], [35.2, -16.6], [35.2, 8.0]] },
       { kind: 'fence', points: [[35.2, 8.0], [7.4, 8.0]], gaps: [{ at: 13.6, width: 2.3 }, { at: 21.6, width: 2.3 }] },
       { kind: 'palisade', points: [[7.4, 8.0], [7.4, 3.2], [4.6, 3.2]] },
     ],
     paths: [{ type: 'trampled', width: 2.0, points: [[4.6, 0], [8.6, 0]] }],
-    streams: [{ points: [[17.4, -1.6], [29.0, -1.6]], width: 0.8 }],
-    clutterZones: [{ theme: 'fishing', ...box(28.0, 29, -7.8, -6.4) }],
-    landmarks: [{ prop: 'dryingRack', x: 28.4, z: -2.6, yaw: Math.PI / 2 }, { prop: 'woodenArch', x: 9.0, z: 0, yaw: Math.PI / 2 },
+    streams: [],
+    edges: [{ kind: 'iceShelf', points: [[10.0, -16.6], [27.6, -16.6]] }],
+    // Shore only (never on the rink): nets and barrels in the west strip and the east shore.
+    clutterZones: [{ theme: 'fishing', ...box(8.0, 9.2, -16.0, -14.4) }, { theme: 'fishing', ...box(33.8, 34.8, -7.6, -6.6) }],
+    landmarks: [{ prop: 'dryingRack', x: 34.0, z: -1.8, yaw: Math.PI / 2 }, { prop: 'woodenArch', x: 9.0, z: 0, yaw: Math.PI / 2 },
       // The market lot stands ready (its pads appear at dawn): a closed stall marks it from the start.
-      { prop: 'marketStall', x: 14.8, z: -8.0, yaw: 0 }],
+      { prop: 'marketStall', x: 31.0, z: -7.6, yaw: 0 }],
   },
   {
     area: 'ironridge',

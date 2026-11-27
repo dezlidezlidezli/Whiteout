@@ -38,9 +38,12 @@ export function computeGuide(sim: Sim): GuideTarget | null {
   const wanted = wantedItems(sim, q.goal.type === 'pad' && !q.guide ? { pad: q.goal.pad } : g);
   // Carrying goods an Open Season order wants: hand those in first (that frees the pack) instead of unloading junk.
   const handIn = (g?.type === 'orders' || g?.type === 'openSeason') && s.player.stack.some((it) => orderRoom(sim, it) > 0);
-  const junk = handIn ? null : unloadJunk(sim, wanted);
-  if (junk) return junk;
   const t = q.goal.type === 'pad' && !q.guide ? padGuide(sim, q.goal.pad) : g ? baseGuide(sim, g) : null;
+  // Paying embers into a pad or scooping an ember pile needs no room in the pack: never detour to unload first.
+  const handsFree = !!t && (t.kind === 'embers' || (t.kind === 'pad' && Object.values(sim.padRemaining(t.id).mats).every((n) => !n)));
+  if (handsFree) s.guideUnload = false;
+  const junk = handIn || handsFree ? null : unloadJunk(sim, wanted);
+  if (junk) return junk;
   // Never lead a full pack to a station that can neither take nor give anything: make room somewhere first.
   if (t && t.kind === 'station' && full(sim) && !s.player.stack.some((it) => sim.room(t.id, it) > 0)) {
     const j = unloadJunk(sim, new Set(), true);
@@ -289,6 +292,9 @@ function unloadJunk(sim: Sim, wanted: Set<ItemKind> | null, force = false): Guid
         back = d;
       }
     }
+    // The only place to hand it back would swallow useful things we carry on the way in (logs into the
+    // sawmill to return one plank): not worth it, carry on with the goal instead.
+    if (back && back.type === 'processor' && p.returning !== back.id && p.stack.some((x) => x !== it && useful(sim, wanted, x) && sim.room(back!.id, x, true) > 0)) back = null;
     if (back) {
       s.guideUnload = true;
       // Items can't go straight back where they were just taken from: step out of its zone, then return.
@@ -437,7 +443,9 @@ function source(sim: Sim, item: ItemKind, depth: number, near?: { x: number; z: 
       const c = carrying(sim, m);
       // Once committed to bringing it, keep going (a source flickering back into stock must not turn us round).
       if (c > 0 && sim.state.guideMemo === m) return stTarget(pd);
-      if (c > 0 && (c >= sim.room(pd.id, m, true) || full(sim) || !sourceAvailable(sim, m))) {
+      // Enough for a few batches (or all it takes) is worth bringing: never shuttle back for the last few.
+      const enough = Math.min(sim.room(pd.id, m, true), (r.inputs[m] ?? 1) * 4);
+      if (c > 0 && (c >= enough || full(sim) || !sourceAvailable(sim, m))) {
         sim.state.guideMemo = m;
         return stTarget(pd);
       }

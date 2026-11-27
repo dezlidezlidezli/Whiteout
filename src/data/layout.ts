@@ -8,7 +8,7 @@ import { FOOTPRINT, FROST_WALL_HALF, segDist } from './declutter';
 import type { AreaId, CounterDef, DecorDef, GameData, Rect, StationDef, Vec2 } from './types';
 
 /** Current world-layout revision (see GameData.layoutRev). 2 = compact yards, 3 = village camp. */
-export const LAYOUT_REV = 4;
+export const LAYOUT_REV = 5;
 
 /** World offset of each area's authored coordinates. */
 export const AREA_OFFSET: Record<AreaId, Vec2> = {
@@ -24,7 +24,8 @@ export const AREA_OFFSET: Record<AreaId, Vec2> = {
 const AUTHORED: [AreaId, Rect][] = [
   ['kettleYard', { x0: -6.5, x1: 6.5, z0: 5.5, z1: 16.2 }],
   ['pinewood', { x0: -27.6, x1: -4.6, z0: -10.4, z1: 10.8 }],
-  ['frozenLake', { x0: 4.6, x1: 29.4, z0: -10.4, z1: 8.2 }],
+  ['frozenLake', { x0: 4.6, x1: 9.4, z0: -10.4, z1: 8.2 }],
+  ['frozenLake', { x0: 9.4, x1: 35.6, z0: -17.2, z1: 8.2 }],
   ['ironridge', { x0: -16.4, x1: 9.4, z0: -34.4, z1: -4.2 }],
   ['beaconPeak', { x0: -8.4, x1: 8.4, z0: -61, z1: -34.4 }],
 ];
@@ -50,7 +51,8 @@ export function placeAreas(d: GameData, lanes: Rect[]): { data: GameData; lanes:
       queuePath: c.queuePath?.map((q) => sh(q, a)),
       emberSpot: sh(c.emberSpot, a),
       spawn: sh(c.spawn, a),
-      exitPath: c.exitPath.map((q) => shAuto(q, a)),
+      // Kettle Yard exits run into the camp (world coordinates); every other counter's exit is its own area's.
+      exitPath: c.exitPath.map((q) => (a === 'kettleYard' ? shAuto(q, a) : sh(q, a))),
     };
   });
   const decor = d.decor.map((o): DecorDef => ({ ...o, ...sh(o, o.area) }));

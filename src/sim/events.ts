@@ -8,6 +8,8 @@ export type Actor = { kind: 'player' } | { kind: 'helper'; id: string } | { kind
 export type Place =
   | { kind: 'station'; id: string }
   | { kind: 'pad'; id: string }
+  /** Not a station: something picked straight off the world. Ids in use: `leap<n>` = the leaping fish
+   * with that id (fishLeapSpawn / fishLeapCatch), scooped by a fast skater on the Frozen Lake rink. */
   | { kind: 'ground'; id: string };
 
 export type SimEvent =
