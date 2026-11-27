@@ -2,6 +2,7 @@
 // All drawn with two InstancedMeshes (frozen + thawed) and per-instance transforms/colours.
 
 import * as THREE from 'three';
+import { visibleTents } from './camplayout';
 import type { GameData } from '../data/types';
 import type { CustomerState, Sim } from '../sim';
 import { FROZEN_TINTS, getCrowdMesh, PALETTE } from './models';
@@ -198,7 +199,8 @@ export class Crowd {
 
     // Homes: raised tents plus any built cabins.
     const spots = this.data.camp.tentSpots;
-    const tents = spots.slice(0, Math.min(s.tents, spots.length));
+    const tentVis = visibleTents(this.data, s);
+    const tents = spots.slice(0, Math.min(s.tents, spots.length)).filter((_, i) => tentVis[i]);
     this.homes = tents.slice();
     for (const d of this.data.decor) if (d.model === 'cabin' && s.unlocked[d.id]) this.homes.push({ x: d.x, z: d.z });
     const obstacles = this.homes;
