@@ -78,16 +78,21 @@ export function updateSkate(sim: Sim, dt: number): void {
     if (l.t > LEAP_LIFE) {
       st.leaps.splice(i, 1);
       st.combo = 0;
-    } else if (speed > 2.5 && Math.hypot(l.x - p.x, l.z - p.z) < 1.1 && p.stack.length < p.capacity && !sim.state.flame.held) {
+    } else if (speed > 2.5 && Math.hypot(l.x - p.x, l.z - p.z) < 1.1) {
       st.leaps.splice(i, 1);
       st.combo = st.comboT > 0 ? st.combo + 1 : 1;
       st.comboT = 4;
-      p.stack.push('fish');
       sim.addStat('fishLeaps', 1);
-      sim.addStat('harvest.fish', 1);
-      sim.addStat('carried', 1);
-      sim.emit({ type: 'pickup', item: 'fish', from: { kind: 'ground', id: `leap${l.id}` }, by: { kind: 'player' }, height: p.stack.length });
-      sim.emit({ type: 'fishLeapCatch', combo: st.combo, x: l.x, z: l.z });
+      // With room (and no flame in hand) the fish lands on the stack; otherwise it is caught and let go
+      // with a splash: the catch and the combo still count, nobody has to empty their pack first.
+      const kept = p.stack.length < p.capacity && !sim.state.flame.held;
+      if (kept) {
+        p.stack.push('fish');
+        sim.addStat('harvest.fish', 1);
+        sim.addStat('carried', 1);
+        sim.emit({ type: 'pickup', item: 'fish', from: { kind: 'ground', id: `leap${l.id}` }, by: { kind: 'player' }, height: p.stack.length });
+      }
+      sim.emit({ type: 'fishLeapCatch', combo: st.combo, x: l.x, z: l.z, kept });
     }
   }
   if (st.comboT > 0) st.comboT -= dt;

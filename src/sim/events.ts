@@ -70,7 +70,8 @@ export type SimEvent =
   | { type: 'skateStart' }
   | { type: 'skateStop' }
   | { type: 'fishLeapSpawn'; id: number; x: number; z: number }
-  | { type: 'fishLeapCatch'; combo: number; x: number; z: number }
+  /** kept: the fish landed on the stack (false: caught and let go, the pack was full or the flame in hand). */
+  | { type: 'fishLeapCatch'; combo: number; x: number; z: number; kept: boolean }
   | { type: 'skateBounce' }
   | { type: 'crankNotch'; id: string }
   | { type: 'crankTurn'; id: string }
