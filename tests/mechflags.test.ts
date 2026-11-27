@@ -130,4 +130,28 @@ describe('mechanic switches', () => {
     back.advance(5);
     expect(back.guide()).not.toBeNull();
   });
+
+  it('an old save with all four Beacon stages done but no finale waits, Beacon dark, on "carry the flame"', () => {
+    for (const d of [GAME_DATA, ON]) {
+      if (!d.mechanics.flame) continue;
+      // Built with the flame off (the finale would have started by itself there, so stop just before it).
+      const old = new Sim(OFF, { seed: 4 });
+      for (const p of OFF.pads) if (!p.group) old.completePad(p.id);
+      old.state.finale = { phase: 'none', t: 0, progress: 0 };
+      const dawn = OFF.quests.findIndex((q) => q.id === 'q_dawn');
+      old.state.quest.index = dawn;
+      old.state.quest.id = 'q_dawn';
+      const raw = JSON.parse(old.serialize());
+      const sim = new Sim(d, { save: JSON.stringify(raw) });
+      expect(sim.state.beacon).toBe(4);
+      expect(sim.state.finale.phase).toBe('none');
+      expect(sim.state.flame.beaconLit).toBe(false);
+      expect(sim.questProgress().id).toBe('q_lightBeacon');
+      sim.advance(2);
+      expect(sim.state.finale.phase).toBe('none'); // dark until the flame arrives
+      const g = sim.guide();
+      expect(g, 'the arrow points at a flame source or the trail').not.toBeNull();
+      expect(g!.id.startsWith('flame:') || g!.id.startsWith('light:')).toBe(true);
+    }
+  });
 });
