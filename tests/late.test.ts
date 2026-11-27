@@ -228,26 +228,28 @@ describe('Open Season', () => {
   });
 });
 
-describe('spare shelf', () => {
-  it('entering with items sets everything down; entering empty-handed takes it back (latest first)', () => {
+describe('bin', () => {
+  it('standing still at it throws the pack away one item at a time; walking past never does', () => {
     const sim = fresh();
-    const sh = sim.stationDefs.get('shelfYard')!;
+    const bin = sim.stationDefs.get('shelfYard')!;
+    expect(bin.name).toBe('Bin');
+    // Walk straight through the bin's zone carrying things: nothing is lost.
     sim.state.player.stack = ['fish', 'stew', 'stew'];
-    tp(sim, sh.x - 1.0, sh.z);
-    stand(sim, 1);
-    expect(sim.state.player.stack).toEqual([]);
-    expect((sim.state.stations.shelfYard as any).items).toEqual(['stew', 'stew', 'fish']);
-    // Still in the zone: the decision holds (no ping-pong back into the pack).
-    stand(sim, 1);
-    expect(sim.state.player.stack).toEqual([]);
-    tp(sim, sh.x - 4, sh.z - 3);
-    stand(sim, 0.2);
-    tp(sim, sh.x - 1.0, sh.z);
-    stand(sim, 1);
+    tp(sim, bin.x - 2.5, bin.z - 0.4);
+    sim.setMove(1, 0);
+    sim.advance(1.0);
     expect(sim.state.player.stack).toEqual(['fish', 'stew', 'stew']);
-    // Persisted in saves; helpers and links never touch it.
-    const b = new Sim(GAME_DATA, { save: sim.serialize() });
-    expect(b.state.player.shelf?.id).toBe('shelfYard');
+    // Stand still in it: after a moment it starts taking the pack, top first, until empty.
+    tp(sim, bin.x - 0.9, bin.z);
+    sim.drainEvents();
+    stand(sim, 0.5);
+    expect(sim.state.player.stack.length).toBe(3);
+    stand(sim, 1.5);
+    expect(sim.state.player.stack).toEqual([]);
+    expect(sim.drainEvents().filter((e) => e.type === 'binned').map((e) => (e as any).item)).toEqual(['stew', 'stew', 'fish']);
+    // Nothing comes back out, and helpers/links ignore it.
+    stand(sim, 1);
+    expect(sim.state.player.stack).toEqual([]);
     expect(sim.takeable('shelfYard')).toBeNull();
     expect(sim.room('shelfYard', 'fish', true)).toBe(0);
   });

@@ -20,6 +20,8 @@ import {
 } from './state';
 
 export const STEP = 1 / 60;
+/** Seconds of standing still at a bin before it starts taking the pack. */
+export const BIN_DELAY = 0.8;
 const MAX_EVENTS = 4000;
 /** Room reported for player drops: effectively unlimited, so a drop is never refused. */
 const PLAYER_ROOM = 9999;
@@ -557,7 +559,7 @@ export class Sim {
       if (!rd || Math.hypot(rd.x - p.x, rd.z - p.z) > rd.reach + 0.3) p[key] = null;
     }
 
-    // Spare shelf: the mode is decided on entering its zone and kept until leaving.
+    // Bin: only standing still in its zone (for BIN_DELAY s) throws things away; walking past never does.
     let shelfId: string | null = null;
     let shelfD = Infinity;
     for (const d of this.data.stations) {
@@ -568,8 +570,14 @@ export class Sim {
         shelfId = d.id;
       }
     }
-    if (!shelfId) p.shelf = null;
-    else if (!p.shelf || p.shelf.id !== shelfId) p.shelf = { id: shelfId, mode: p.stack.length > 0 ? 'drop' : 'pick' };
+    if (!shelfId) {
+      p.shelf = null;
+      p.binT = 0;
+    } else {
+      if (!p.shelf || p.shelf.id !== shelfId) p.shelf = { id: shelfId, mode: 'drop' };
+      const still = Math.hypot(this.moveX, this.moveZ) < 0.2 && Math.hypot(p.vx, p.vz) < 0.4;
+      p.binT = still ? (p.binT ?? 0) + dt : 0;
+    }
 
     // Item transfers at a fixed cadence.
     if (p.transferCd > 0) p.transferCd -= dt;
@@ -640,24 +648,14 @@ export class Sim {
   /** One shelf transfer (set down the top item, or take back the most recently shelved one). */
   private playerShelf(): boolean {
     const p = this.state.player;
-    if (!p.shelf) return false;
+    if (!p.shelf || (p.binT ?? 0) < BIN_DELAY) return false;
     const st = this.state.stations[p.shelf.id];
     if (!st || st.kind !== 'shelf') return false;
-    const where: Place = { kind: 'station', id: p.shelf.id };
-    if (p.shelf.mode === 'drop') {
-      const it = p.stack.pop();
-      if (!it) return false;
-      st.items.push(it);
-      this.addStat('shelved', 1);
-      this.emit({ type: 'drop', item: it, to: where, by: PLAYER, height: p.stack.length });
-      return true;
-    }
-    if (p.stack.length >= p.capacity) return false;
-    const it = st.items.pop();
+    const it = p.stack.pop();
     if (!it) return false;
-    p.stack.push(it);
-    this.addStat('carried', 1);
-    this.emit({ type: 'pickup', item: it, from: where, by: PLAYER, height: p.stack.length });
+    this.addStat('binned', 1);
+    this.emit({ type: 'drop', item: it, to: { kind: 'station', id: p.shelf.id }, by: PLAYER, height: p.stack.length });
+    this.emit({ type: 'binned', bin: p.shelf.id, item: it });
     return true;
   }
 

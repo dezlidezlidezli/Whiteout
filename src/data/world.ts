@@ -46,7 +46,7 @@ export const STATIONS: StationDef[] = [
     id: 'crateA', type: 'pile', area: 'kettleYard', name: 'Fish crate', model: 'fishCrate', x: -3.4, z: 13.2,
     solid: { r: 0.75 }, reach: 1.75, item: 'fish', cap: 14, start: 6, refill: 0, accepts: true,
   },
-  { id: 'shelfYard', type: 'shelf', area: 'kettleYard', name: 'Spare shelf', model: 'storageTable', x: 5.7, z: 15.4, rot: 0,
+  { id: 'shelfYard', type: 'shelf', area: 'kettleYard', name: 'Bin', model: 'barrel', x: 5.7, z: 15.4, rot: 0,
     solid: { hw: 0.6, hd: 0.4 }, reach: 1.3 },
   {
     id: 'kettleA', type: 'processor', area: 'kettleYard', name: 'Kettle', model: 'kettle', x: -2.2, z: 10.0,
@@ -70,7 +70,7 @@ export const STATIONS: StationDef[] = [
     id: 'woodpile', type: 'pile', area: 'pinewood', name: 'Woodpile', model: 'woodPile', x: -11.4, z: -2.8,
     solid: { r: 0.9 }, reach: 1.9, item: 'log', cap: 30, start: 0, refill: 0, accepts: true, unlockedBy: 'pad_lumberjack',
   },
-  { id: 'shelfPine', type: 'shelf', area: 'pinewood', name: 'Spare shelf', model: 'storageTable', x: -12.4, z: 9.6, rot: 0,
+  { id: 'shelfPine', type: 'shelf', area: 'pinewood', name: 'Bin', model: 'barrel', x: -12.4, z: 9.6, rot: 0,
     solid: { hw: 0.6, hd: 0.4 }, reach: 1.3 },
   ...pines(),
 ];

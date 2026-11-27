@@ -23,6 +23,8 @@ export interface PlayerState {
   pickedFrom: string | null;
   /** Spare shelf zone the player is in, and what entering decided: set everything down, or pick it back up. */
   shelf?: { id: string; mode: 'drop' | 'pick' } | null;
+  /** Seconds the player has stood still in the bin's zone (discarding starts at Balance-free 0.8 s). */
+  binT?: number;
 }
 
 export interface PileState { kind: 'pile'; count: number; acc: number }

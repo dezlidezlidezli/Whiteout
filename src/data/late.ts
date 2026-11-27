@@ -93,7 +93,7 @@ const LAKE_STATIONS: StationDef[] = [
     id: 'logRack', type: 'pile', area: 'frozenLake', name: 'Log rack', model: 'woodPile', x: 9.6, z: 1.4,
     solid: { r: 0.7 }, reach: 1.8, item: 'log', cap: 40, start: 0, refill: 0, accepts: true, unlockedBy: 'pad_courier',
   },
-  { id: 'shelfLake', type: 'shelf', area: 'frozenLake', name: 'Spare shelf', model: 'storageTable', x: 9.4, z: 6.6, rot: Math.PI / 2,
+  { id: 'shelfLake', type: 'shelf', area: 'frozenLake', name: 'Bin', model: 'barrel', x: 9.4, z: 6.6, rot: Math.PI / 2,
     solid: { hw: 0.4, hd: 0.6 }, reach: 1.3 },
   lateCounter({
     id: 'lakeCounterA', area: 'frozenLake', name: 'Lakeside counter', x: 13.6, z: 7.3, item: 'smokedFish', facing: 'south',
@@ -120,7 +120,7 @@ const ORE_VEINS: StationDef[] = grid(
 );
 
 const PEAK_STATIONS: StationDef[] = [
-  { id: 'shelfPeak', type: 'shelf', area: 'beaconPeak', name: 'Spare shelf', model: 'storageTable', x: -5.0, z: -37.0, rot: Math.PI / 2,
+  { id: 'shelfPeak', type: 'shelf', area: 'beaconPeak', name: 'Bin', model: 'barrel', x: -5.0, z: -37.0, rot: Math.PI / 2,
     solid: { hw: 0.4, hd: 0.6 }, reach: 1.3 },
 ];
 
@@ -143,7 +143,7 @@ const RIDGE_STATIONS: StationDef[] = [
     solid: { hw: 1.3, hd: 1.0 }, reach: 2.3, recipe: 'feast', inputCap: 12, outputCap: 16, operator: 'boost', boost: 2,
     speedMod: 'cookSpeed', unlockedBy: 'pad_greatKitchen',
   },
-  { id: 'shelfRidge', type: 'shelf', area: 'ironridge', name: 'Spare shelf', model: 'storageTable', x: -9.3, z: -16.2, rot: Math.PI / 2,
+  { id: 'shelfRidge', type: 'shelf', area: 'ironridge', name: 'Bin', model: 'barrel', x: -9.3, z: -16.2, rot: Math.PI / 2,
     solid: { hw: 0.4, hd: 0.6 }, reach: 1.3 },
   lateCounter({
     id: 'feastCounterA', area: 'ironridge', name: 'Feast counter', x: 8.3, z: -17.0, item: 'feast', facing: 'east',
@@ -330,7 +330,7 @@ export const LATE_PADS: PadDef[] = [
   { id: 'pad_cabin5', area: 'ironridge', x: -8.4, z: -28.0, label: "Miners' lodge", cost: 3600, materials: { plank: 30 },
     requires: ['pad_feastCounterA'], effects: [{ type: 'unlock', id: 'cabin5' }, { type: 'mod', key: 'spawnRate', add: 0.25 }],
     icon: { prop: 'cabin' } },
-  { id: 'pad_hearth5', area: 'camp', ...HEARTH_SPOT, label: 'Raise the Hearth', cost: 6700, materials: { plank: 40, ingot: 30, feast: 20 },
+  { id: 'pad_hearth5', area: 'camp', ...HEARTH_SPOT, label: 'Raise the Hearth', cost: 6700, materials: { plank: 30, ingot: 20, feast: 12 },
     requires: ['pad_feastBelt', 'pad_kitchenDog', 'pad_pack6', 'pad_cabin5', 'pad_oreBelt', 'pad_lumberjack3'],
     effects: [{ type: 'hearth', level: 5 }], icon: { prop: 'hearth', level: 5 } },
 
