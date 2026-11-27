@@ -1,7 +1,7 @@
 // Boot: sim + view + ui + platform glue. Fixed-step sim with accumulator; the view interpolates.
 
 import { audio } from './audio';
-import { GAME_DATA } from './data';
+import { GAME_DATA, MECHANIC_IDS, withMechanics, type GameData } from './data';
 import { Autopilot, decodeSaveCode, encodeSaveCode, Sim, STEP, type SimEvent } from './sim';
 import { installLifecycle } from './platform/lifecycle';
 import { AutoQuality, detectQuality, type QualityLevel } from './platform/quality';
@@ -21,6 +21,16 @@ const autoplayParam = params.get('autoplay') === '1';
 let timeScale = Math.max(0, Number(params.get('timescale') ?? '1') || 1);
 const fresh = params.get('fresh') === '1' || params.get('new') === '1';
 
+// Development switch for the five mechanics (shipped data has them OFF):
+//   ?mech=plough,rescue,skate   ?mech=all   (or __fk.cheat.mechanics('all') at runtime)
+function parseMech(v: string | null): Record<string, boolean> | null {
+  if (!v) return null;
+  const want = v === 'all' ? [...MECHANIC_IDS] : v.split(',').map((x) => x.trim()).filter(Boolean);
+  return Object.fromEntries(MECHANIC_IDS.map((m) => [m, want.includes(m)]));
+}
+const mechFlags = parseMech(params.get('mech'));
+let DATA: GameData = mechFlags ? withMechanics(GAME_DATA, mechFlags) : GAME_DATA;
+
 const canvas = document.getElementById('game') as HTMLCanvasElement;
 const uiRoot = (document.getElementById('ui') as HTMLDivElement | null) ?? document.body;
 
@@ -35,7 +45,7 @@ const seed = seedParam ? Number(seedParam) || 1 : 1 + Math.floor(Math.random() *
 function loadChecked(json: string): Sim {
   let probe: Sim;
   try {
-    probe = new Sim(GAME_DATA, { save: json });
+    probe = new Sim(DATA, { save: json });
   } catch (e) {
     const msg = e instanceof Error ? e.message : '';
     throw new Error(/newer version/i.test(msg) ? 'that save is from a newer version of the game' : "that doesn't look like a Frostkettle save");
@@ -49,7 +59,7 @@ function loadChecked(json: string): Sim {
   } catch {
     throw new Error('that save is damaged and cannot be played');
   }
-  return new Sim(GAME_DATA, { save: json });
+  return new Sim(DATA, { save: json });
 }
 
 /** Saves that failed the boot check are kept here (never destroyed). */
@@ -78,7 +88,7 @@ function createSim(): Sim {
       }
     }
   }
-  return new Sim(GAME_DATA, { seed });
+  return new Sim(DATA, { seed });
 }
 
 const frameStats = new FrameStats();
@@ -171,7 +181,7 @@ view = new View(canvas, sim, startQuality, {
 
 function newGame(): void {
   store.clear();
-  sim = new Sim(GAME_DATA, { seed: 1 + Math.floor(Math.random() * 1e6) });
+  sim = new Sim(DATA, { seed: 1 + Math.floor(Math.random() * 1e6) });
   view.setSim(sim);
   save();
 }
@@ -307,7 +317,7 @@ const cheat = {
   /** Complete every currently visible pad (or the named one). */
   pad: (id?: string) => {
     if (id) return sim.completePad(id);
-    for (const p of GAME_DATA.pads) if (sim.state.pads[p.id].visible) sim.completePad(p.id);
+    for (const p of DATA.pads) if (sim.state.pads[p.id].visible) sim.completePad(p.id);
   },
   skipQuest: (n = 1) => {
     for (let i = 0; i < n; i++) sim.skipQuest();
@@ -353,7 +363,7 @@ const cheat = {
   },
   reset: () => {
     store.clear();
-    sim = new Sim(GAME_DATA, { seed: 1 });
+    sim = new Sim(DATA, { seed: 1 });
     view.setSim(sim);
   },
   /** Frame-time summary over the last n frames (perf tests / debug). */
@@ -388,6 +398,25 @@ const cheat = {
     view.skipRender = false;
     const tot = a.map((v, i) => v + b[i] + c[i]);
     return { sim: st(a), view: st(b), hud: st(c), total: st(tot) };
+  },
+  /**
+   * Turn mechanics on/off at runtime: 'all', 'none', 'plough,skate' or an array. Rebuilds the sim
+   * from the current save (saves load in either configuration) and rebuilds the view.
+   */
+  mechanics: (list: string | string[] = 'all') => {
+    const v = Array.isArray(list) ? list.join(',') : list;
+    DATA = withMechanics(GAME_DATA, parseMech(v === 'none' ? '' : v) ?? {});
+    const json = sim.serialize();
+    sim = new Sim(DATA, { save: json });
+    view.dispose();
+    view = new View(canvas, sim, view.quality, {
+      float: (text, world, kind) => hud.float(text, world, kind),
+      toast: (text, kind) => hud.toast(text, kind),
+      emberLand: () => hud.emberLand(),
+    });
+    view.setSnow(snowLevel);
+    if (title) view.setTitle(true, true);
+    return { ...DATA.mechanics };
   },
   /** Leave the title screen (tests). */
   begin: () => title?.finish(false),
