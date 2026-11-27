@@ -109,9 +109,18 @@ function assert(cond, msg) {
     // Let it go out in the cold: nothing lost, relight at a brazier.
     await fk(() => window.__fk.sim.drainEvents());
     const cold = await fk(() => {
-      const m = window.__fk.sim.data.mech;
-      const b = m.beacon;
-      return { x: b.x + 5.5, z: b.z + 4 };
+      // A spot on the peak well away from every lit brazier (and outside the Hearth's warmth).
+      const sim = window.__fk.sim;
+      const m = sim.data.mech;
+      const a = sim.data.areas.find((x) => x.id === 'beaconPeak').rects[0];
+      let best = null;
+      for (let x = a.x0 + 1; x <= a.x1 - 1; x += 0.5)
+        for (let z = a.z0 + 1; z <= a.z1 - 1; z += 0.5) {
+          let d = Infinity;
+          for (const b of m.braziers) d = Math.min(d, Math.hypot(b.x - x, b.z - z));
+          if (!best || d > best.d) best = { x, z, d };
+        }
+      return best;
     });
     r = await standAt(cold.x, cold.z, 22, false);
     assert(!r.held, 'the flame goes out in the cold');
