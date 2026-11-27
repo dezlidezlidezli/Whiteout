@@ -254,7 +254,7 @@ export class PadVisual {
     const def = this.def;
     const matsTotal = Object.values(def.materials ?? {}).reduce((a, b) => a + (b ?? 0), 0);
     const matsHave = Object.entries(def.materials ?? {}).reduce((a, [k]) => a + Math.min(ps.mats[k as ItemKind] ?? 0, def.materials![k as ItemKind] ?? 0), 0);
-    const frac = (ps.paid + matsHave) / Math.max(1, def.cost + matsTotal);
+    const frac = (ps.paid + matsHave) / Math.max(1, sim.padCost(def.id) + matsTotal); // repeatable pads grow in cost
     this.fillShown += (frac - this.fillShown) * Math.min(1, dt * 10);
     this.hot += ((onPad ? 1 : 0) - this.hot) * Math.min(1, dt * 8);
     const locked = sim.padLocked(def.id);

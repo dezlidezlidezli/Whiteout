@@ -1,3 +1,4 @@
+import { LATE_QUESTS } from './quests_late';
 import type { QuestDef } from './types';
 
 // Linear quest chain. The first few double as the tutorial (no text walls).
@@ -6,6 +7,8 @@ export const QUESTS: QuestDef[] = [
   // ---- Kettle Yard ----
   { id: 'q_fish', text: 'Grab fish from the crate', goal: { type: 'stat', stat: 'pickup.fish', n: 3 },
     guide: { type: 'station', id: 'crateA' }, reward: 0 },
+  { id: 'q_catch', text: 'Catch fish at the stream', goal: { type: 'stat', stat: 'harvest.fish', n: 6 },
+    guide: { type: 'harvest', tag: 'stream' }, reward: 0, hint: 'Stand by a fishing hole to fish' },
   { id: 'q_cook', text: 'Cook stew in the kettle', goal: { type: 'stat', stat: 'craft.stew', n: 3 },
     guide: { type: 'produce', item: 'stew' }, reward: 0 },
   { id: 'q_serve3', text: 'Serve hot stew to the Icebound', goal: { type: 'stat', stat: 'served', n: 3 },
@@ -13,15 +16,19 @@ export const QUESTS: QuestDef[] = [
   { id: 'q_pack1', text: 'Get a bigger pack', goal: { type: 'pad', pad: 'pad_pack1' }, reward: 4 },
   { id: 'q_kettleB', text: 'Light a second kettle', goal: { type: 'pad', pad: 'pad_kettleB' }, reward: 6 },
   { id: 'q_serve12', text: 'Serve 12 bowls', goal: { type: 'stat', stat: 'served', n: 12 },
-    guide: { type: 'deliver', item: 'stew', to: ['counterA', 'counterB'] }, reward: 10 },
+    guide: { type: 'deliver', item: 'stew', to: ['counterA', 'counterB'] }, reward: 10,
+    hint: 'Walk onto the spare shelf to set your pack down; walk on empty-handed to take it back' },
   { id: 'q_counterB', text: 'Open a second counter', goal: { type: 'pad', pad: 'pad_counterB' }, reward: 10 },
   { id: 'q_pop10', text: 'Welcome 10 villagers to camp', goal: { type: 'pop', n: 10 }, guide: { type: 'earn' }, reward: 12 },
+  { id: 'q_fisherYard', text: 'Hire a fisher', goal: { type: 'pad', pad: 'pad_fisherYard' }, reward: 12 },
   { id: 'q_porter', text: 'Hire a porter', goal: { type: 'pad', pad: 'pad_porter' }, reward: 15 },
   { id: 'q_beltA', text: 'Build a stew conveyor', goal: { type: 'pad', pad: 'pad_beltA' }, reward: 20 },
-  { id: 'q_crateB', text: 'Add another fish crate', goal: { type: 'pad', pad: 'pad_crateB' }, reward: 15 },
+  { id: 'q_crateB', text: 'Cut another fishing hole', goal: { type: 'pad', pad: 'pad_crateB' }, reward: 15 },
   { id: 'q_pack2', text: 'Get an even bigger pack', goal: { type: 'pad', pad: 'pad_pack2' }, reward: 20 },
   { id: 'q_pop25', text: 'Welcome 25 villagers', goal: { type: 'pop', n: 25 }, guide: { type: 'earn' }, reward: 20 },
   { id: 'q_cook_hire', text: 'Hire a cook', goal: { type: 'pad', pad: 'pad_cook' }, reward: 25 },
+  { id: 'q_serve30', text: 'Serve 30 bowls', goal: { type: 'stat', stat: 'served', n: 30 },
+    guide: { type: 'deliver', item: 'stew', to: ['counterA', 'counterB'] }, reward: 30 },
   { id: 'q_hearth2', text: 'Raise the Hearth', goal: { type: 'pad', pad: 'pad_hearth2' }, reward: 30,
     hint: 'A bigger fire melts the frost wall' },
   // ---- Pinewood ----
@@ -47,6 +54,6 @@ export const QUESTS: QuestDef[] = [
   { id: 'q_cabin3', text: 'Raise a third cabin', goal: { type: 'pad', pad: 'pad_cabin3' }, reward: 50 },
   { id: 'q_hearth3', text: 'Raise the Hearth again', goal: { type: 'pad', pad: 'pad_hearth3' }, reward: 60,
     hint: 'The Frozen Lake lies beyond the eastern frost' },
-  // ---- End of the current content ----
-  { id: 'q_more', text: 'The Frozen Lake thaws soon…', goal: { type: 'never' }, guide: { type: 'none' }, reward: 0 },
+  // ---- Frozen Lake, Ironridge, Beacon Peak, Open Season (see quests_late.ts) ----
+  ...LATE_QUESTS,
 ];

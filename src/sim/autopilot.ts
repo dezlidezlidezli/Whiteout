@@ -12,10 +12,14 @@ export class Autopilot {
   private sideT = 0;
   private plainT = 0;
   private stuckN = 0;
+  private guideN = 0;
+  private lastGuide: ReturnType<Sim['guide']> = null;
 
   /** Call once per sim step before sim.step(). */
   update(sim: Sim, dt: number): void {
-    const t = sim.guide();
+    // The guidance target changes slowly: refresh it every few steps (cheaper headless runs).
+    if (this.guideN++ % 3 === 0 || !this.lastGuide) this.lastGuide = sim.guide();
+    const t = this.lastGuide;
     const p = sim.state.player;
     if (!t) {
       sim.setMove(0, 0);
@@ -31,10 +35,11 @@ export class Autopilot {
     }
     const w = sim.navFromPlayer(t.x, t.z);
     // Give other stations a wide berth so we don't grab things we don't need on the way.
-    const avoid = sim.allSolids().slice();
+    const near = (x: number, z: number) => Math.abs(x - p.x) < 6 && Math.abs(z - p.z) < 6;
+    const avoid = sim.allSolids().filter((s) => near(s.x, s.z));
     for (const d of sim.data.stations) {
-      if (d.id === t.id || d.type === 'node' || !sim.isUsable(d.id)) continue;
-      avoid.push({ kind: 'circle', x: d.x, z: d.z, r: Math.max(0.5, d.reach - 0.45) });
+      if (d.id === t.id || d.type === 'node' || !near(d.x, d.z) || !sim.isUsable(d.id)) continue;
+      avoid.push({ kind: 'circle', x: d.x, z: d.z, r: Math.max(0.5, d.reach - (d.type === 'pile' ? 0.25 : 0.45)) });
     }
     const r = sim.data.balance.playerRadius;
     let dir = steer(p, w.x, w.z, r, avoid, this.sideT > 0 ? -this.side : this.side);

@@ -174,8 +174,8 @@ describe('Counter + Icebound', () => {
   });
   it('collects embers by proximity', () => {
     const sim = fresh();
-    sim.addEmbers({ x: 0, z: 12 }, 25, 'test');
-    tp(sim, 0, 13);
+    sim.addEmbers({ x: -3, z: 12.2 }, 25, 'test');
+    tp(sim, -3, 12.6);
     stand(sim, 1);
     expect(sim.state.embers).toBe(25);
     expect(sim.state.emberPiles.find((e) => e.id === 'test')).toBeUndefined();
@@ -218,7 +218,7 @@ describe('Pads', () => {
   });
   it('population-gated pads do not take payment', () => {
     const sim = fresh();
-    for (const id of ['pad_pack1', 'pad_kettleB', 'pad_counterB']) sim.completePad(id);
+    for (const id of ['pad_pack1', 'pad_kettleB', 'pad_counterB', 'pad_fisherYard']) sim.completePad(id);
     sim.state.embers = 1000;
     const pad = sim.padDefs.get('pad_porter')!;
     tp(sim, pad.x, pad.z);
@@ -274,7 +274,7 @@ describe('Nodes, Hearth, warmth', () => {
   it('trees yield logs, fall, and regrow', () => {
     const sim = fresh();
     sim.setHearth(2);
-    const pine = sim.data.stations.find((d) => d.type === 'node')!;
+    const pine = sim.data.stations.find((d) => d.type === 'node' && d.tag === 'pine')!;
     tp(sim, pine.x + 1.0, pine.z);
     stand(sim, 2);
     expect(sim.state.player.stack.filter((i) => i === 'log').length).toBe(3);
@@ -331,6 +331,7 @@ describe('Quests + guidance', () => {
   });
   it('quest rewards are paid', () => {
     const sim = fresh();
+    sim.skipQuest();
     sim.skipQuest();
     sim.skipQuest();
     const before = sim.state.embers;

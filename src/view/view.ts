@@ -814,6 +814,16 @@ export class View {
         const n = st.count - (this.hidden.get(`st:${d.id}:${k}`) ?? 0);
         this.world.itemSpot(d.id, k, _v, 'in');
         items.grid(k, Math.max(0, n), _v.x, 0.02, _v.z, yaw + 0.6, 4, 4, 0.36);
+      } else if (st.kind === 'shelf') {
+        // Spare shelf: a mix of kinds, one small stack per kind.
+        this.world.itemSpot(d.id, null, _v, 'in');
+        const kinds: ItemKind[] = [];
+        for (const it of st.items) if (!kinds.includes(it)) kinds.push(it);
+        kinds.forEach((k, i) => {
+          let n = 0;
+          for (const it of st.items) if (it === k) n++;
+          items.grid(k, n, _v.x + (i - (kinds.length - 1) / 2) * 0.45, _v.y, _v.z, yaw, 2, 2, 0.36);
+        });
       }
     }
     // Conveyor belts.
