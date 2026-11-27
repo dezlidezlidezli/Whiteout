@@ -157,9 +157,8 @@ export interface DepositDef extends StationBase {
 }
 
 /**
- * Spare shelf: holds any mix of item kinds without limit. Entering its zone carrying items sets them all down
- * (at the normal cadence); entering empty-handed picks them back up (most recently shelved first). The mode is
- * decided on entering and kept until the player leaves, so nothing ping-pongs. Helpers and links ignore shelves.
+ * Bin (station type 'shelf' for save/view compatibility): standing STILL in its zone for a moment throws the pack
+ * away one item at a time. Walking past never discards anything; nothing is handed back; helpers ignore it.
  */
 export interface ShelfDef extends StationBase {
   type: 'shelf';
@@ -400,4 +399,6 @@ export interface GameData {
   finale: FinaleDef;
   /** Floors, walls, paths, streams, clutter zones and landmarks per area (view dressing; walls also collide). */
   dressing: import('./dressing').AreaDressing[];
+  /** Bumped whenever world placement changes: saves from an older layout re-seat player, helpers and walkers. */
+  layoutRev: number;
 }

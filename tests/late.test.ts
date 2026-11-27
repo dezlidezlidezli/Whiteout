@@ -2,7 +2,7 @@
 // sled-dog couriers, spare shelves, the soft-cap (never soft-lock) rule, dressing data and save migration.
 
 import { describe, expect, it } from 'vitest';
-import { DRESSING, GAME_DATA, ITEM_KINDS, wallSolids } from '../src/data';
+import { GAME_DATA, ITEM_KINDS, wallSolids } from '../src/data';
 import type { CounterDef, ItemKind, Vec2 } from '../src/data';
 import { Sim } from '../src/sim';
 import type { CounterState, NodeState, PileState, ProcState } from '../src/sim';
@@ -228,26 +228,28 @@ describe('Open Season', () => {
   });
 });
 
-describe('spare shelf', () => {
-  it('entering with items sets everything down; entering empty-handed takes it back (latest first)', () => {
+describe('bin', () => {
+  it('standing still at it throws the pack away one item at a time; walking past never does', () => {
     const sim = fresh();
-    const sh = sim.stationDefs.get('shelfYard')!;
+    const bin = sim.stationDefs.get('shelfYard')!;
+    expect(bin.name).toBe('Bin');
+    // Walk straight through the bin's zone carrying things: nothing is lost.
     sim.state.player.stack = ['fish', 'stew', 'stew'];
-    tp(sim, sh.x - 1.0, sh.z);
-    stand(sim, 1);
-    expect(sim.state.player.stack).toEqual([]);
-    expect((sim.state.stations.shelfYard as any).items).toEqual(['stew', 'stew', 'fish']);
-    // Still in the zone: the decision holds (no ping-pong back into the pack).
-    stand(sim, 1);
-    expect(sim.state.player.stack).toEqual([]);
-    tp(sim, sh.x - 4, sh.z - 3);
-    stand(sim, 0.2);
-    tp(sim, sh.x - 1.0, sh.z);
-    stand(sim, 1);
+    tp(sim, bin.x - 2.5, bin.z - 0.4);
+    sim.setMove(1, 0);
+    sim.advance(1.0);
     expect(sim.state.player.stack).toEqual(['fish', 'stew', 'stew']);
-    // Persisted in saves; helpers and links never touch it.
-    const b = new Sim(GAME_DATA, { save: sim.serialize() });
-    expect(b.state.player.shelf?.id).toBe('shelfYard');
+    // Stand still in it: after a moment it starts taking the pack, top first, until empty.
+    tp(sim, bin.x - 0.9, bin.z);
+    sim.drainEvents();
+    stand(sim, 0.5);
+    expect(sim.state.player.stack.length).toBe(3);
+    stand(sim, 1.5);
+    expect(sim.state.player.stack).toEqual([]);
+    expect(sim.drainEvents().filter((e) => e.type === 'binned').map((e) => (e as any).item)).toEqual(['stew', 'stew', 'fish']);
+    // Nothing comes back out, and helpers/links ignore it.
+    stand(sim, 1);
+    expect(sim.state.player.stack).toEqual([]);
     expect(sim.takeable('shelfYard')).toBeNull();
     expect(sim.room('shelfYard', 'fish', true)).toBe(0);
   });
@@ -329,7 +331,7 @@ describe('world layout + dressing', () => {
     expect(d('forge', 'oreBin')).toBeLessThan(6);
   });
   it('counters sit in palisade gaps; walls never overlap a station', () => {
-    const solids = wallSolids(DRESSING);
+    const solids = wallSolids(GAME_DATA.dressing);
     for (const s of GAME_DATA.stations) {
       for (const w of solids) {
         const inside = Math.abs(s.x - w.x) < w.hw && Math.abs(s.z - w.z) < w.hd;
@@ -356,7 +358,7 @@ describe('world layout + dressing', () => {
     for (const l of GAME_DATA.links) line(l.path, 0.6, l.id);
     for (const h of GAME_DATA.helpers) if (h.route) line(h.route, 0.6, `trail ${h.id}`);
     for (const c of GAME_DATA.stations) if (c.type === 'counter' && c.queuePath) line(c.queuePath, 0.6, `queue ${c.id}`);
-    for (const a of DRESSING) {
+    for (const a of GAME_DATA.dressing) {
       for (const z of a.clutterZones) {
         for (const b of blockers) {
           const dx = Math.max(Math.abs(b.x - z.x) - z.w / 2, 0);

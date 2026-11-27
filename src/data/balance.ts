@@ -18,7 +18,7 @@ export const BALANCE: Balance = {
   fuelPerLog: 24,
   hearthFuelCap: 16,
   // Warm radius per hearth level (index 0 = level 1).
-  warmRadius: [6.5, 11.5, 16, 21, 28],
+  warmRadius: [9, 18.5, 23, 28, 35],
   padBaseRate: 12,
   padSecondsToFill: 2.2,
   padAccel: 1.6,

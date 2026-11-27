@@ -1,7 +1,7 @@
 // Headless bot: plays the campaign through the public sim API only and records time-to-milestone.
 // It plays all five areas to the finale, then `endlessMinutes` of Open Season.
 
-import { GAME_DATA } from '../src/data';
+import { GAME_DATA, type GameData } from '../src/data';
 import { Autopilot, Sim, STEP } from '../src/sim';
 
 export interface Milestone {
@@ -39,8 +39,8 @@ export interface BotResult {
   firstPad: number;
 }
 
-export function runBot(opts: { seed?: number; maxMinutes?: number; endlessMinutes?: number; verbose?: boolean } = {}): BotResult {
-  const sim = new Sim(GAME_DATA, { seed: opts.seed ?? 1 });
+export function runBot(opts: { seed?: number; maxMinutes?: number; endlessMinutes?: number; verbose?: boolean; data?: GameData } = {}): BotResult {
+  const sim = new Sim(opts.data ?? GAME_DATA, { seed: opts.seed ?? 1 });
   const bot = new Autopilot();
   const maxT = (opts.maxMinutes ?? 240) * 60;
   const endlessT = (opts.endlessMinutes ?? 20) * 60;

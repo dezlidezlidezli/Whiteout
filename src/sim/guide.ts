@@ -110,6 +110,27 @@ function openSeasonGuide(sim: Sim): GuideTarget | null {
     }
   }
   if (pick) return { x: pick.x, z: pick.z, id: pick.id, kind: 'pad', reach: 0.5 };
+  // Embers lying in piles would buy the next upgrade: go and scoop the best pile first.
+  let cheapest = Infinity;
+  for (const def of sim.data.pads) {
+    if (!def.group) continue;
+    const ps = s.pads[def.id];
+    if (ps.visible && !ps.done && Object.keys(sim.padRemaining(def.id).mats).length === 0) cheapest = Math.min(cheapest, sim.padRemaining(def.id).embers);
+  }
+  let lying = 0;
+  for (const e of s.emberPiles) lying += e.count;
+  if (cheapest < Infinity && s.embers < cheapest && s.embers + lying >= cheapest) {
+    let best: (typeof s.emberPiles)[number] | null = null;
+    let bv = 0;
+    for (const e of s.emberPiles) {
+      const v = e.count / (dist(sim, e.x, e.z) + 12);
+      if (e.count >= 6 && v > bv) {
+        bv = v;
+        best = e;
+      }
+    }
+    if (best) return { x: best.x, z: best.z, id: best.id, kind: 'embers', reach: 1.2 };
+  }
   return ordersGuide(sim) ?? earn(sim);
 }
 
@@ -238,11 +259,36 @@ function unloadJunk(sim: Sim, wanted: Set<ItemKind> | null, force = false): Guid
     }
     if (back) {
       s.guideUnload = true;
+      // Items can't go straight back where they were just taken from: step out of its zone, then return.
+      if (p.pickedFrom === back.id) return leaveZone(sim, back);
       return stTarget(back);
+    }
+  }
+  // Last resort, only when everything carried is genuinely unwanted: the nearest bin.
+  if (wanted && full(sim) && p.stack.every((it) => !useful(sim, wanted, it))) {
+    let bin: StationDef | null = null;
+    for (const d of sim.data.stations) {
+      if (d.type === 'shelf' && sim.isUsable(d.id) && (!bin || dist(sim, d.x, d.z) < dist(sim, bin.x, bin.z))) bin = d;
+    }
+    if (bin) {
+      s.guideUnload = true;
+      return stTarget(bin);
     }
   }
   s.guideUnload = false;
   return null;
+}
+
+/** A free spot just outside a station's zone, on the player's side (to leave and come back). */
+function leaveZone(sim: Sim, d: StationDef): Dest {
+  const p = sim.state.player;
+  let dx = p.x - d.x;
+  let dz = p.z - d.z;
+  const l = Math.hypot(dx, dz) || 1;
+  dx /= l;
+  dz /= l;
+  const r = d.reach + 1.2;
+  return { x: d.x + dx * r, z: d.z + dz * r, id: `leave:${d.id}`, kind: 'station', reach: 0.5 };
 }
 
 function stTarget(d: StationDef): Dest {

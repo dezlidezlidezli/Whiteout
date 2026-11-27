@@ -50,6 +50,8 @@ export type SimEvent =
   | { type: 'orderPosted'; order: number; item: ItemKind; n: number; reward: number; slot: number }
   | { type: 'orderProgress'; order: number; got: number; n: number }
   | { type: 'orderComplete'; order: number; item: ItemKind; reward: number }
-  | { type: 'seasonUp'; level: number };
+  | { type: 'seasonUp'; level: number }
+  /** An item thrown away at a bin (after a 'drop' event to the bin station). */
+  | { type: 'binned'; bin: string; item: ItemKind };
 
 export type SimEventType = SimEvent['type'];

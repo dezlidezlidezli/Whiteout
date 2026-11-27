@@ -17,7 +17,7 @@ export const QUESTS: QuestDef[] = [
   { id: 'q_kettleB', text: 'Light a second kettle', goal: { type: 'pad', pad: 'pad_kettleB' }, reward: 6 },
   { id: 'q_serve12', text: 'Serve 12 bowls', goal: { type: 'stat', stat: 'served', n: 12 },
     guide: { type: 'deliver', item: 'stew', to: ['counterA', 'counterB'] }, reward: 10,
-    hint: 'Walk onto the spare shelf to set your pack down; walk on empty-handed to take it back' },
+    hint: 'Stand still at a bin to throw away things you do not want' },
   { id: 'q_counterB', text: 'Open a second counter', goal: { type: 'pad', pad: 'pad_counterB' }, reward: 10 },
   { id: 'q_pop10', text: 'Welcome 10 villagers to camp', goal: { type: 'pop', n: 10 }, guide: { type: 'earn' }, reward: 12 },
   { id: 'q_fisherYard', text: 'Hire a fisher', goal: { type: 'pad', pad: 'pad_fisherYard' }, reward: 12 },

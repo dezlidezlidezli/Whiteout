@@ -62,10 +62,10 @@ function grid<T>(xs: number[], zs: number[], skip: (x: number, z: number) => boo
 
 // Thawed villagers walk round the outside of the palisade to camp.
 const LAKE_EXIT_A: Vec2[] = [{ x: 10.8, z: 8.9 }, { x: 7.4, z: 8.9 }, { x: 6.0, z: 6.0 }, { x: 4.0, z: 4.8 }];
-const LAKE_EXIT_B: Vec2[] = [{ x: 19.8, z: 8.9 }, { x: 23.6, z: 8.9 }, { x: 23.6, z: -10.6 }, { x: 9.6, z: -10.6 }, { x: 6.0, z: -6.0 }];
+const LAKE_EXIT_B: Vec2[] = [{ x: 23.8, z: 8.9 }, { x: 29.6, z: 8.9 }, { x: 29.6, z: -10.6 }, { x: 9.6, z: -10.6 }, { x: 3.0, z: -3.0 }];
 
 const ICE_HOLES: StationDef[] = grid(
-  [16.0, 18.6, 21.2], [-7.6, -5.0, -2.4], () => false,
+  [19.0, 22.0, 25.0], [-8.8, -6.2, -3.6], () => false,
   (gx, gz, i) => ({
     id: `hole${i}`, type: 'node', area: 'frozenLake', name: 'Ice hole', model: 'iceHole',
     x: gx + ((i % 2) ? 0.2 : 0), z: gz, rot: i * 1.3, solid: { r: 0.55 }, reach: 1.5,
@@ -76,42 +76,42 @@ const ICE_HOLES: StationDef[] = grid(
 const LAKE_STATIONS: StationDef[] = [
   ...ICE_HOLES,
   {
-    id: 'fishRack', type: 'pile', area: 'frozenLake', name: 'Fish rack', model: 'fishCrate', x: 15.2, z: 1.8,
+    id: 'fishRack', type: 'pile', area: 'frozenLake', name: 'Fish rack', model: 'fishCrate', x: 17.6, z: 1.4,
     solid: { r: 0.7 }, reach: 1.8, item: 'fish', cap: 40, start: 0, refill: 0, accepts: true, unlockedBy: 'pad_fisher',
   },
   {
-    id: 'smokehouseA', type: 'processor', area: 'frozenLake', name: 'Smokehouse', model: 'smokehouse', x: 12.8, z: 1.8,
+    id: 'smokehouseA', type: 'processor', area: 'frozenLake', name: 'Smokehouse', model: 'smokehouse', x: 13.6, z: 1.4,
     solid: { hw: 1.1, hd: 0.9 }, reach: 2.2, recipe: 'smokedFish', inputCap: 12, outputCap: 16, operator: 'none',
     speedMod: 'cookSpeed', unlockedBy: 'pad_smokehouseA',
   },
   {
-    id: 'smokehouseB', type: 'processor', area: 'frozenLake', name: 'Second smokehouse', model: 'smokehouse', x: 17.6, z: 1.8,
+    id: 'smokehouseB', type: 'processor', area: 'frozenLake', name: 'Second smokehouse', model: 'smokehouse', x: 21.6, z: 1.4,
     solid: { hw: 1.1, hd: 0.9 }, reach: 2.2, recipe: 'smokedFish', inputCap: 12, outputCap: 16, operator: 'boost', boost: 2,
     speedMod: 'cookSpeed', unlockedBy: 'pad_smokehouseB',
   },
   {
-    id: 'logRack', type: 'pile', area: 'frozenLake', name: 'Log rack', model: 'woodPile', x: 10.0, z: 1.8,
+    id: 'logRack', type: 'pile', area: 'frozenLake', name: 'Log rack', model: 'woodPile', x: 9.6, z: 1.4,
     solid: { r: 0.7 }, reach: 1.8, item: 'log', cap: 40, start: 0, refill: 0, accepts: true, unlockedBy: 'pad_courier',
   },
-  { id: 'shelfLake', type: 'shelf', area: 'frozenLake', name: 'Spare shelf', model: 'storageTable', x: 8.4, z: 4.6, rot: Math.PI / 2,
+  { id: 'shelfLake', type: 'shelf', area: 'frozenLake', name: 'Bin', model: 'barrel', x: 9.4, z: 6.6, rot: Math.PI / 2,
     solid: { hw: 0.4, hd: 0.6 }, reach: 1.3 },
   lateCounter({
-    id: 'lakeCounterA', area: 'frozenLake', name: 'Lakeside counter', x: 12.8, z: 7.3, item: 'smokedFish', facing: 'south',
+    id: 'lakeCounterA', area: 'frozenLake', name: 'Lakeside counter', x: 13.6, z: 7.3, item: 'smokedFish', facing: 'south',
     unlockedBy: 'pad_lakeCounterA', queueLen: 44, exitPath: LAKE_EXIT_A, spawn: { x: 12.8, z: 30 }, wantMax: 2,
   }),
   lateCounter({
-    id: 'lakeCounterB', area: 'frozenLake', name: 'Second lakeside counter', x: 17.6, z: 7.3, item: 'smokedFish', facing: 'south',
+    id: 'lakeCounterB', area: 'frozenLake', name: 'Second lakeside counter', x: 21.6, z: 7.3, item: 'smokedFish', facing: 'south',
     unlockedBy: 'pad_lakeCounterB', queueLen: 44, exitPath: LAKE_EXIT_B, spawn: { x: 17.6, z: 30 }, wantMax: 2,
   }),
 ];
 
 // ------------------------------------------------------------------ Ironridge (Area 4)
 
-const FEAST_EXIT_A: Vec2[] = [{ x: 9.8, z: -18.8 }, { x: 9.8, z: -8.4 }, { x: 6.0, z: -6.0 }];
-const FEAST_EXIT_B: Vec2[] = [{ x: 9.8, z: -23.2 }, { x: 9.8, z: -8.4 }, { x: 6.0, z: -6.0 }];
+const FEAST_EXIT_A: Vec2[] = [{ x: 9.8, z: -18.8 }, { x: 9.8, z: -8.4 }, { x: 3.0, z: -3.0 }];
+const FEAST_EXIT_B: Vec2[] = [{ x: 9.8, z: -23.8 }, { x: 9.8, z: -8.4 }, { x: 3.0, z: -3.0 }];
 
 const ORE_VEINS: StationDef[] = grid(
-  [-7.6, -5.0, -2.4], [-23.6, -21.0, -18.4], () => false,
+  [-7.6, -5.0, -2.4], [-25.0, -22.0, -19.0], () => false,
   (gx, gz, i) => ({
     id: `vein${i}`, type: 'node', area: 'ironridge', name: 'Ore vein', model: 'oreVein',
     x: gx + ((i % 2) ? 0.2 : 0), z: gz, rot: i * 0.9, solid: { r: 0.6 }, reach: 1.55,
@@ -120,37 +120,37 @@ const ORE_VEINS: StationDef[] = grid(
 );
 
 const PEAK_STATIONS: StationDef[] = [
-  { id: 'shelfPeak', type: 'shelf', area: 'beaconPeak', name: 'Spare shelf', model: 'storageTable', x: -5.0, z: -31.4, rot: Math.PI / 2,
+  { id: 'shelfPeak', type: 'shelf', area: 'beaconPeak', name: 'Bin', model: 'barrel', x: -5.0, z: -37.0, rot: Math.PI / 2,
     solid: { hw: 0.4, hd: 0.6 }, reach: 1.3 },
 ];
 
 const RIDGE_STATIONS: StationDef[] = [
   ...ORE_VEINS,
   {
-    id: 'oreBin', type: 'pile', area: 'ironridge', name: 'Ore bin', model: 'crate', x: -7.8, z: -13.4,
+    id: 'oreBin', type: 'pile', area: 'ironridge', name: 'Ore bin', model: 'crate', x: -7.8, z: -12.4,
     solid: { r: 0.7 }, reach: 1.8, item: 'ore', cap: 40, start: 0, refill: 0, accepts: true, unlockedBy: 'pad_miner',
   },
   {
-    id: 'ridgeLogRack', type: 'pile', area: 'ironridge', name: 'Log rack', model: 'woodPile', x: -5.8, z: -11.0,
+    id: 'ridgeLogRack', type: 'pile', area: 'ironridge', name: 'Log rack', model: 'woodPile', x: -6.2, z: -9.6,
     solid: { r: 0.7 }, reach: 1.8, item: 'log', cap: 40, start: 0, refill: 0, accepts: true, unlockedBy: 'pad_courierB',
   },
   {
-    id: 'forge', type: 'processor', area: 'ironridge', name: 'Forge', model: 'forge', x: -3.0, z: -13.4,
+    id: 'forge', type: 'processor', area: 'ironridge', name: 'Forge', model: 'forge', x: -3.0, z: -12.4,
     solid: { r: 1.0 }, reach: 2.1, recipe: 'ingot', inputCap: 12, outputCap: 20, operator: 'none', unlockedBy: 'pad_forge',
   },
   {
-    id: 'greatKitchen', type: 'processor', area: 'ironridge', name: 'Great Kitchen', model: 'greatKitchen', x: 3.4, z: -13.4,
+    id: 'greatKitchen', type: 'processor', area: 'ironridge', name: 'Great Kitchen', model: 'greatKitchen', x: 1.6, z: -16.0,
     solid: { hw: 1.3, hd: 1.0 }, reach: 2.3, recipe: 'feast', inputCap: 12, outputCap: 16, operator: 'boost', boost: 2,
     speedMod: 'cookSpeed', unlockedBy: 'pad_greatKitchen',
   },
-  { id: 'shelfRidge', type: 'shelf', area: 'ironridge', name: 'Spare shelf', model: 'storageTable', x: -9.2, z: -21.0, rot: Math.PI / 2,
+  { id: 'shelfRidge', type: 'shelf', area: 'ironridge', name: 'Bin', model: 'barrel', x: -9.3, z: -16.2, rot: Math.PI / 2,
     solid: { hw: 0.4, hd: 0.6 }, reach: 1.3 },
   lateCounter({
     id: 'feastCounterA', area: 'ironridge', name: 'Feast counter', x: 8.3, z: -17.0, item: 'feast', facing: 'east',
     unlockedBy: 'pad_feastCounterA', queueLen: 48, exitPath: FEAST_EXIT_A, spawn: { x: 34, z: -17.0 }, wantMax: 2,
   }),
   lateCounter({
-    id: 'feastCounterB', area: 'ironridge', name: 'Second feast counter', x: 8.3, z: -21.4, item: 'feast', facing: 'east',
+    id: 'feastCounterB', area: 'ironridge', name: 'Second feast counter', x: 8.3, z: -22.0, item: 'feast', facing: 'east',
     unlockedBy: 'pad_feastCounterB', queueLen: 48, exitPath: FEAST_EXIT_B, spawn: { x: 34, z: -21.4 }, wantMax: 2,
   }),
 ];
@@ -162,7 +162,7 @@ export const ORDER_BOARD = 'orderBoard';
 const CAMP_STATIONS: StationDef[] = [
   {
     // Always standing; only takes items while caravan orders are open (after the finale).
-    id: ORDER_BOARD, type: 'deposit', area: 'frozenLake', name: 'Notice board', model: 'noticeBoard', x: 10.2, z: -0.6,
+    id: ORDER_BOARD, type: 'deposit', area: 'frozenLake', name: 'Notice board', model: 'noticeBoard', x: 16.6, z: -5.0,
     rot: -Math.PI / 2, solid: { r: 0.5 }, reach: 2.0, accepts: ['fish', 'stew', 'log', 'plank', 'smokedFish', 'ore', 'ingot', 'feast'],
     cap: 9999, role: 'orders',
   },
@@ -175,23 +175,23 @@ export const LATE_STATIONS: StationDef[] = [...LAKE_STATIONS, ...RIDGE_STATIONS,
 export const LATE_LINKS: LinkDef[] = [
   {
     id: 'lakeBeltA', area: 'frozenLake', from: 'smokehouseA', to: 'lakeCounterA', item: 'smokedFish', interval: 0.45, travel: 3,
-    path: [{ x: 12.8, z: 2.7 }, { x: 12.8, z: 6.8 }], unlockedBy: 'pad_lakeBeltA', maxOnBelt: 8,
+    path: [{ x: 13.6, z: 2.9 }, { x: 13.6, z: 6.8 }], unlockedBy: 'pad_lakeBeltA', maxOnBelt: 8,
   },
   {
     id: 'lakeBeltB', area: 'frozenLake', from: 'smokehouseB', to: 'lakeCounterB', item: 'smokedFish', interval: 0.45, travel: 3,
-    path: [{ x: 17.6, z: 2.7 }, { x: 17.6, z: 6.8 }], unlockedBy: 'pad_lakeBeltB', maxOnBelt: 8,
+    path: [{ x: 21.6, z: 2.9 }, { x: 21.6, z: 6.8 }], unlockedBy: 'pad_lakeBeltB', maxOnBelt: 8,
   },
   {
     id: 'oreBelt', area: 'ironridge', from: 'oreBin', to: 'forge', item: 'ore', interval: 0.5, travel: 2.2,
-    path: [{ x: -7.1, z: -13.4 }, { x: -4.0, z: -13.4 }], unlockedBy: 'pad_oreBelt', maxOnBelt: 5,
+    path: [{ x: -7.1, z: -12.4 }, { x: -4.4, z: -12.4 }], unlockedBy: 'pad_oreBelt', maxOnBelt: 5,
   },
   {
     id: 'feastBelt', area: 'ironridge', from: 'greatKitchen', to: 'feastCounterA', item: 'feast', interval: 0.5, travel: 3.4,
-    path: [{ x: 4.2, z: -14.4 }, { x: 4.2, z: -17.0 }, { x: 7.8, z: -17.0 }], unlockedBy: 'pad_feastBelt', maxOnBelt: 8,
+    path: [{ x: 4.6, z: -17.0 }, { x: 7.8, z: -17.0 }], unlockedBy: 'pad_feastBelt', maxOnBelt: 8,
   },
   {
     id: 'feastBeltB', area: 'ironridge', from: 'greatKitchen', to: 'feastCounterB', item: 'feast', interval: 0.5, travel: 4.5,
-    path: [{ x: 3.0, z: -14.4 }, { x: 3.0, z: -21.4 }, { x: 7.8, z: -21.4 }], unlockedBy: 'pad_feastBeltB', maxOnBelt: 10,
+    path: [{ x: 1.6, z: -19.0 }, { x: 1.6, z: -22.0 }, { x: 7.8, z: -22.0 }], unlockedBy: 'pad_feastBeltB', maxOnBelt: 10,
   },
 ];
 
@@ -199,13 +199,13 @@ export const LATE_LINKS: LinkDef[] = [
 
 /** Woodpile (Pinewood) → lake log rack / smokehouse, along the south edge of camp. */
 export const ROUTE_LAKE: Vec2[] = [
-  { x: -10.2, z: -2.0 }, { x: -9.4, z: 6.2 }, { x: 6.8, z: 6.2 }, { x: 8.4, z: 5.0 }, { x: 10.6, z: 3.6 },
+  { x: -10.2, z: -2.0 }, { x: -9.4, z: 0.0 }, { x: 3.0, z: 0.0 }, { x: 8.4, z: 0.0 }, { x: 10.8, z: 3.4 },
 ];
 /** Woodpile → Ironridge forge, through the Pinewood–Ironridge gap. */
-export const ROUTE_RIDGE: Vec2[] = [{ x: -10.2, z: -3.8 }, { x: -9.2, z: -9.2 }, { x: -6.6, z: -9.8 }, { x: -5.0, z: -10.4 }];
+export const ROUTE_RIDGE: Vec2[] = [{ x: -10.2, z: -3.8 }, { x: -9.4, z: 0.0 }, { x: -3.0, z: -3.0 }, { x: -2.0, z: -6.0 }, { x: -5.2, z: -8.6 }];
 /** Smokehouses → Great Kitchen, past the market and the camp's north-east corner. */
 export const ROUTE_KITCHEN: Vec2[] = [
-  { x: 15.2, z: 0.2 }, { x: 15.2, z: -1.2 }, { x: 9.6, z: -1.2 }, { x: 9.6, z: -9.4 }, { x: 5.6, z: -11.0 },
+  { x: 17.6, z: -0.4 }, { x: 8.6, z: -0.4 }, { x: 3.0, z: -3.0 }, { x: 0.0, z: -6.0 }, { x: 3.4, z: -12.0 },
 ];
 
 export const LATE_HELPERS: HelperDef[] = [
@@ -257,38 +257,38 @@ export const LATE_HELPERS: HelperDef[] = [
 
 // ------------------------------------------------------------------ pads
 
-const HEARTH_SPOT = { x: 0, z: 3.4 };
+const HEARTH_SPOT = { x: 4.2, z: 4.2 };
 const BEACON_PAD = { x: 0, z: -30.4 };
 
 export const LATE_PADS: PadDef[] = [
   // ---- Frozen Lake ----
-  { id: 'pad_smokehouseA', area: 'frozenLake', x: 12.8, z: 1.8, label: 'Smokehouse', cost: 550, requires: ['pad_hearth3'],
+  { id: 'pad_smokehouseA', area: 'frozenLake', x: 13.6, z: 1.4, label: 'Smokehouse', cost: 550, requires: ['pad_hearth3'],
     effects: [{ type: 'unlock', id: 'smokehouseA' }], icon: { prop: 'smokehouse' } },
-  { id: 'pad_lakeCounterA', area: 'frozenLake', x: 12.8, z: 6.6, label: 'Lakeside counter', cost: 700, requires: ['pad_smokehouseA'],
+  { id: 'pad_lakeCounterA', area: 'frozenLake', x: 13.6, z: 6.6, label: 'Lakeside counter', cost: 700, requires: ['pad_smokehouseA'],
     effects: [{ type: 'unlock', id: 'lakeCounterA' }], icon: { prop: 'counter' } },
-  { id: 'pad_lakeBeltA', area: 'frozenLake', x: 11.4, z: 4.4, label: 'Smoked fish conveyor', cost: 950, requires: ['pad_lakeCounterA'],
+  { id: 'pad_lakeBeltA', area: 'frozenLake', x: 11.0, z: 4.6, label: 'Smoked fish conveyor', cost: 950, requires: ['pad_lakeCounterA'],
     effects: [{ type: 'unlock', id: 'lakeBeltA' }], icon: { prop: 'conveyor' } },
   { id: 'pad_lumberjack2', area: 'pinewood', x: -11.6, z: -7.4, label: 'Hire a lumberjack', cost: 1000, requires: ['pad_lakeCounterA'],
     effects: [{ type: 'hire', helper: 'lumberjack2' }], icon: { character: 'lumberjack' } },
-  { id: 'pad_fisher', area: 'frozenLake', x: 15.2, z: 1.8, label: 'Hire a fisher', cost: 1100, requires: ['pad_lakeBeltA'],
+  { id: 'pad_fisher', area: 'frozenLake', x: 17.6, z: 1.4, label: 'Hire a fisher', cost: 1100, requires: ['pad_lakeBeltA'],
     effects: [{ type: 'unlock', id: 'fishRack' }, { type: 'hire', helper: 'fisher' }], icon: { character: 'fisher' } },
-  { id: 'pad_courier', area: 'frozenLake', x: 10.0, z: 1.8, label: 'Sled-dog courier', cost: 1500, requires: ['pad_lumberjack2'],
+  { id: 'pad_courier', area: 'frozenLake', x: 9.6, z: 1.4, label: 'Sled-dog courier', cost: 1500, requires: ['pad_lumberjack2'],
     effects: [{ type: 'unlock', id: 'logRack' }, { type: 'hire', helper: 'sledDog' }], icon: { character: 'dog' } },
-  { id: 'pad_lakePorter', area: 'frozenLake', x: 15.2, z: 4.4, label: 'Hire a porter', cost: 1350, requires: ['pad_fisher'],
+  { id: 'pad_lakePorter', area: 'frozenLake', x: 16.6, z: 4.0, label: 'Hire a porter', cost: 1350, requires: ['pad_fisher'],
     effects: [{ type: 'hire', helper: 'lakePorter' }], icon: { character: 'porter' } },
-  { id: 'pad_auger', area: 'frozenLake', x: 20.0, z: -0.6, label: 'Ice auger', cost: 1350, materials: { plank: 12 }, requires: ['pad_fisher'],
+  { id: 'pad_auger', area: 'frozenLake', x: 16.6, z: -1.8, label: 'Ice auger', cost: 1350, materials: { plank: 12 }, requires: ['pad_fisher'],
     effects: [{ type: 'mod', key: 'fishSpeed', mul: 1.6 }, { type: 'tool', tool: 'auger' }], icon: { prop: 'iceHole' } },
-  { id: 'pad_pack4', area: 'frozenLake', x: 22.0, z: -0.6, label: 'Fur-lined pack', cost: 1800, materials: { smokedFish: 10 },
+  { id: 'pad_pack4', area: 'frozenLake', x: 25.6, z: -1.0, label: 'Fur-lined pack', cost: 1800, materials: { smokedFish: 10 },
     requires: ['pad_courier'], effects: [{ type: 'capacity', add: 4 }], icon: { item: 'smokedFish' } },
-  { id: 'pad_smokehouseB', area: 'frozenLake', x: 17.6, z: 1.8, label: 'Second smokehouse', cost: 2050, materials: { plank: 16 },
+  { id: 'pad_smokehouseB', area: 'frozenLake', x: 21.6, z: 1.4, label: 'Second smokehouse', cost: 2050, materials: { plank: 16 },
     requires: ['pad_courier', 'pad_lakePorter'], effects: [{ type: 'unlock', id: 'smokehouseB' }], icon: { prop: 'smokehouse' } },
-  { id: 'pad_lakeCounterB', area: 'frozenLake', x: 17.6, z: 6.6, label: 'Second lakeside counter', cost: 2300, requires: ['pad_smokehouseB'],
+  { id: 'pad_lakeCounterB', area: 'frozenLake', x: 21.6, z: 6.6, label: 'Second lakeside counter', cost: 2300, requires: ['pad_smokehouseB'],
     effects: [{ type: 'unlock', id: 'lakeCounterB' }], icon: { prop: 'counter' } },
-  { id: 'pad_smoker', area: 'frozenLake', x: 20.2, z: 1.8, label: 'Hire a smoker', cost: 2250, requires: ['pad_smokehouseB'],
+  { id: 'pad_smoker', area: 'frozenLake', x: 25.6, z: 1.4, label: 'Hire a smoker', cost: 2250, requires: ['pad_smokehouseB'],
     effects: [{ type: 'hire', helper: 'smoker' }], icon: { character: 'cook' } },
-  { id: 'pad_lakeBeltB', area: 'frozenLake', x: 19.0, z: 4.4, label: 'Smoked fish conveyor', cost: 2650, requires: ['pad_lakeCounterB'],
+  { id: 'pad_lakeBeltB', area: 'frozenLake', x: 19.4, z: 5.6, label: 'Smoked fish conveyor', cost: 2650, requires: ['pad_lakeCounterB'],
     effects: [{ type: 'unlock', id: 'lakeBeltB' }], icon: { prop: 'conveyor' } },
-  { id: 'pad_cabin4', area: 'frozenLake', x: 21.6, z: 5.4, label: 'Lakeside lodge', cost: 2450, materials: { plank: 24 },
+  { id: 'pad_cabin4', area: 'frozenLake', x: 27.2, z: 6.4, label: 'Lakeside lodge', cost: 2450, materials: { plank: 24 },
     requires: ['pad_pack4'], effects: [{ type: 'unlock', id: 'cabin4' }, { type: 'mod', key: 'spawnRate', add: 0.25 }],
     icon: { prop: 'cabin' } },
   { id: 'pad_hearth4', area: 'camp', ...HEARTH_SPOT, label: 'Raise the Hearth', cost: 4600, materials: { plank: 40, smokedFish: 30 },
@@ -296,61 +296,61 @@ export const LATE_PADS: PadDef[] = [
     effects: [{ type: 'hearth', level: 4 }], icon: { prop: 'hearth', level: 4 } },
 
   // ---- Ironridge ----
-  { id: 'pad_forge', area: 'ironridge', x: -3.0, z: -13.4, label: 'Forge', cost: 1700, requires: ['pad_hearth4'],
+  { id: 'pad_forge', area: 'ironridge', x: -3.0, z: -12.4, label: 'Forge', cost: 1700, requires: ['pad_hearth4'],
     effects: [{ type: 'unlock', id: 'forge' }], icon: { prop: 'forge' } },
-  { id: 'pad_pick', area: 'ironridge', x: -8.8, z: -17.0, label: 'Steel pick', cost: 1400, materials: { ingot: 4 }, requires: ['pad_forge'],
+  { id: 'pad_pick', area: 'ironridge', x: -4.4, z: -16.2, label: 'Steel pick', cost: 1400, materials: { ingot: 4 }, requires: ['pad_forge'],
     effects: [{ type: 'mod', key: 'mineSpeed', mul: 1.6 }, { type: 'tool', tool: 'pick' }], icon: { prop: 'oreVein' } },
-  { id: 'pad_miner', area: 'ironridge', x: -7.8, z: -13.4, label: 'Hire a miner', cost: 1950, requires: ['pad_forge'],
+  { id: 'pad_miner', area: 'ironridge', x: -7.8, z: -12.4, label: 'Hire a miner', cost: 1950, requires: ['pad_forge'],
     effects: [{ type: 'unlock', id: 'oreBin' }, { type: 'hire', helper: 'miner' }], icon: { character: 'miner' } },
-  { id: 'pad_pack5', area: 'ironridge', x: -0.4, z: -17.6, label: 'Iron-frame pack', cost: 2250, materials: { ingot: 8 }, requires: ['pad_pick'],
+  { id: 'pad_pack5', area: 'ironridge', x: 2.0, z: -26.6, label: 'Iron-frame pack', cost: 2250, materials: { ingot: 8 }, requires: ['pad_pick'],
     effects: [{ type: 'capacity', add: 5 }], icon: { item: 'ingot' } },
   { id: 'pad_lumberjack3', area: 'pinewood', x: -19.8, z: 8.6, label: 'Hire a lumberjack', cost: 2250, requires: ['pad_miner'],
     effects: [{ type: 'hire', helper: 'lumberjack3' }], icon: { character: 'lumberjack' } },
-  { id: 'pad_courierB', area: 'ironridge', x: -5.8, z: -11.0, label: 'Sled-dog courier', cost: 2450, requires: ['pad_miner'],
+  { id: 'pad_courierB', area: 'ironridge', x: -6.2, z: -9.6, label: 'Sled-dog courier', cost: 2450, requires: ['pad_miner'],
     effects: [{ type: 'unlock', id: 'ridgeLogRack' }, { type: 'hire', helper: 'ridgeDog' }], icon: { character: 'dog' } },
-  { id: 'pad_oreBelt', area: 'ironridge', x: -5.6, z: -15.2, label: 'Ore conveyor', cost: 2450, requires: ['pad_miner'],
+  { id: 'pad_oreBelt', area: 'ironridge', x: -7.4, z: -15.4, label: 'Ore conveyor', cost: 2450, requires: ['pad_miner'],
     effects: [{ type: 'unlock', id: 'oreBelt' }], icon: { prop: 'conveyor' } },
-  { id: 'pad_steelAxe', area: 'ironridge', x: -1.2, z: -9.8, label: 'Steel axe', cost: 1950, materials: { ingot: 6 }, requires: ['pad_pack5'],
+  { id: 'pad_steelAxe', area: 'ironridge', x: 0.8, z: -9.6, label: 'Steel axe', cost: 1950, materials: { ingot: 6 }, requires: ['pad_pack5'],
     effects: [{ type: 'mod', key: 'chopSpeed', mul: 1.4 }, { type: 'tool', tool: 'axe' }], icon: { prop: 'stump' } },
-  { id: 'pad_steelKettle', area: 'ironridge', x: 1.2, z: -9.8, label: 'Steel kettles', cost: 2250, materials: { ingot: 8 },
+  { id: 'pad_steelKettle', area: 'ironridge', x: 3.2, z: -9.6, label: 'Steel kettles', cost: 2250, materials: { ingot: 8 },
     requires: ['pad_steelAxe'], effects: [{ type: 'mod', key: 'cookSpeed', mul: 1.5 }, { type: 'tool', tool: 'kettle' }],
     icon: { prop: 'kettle', level: 3 } },
-  { id: 'pad_greatKitchen', area: 'ironridge', x: 3.4, z: -13.4, label: 'Great Kitchen', cost: 3150, materials: { plank: 20, ingot: 10 },
+  { id: 'pad_greatKitchen', area: 'ironridge', x: 1.6, z: -16.0, label: 'Great Kitchen', cost: 3150, materials: { plank: 20, ingot: 10 },
     requires: ['pad_courierB', 'pad_steelKettle'], effects: [{ type: 'unlock', id: 'greatKitchen' }], icon: { prop: 'greatKitchen' } },
   { id: 'pad_feastCounterA', area: 'ironridge', x: 7.6, z: -17.0, label: 'Feast counter', cost: 3350, requires: ['pad_greatKitchen'],
     effects: [{ type: 'unlock', id: 'feastCounterA' }], icon: { prop: 'counter' } },
-  { id: 'pad_kitchenPorter', area: 'ironridge', x: 1.2, z: -12.2, label: 'Hire a kitchen porter', cost: 3600, requires: ['pad_feastCounterA'],
+  { id: 'pad_kitchenPorter', area: 'ironridge', x: 5.6, z: -9.6, label: 'Hire a kitchen porter', cost: 3600, requires: ['pad_feastCounterA'],
     effects: [{ type: 'hire', helper: 'kitchenPorter' }], icon: { character: 'porter' } },
-  { id: 'pad_kitchenDog', area: 'ironridge', x: 5.8, z: -10.2, label: 'Sled-dog courier', cost: 3900, requires: ['pad_feastCounterA'],
+  { id: 'pad_kitchenDog', area: 'ironridge', x: 8.0, z: -9.6, label: 'Sled-dog courier', cost: 3900, requires: ['pad_feastCounterA'],
     effects: [{ type: 'hire', helper: 'kitchenDog' }], icon: { character: 'dog' } },
-  { id: 'pad_feastBelt', area: 'ironridge', x: 5.8, z: -15.0, label: 'Feast conveyor', cost: 4250, requires: ['pad_kitchenPorter'],
+  { id: 'pad_feastBelt', area: 'ironridge', x: 6.2, z: -19.6, label: 'Feast conveyor', cost: 4250, requires: ['pad_kitchenPorter'],
     effects: [{ type: 'unlock', id: 'feastBelt' }], icon: { prop: 'conveyor' } },
-  { id: 'pad_pack6', area: 'ironridge', x: -0.4, z: -17.6, label: 'Iron-frame pack', cost: 3900, materials: { ingot: 14 },
+  { id: 'pad_pack6', area: 'ironridge', x: 2.0, z: -26.6, label: 'Iron-frame pack', cost: 3900, materials: { ingot: 14 },
     requires: ['pad_pack5', 'pad_greatKitchen'], effects: [{ type: 'capacity', add: 5 }], icon: { item: 'feast' } },
-  { id: 'pad_cabin5', area: 'ironridge', x: 4.8, z: -24.4, label: "Miners' lodge", cost: 3600, materials: { plank: 30 },
+  { id: 'pad_cabin5', area: 'ironridge', x: -8.4, z: -28.0, label: "Miners' lodge", cost: 3600, materials: { plank: 30 },
     requires: ['pad_feastCounterA'], effects: [{ type: 'unlock', id: 'cabin5' }, { type: 'mod', key: 'spawnRate', add: 0.25 }],
     icon: { prop: 'cabin' } },
-  { id: 'pad_hearth5', area: 'camp', ...HEARTH_SPOT, label: 'Raise the Hearth', cost: 6700, materials: { plank: 40, ingot: 30, feast: 20 },
+  { id: 'pad_hearth5', area: 'camp', ...HEARTH_SPOT, label: 'Raise the Hearth', cost: 6700, materials: { plank: 30, ingot: 20, feast: 12 },
     requires: ['pad_feastBelt', 'pad_kitchenDog', 'pad_pack6', 'pad_cabin5', 'pad_oreBelt', 'pad_lumberjack3'],
     effects: [{ type: 'hearth', level: 5 }], icon: { prop: 'hearth', level: 5 } },
 
   // ---- Beacon Peak ----
   { id: 'pad_beacon1', area: 'beaconPeak', ...BEACON_PAD, label: 'Beacon: timber frame', cost: 2800, materials: { plank: 60 },
     requires: ['pad_hearth5'], effects: [{ type: 'beacon', stage: 1 }], icon: { prop: 'beacon', level: 1 } },
-  { id: 'pad_peakLights', area: 'beaconPeak', x: -4.0, z: -28.2, label: 'Trail braziers', cost: 4200, requires: ['pad_beacon1'],
+  { id: 'pad_peakLights', area: 'beaconPeak', x: -5.0, z: -31.2, label: 'Trail braziers', cost: 4200, requires: ['pad_beacon1'],
     effects: [{ type: 'unlock', id: 'peakBrazier1' }, { type: 'unlock', id: 'peakBrazier2' }, { type: 'unlock', id: 'peakBrazier3' },
       { type: 'unlock', id: 'peakBrazier4' }, { type: 'mod', key: 'moveSpeed', mul: 1.1 }], icon: { prop: 'brazier' } },
   { id: 'pad_beacon2', area: 'beaconPeak', ...BEACON_PAD, label: 'Beacon: iron crown', cost: 4800, materials: { ingot: 40 },
     requires: ['pad_beacon1'], effects: [{ type: 'beacon', stage: 2 }], icon: { prop: 'beacon', level: 2 } },
-  { id: 'pad_feastCounterB', area: 'ironridge', x: 7.6, z: -21.4, label: 'Second feast counter', cost: 5600, requires: ['pad_beacon1'],
+  { id: 'pad_feastCounterB', area: 'ironridge', x: 7.6, z: -22.0, label: 'Second feast counter', cost: 5600, requires: ['pad_beacon1'],
     effects: [{ type: 'unlock', id: 'feastCounterB' }], icon: { prop: 'counter' } },
-  { id: 'pad_chef', area: 'ironridge', x: 6.0, z: -12.6, label: 'Hire a chef', cost: 5000, requires: ['pad_beacon2'],
+  { id: 'pad_chef', area: 'ironridge', x: 6.4, z: -13.2, label: 'Hire a chef', cost: 5000, requires: ['pad_beacon2'],
     effects: [{ type: 'hire', helper: 'chef' }], icon: { character: 'cook' } },
-  { id: 'pad_pack7', area: 'beaconPeak', x: 4.0, z: -28.2, label: 'Summit pack', cost: 5400, materials: { ingot: 12, plank: 20 },
+  { id: 'pad_pack7', area: 'beaconPeak', x: 5.0, z: -31.2, label: 'Summit pack', cost: 5400, materials: { ingot: 12, plank: 20 },
     requires: ['pad_beacon2'], effects: [{ type: 'capacity', add: 5 }], icon: { item: 'plank' } },
   { id: 'pad_beacon3', area: 'beaconPeak', ...BEACON_PAD, label: 'Beacon: fire bed', cost: 4600, materials: { log: 60 },
     requires: ['pad_beacon2'], effects: [{ type: 'beacon', stage: 3 }], icon: { prop: 'beacon', level: 3 } },
-  { id: 'pad_feastBeltB', area: 'ironridge', x: 1.6, z: -20.0, label: 'Feast conveyor', cost: 5000, requires: ['pad_beacon3', 'pad_feastCounterB'],
+  { id: 'pad_feastBeltB', area: 'ironridge', x: 4.0, z: -24.6, label: 'Feast conveyor', cost: 5000, requires: ['pad_beacon3', 'pad_feastCounterB'],
     effects: [{ type: 'unlock', id: 'feastBeltB' }], icon: { prop: 'conveyor' } },
   { id: 'pad_beacon4', area: 'beaconPeak', ...BEACON_PAD, label: 'Light the Great Beacon', cost: 5600, requires: ['pad_feastBeltB'],
     effects: [{ type: 'beacon', stage: 4 }], icon: { prop: 'beacon', level: 4 } },
@@ -360,7 +360,7 @@ export const LATE_PADS: PadDef[] = [
 ];
 
 function openSeasonPads(): PadDef[] {
-  const spot = (i: number) => ({ x: 10.2 + (i % 3) * 2.0, z: -9.0 + Math.floor(i / 3) * 2.0 });
+  const spot = (i: number) => ({ x: 10.2 + (i % 3) * 2.0, z: -9.2 + Math.floor(i / 3) * 2.0 });
   const req = ['pad_beacon4'];
   const up = (i: number, id: string, label: string, cost: number, growth: number, effects: PadDef['effects'], icon: PadDef['icon'], max?: number): PadDef => ({
     id, area: 'frozenLake', ...spot(i), label, cost, requires: req, effects, icon, repeat: { growth, max }, group: 'upgrade',
@@ -388,55 +388,52 @@ function openSeasonPads(): PadDef[] {
 
 export const LATE_DECOR: DecorDef[] = [
   // Lake
-  { id: 'cabin4', area: 'frozenLake', model: 'cabin', x: 21.6, z: 5.4, rot: -2.6, unlockedBy: 'pad_cabin4', solid: { hw: 1.3, hd: 1.1 } },
+  { id: 'cabin4', area: 'frozenLake', model: 'cabin', x: 27.2, z: 6.4, rot: -2.6, scale: 0.72, unlockedBy: 'pad_cabin4', solid: { hw: 0.94, hd: 0.8 } },
   { id: 'lakeLantern1', area: 'frozenLake', model: 'lantern', x: 10.6, z: 7.4 },
   { id: 'lakeLantern2', area: 'frozenLake', model: 'lantern', x: 15.2, z: 7.4 },
-  { id: 'lakeLantern3', area: 'frozenLake', model: 'lantern', x: 22.6, z: -9.6 },
-  { id: 'lakeBrazier', area: 'frozenLake', model: 'brazier', x: 22.4, z: -4.0 },
-  { id: 'lakeSled', area: 'frozenLake', model: 'sled', x: 22.4, z: 2.4, rot: 1.2, solid: { r: 0.6 } },
-  { id: 'lakeBarrel', area: 'frozenLake', model: 'barrel', x: 22.6, z: -6.6, solid: { r: 0.35 } },
+  { id: 'lakeLantern3', area: 'frozenLake', model: 'lantern', x: 28.4, z: -9.4 },
+  { id: 'lakeBrazier', area: 'frozenLake', model: 'brazier', x: 28.0, z: -5.0 },
+  { id: 'lakeSled', area: 'frozenLake', model: 'sled', x: 28.0, z: -0.4, rot: 1.2, solid: { r: 0.6 } },
+  { id: 'lakeBarrel', area: 'frozenLake', model: 'barrel', x: 27.6, z: -8.8, solid: { r: 0.35 } },
   // Ironridge
-  { id: 'shelfPeakDecor', area: 'beaconPeak', model: 'rugMat', x: -5.0, z: -31.4 },
-  { id: 'cabin5', area: 'ironridge', model: 'cabin', x: 4.8, z: -24.4, rot: 1.2, unlockedBy: 'pad_cabin5', solid: { hw: 1.3, hd: 1.1 } },
-  { id: 'ridgeLantern1', area: 'ironridge', model: 'lantern', x: 1.0, z: -16.0 },
-  { id: 'ridgeLantern2', area: 'ironridge', model: 'lantern', x: 1.0, z: -23.0 },
+  { id: 'cabin5', area: 'ironridge', model: 'cabin', x: -8.4, z: -28.0, rot: 1.2, scale: 0.72, unlockedBy: 'pad_cabin5', solid: { hw: 0.94, hd: 0.8 } },
+  { id: 'ridgeLantern1', area: 'ironridge', model: 'lantern', x: -1.0, z: -26.0 },
+  { id: 'ridgeLantern2', area: 'ironridge', model: 'lantern', x: 6.4, z: -24.6 },
   { id: 'ridgeBrazier', area: 'ironridge', model: 'brazier', x: -0.4, z: -22.2 },
   { id: 'ridgeCrate', area: 'ironridge', model: 'crate', x: -9.3, z: -25.3, solid: { r: 0.4 } },
-  { id: 'sign_peak', area: 'ironridge', model: 'signpost', x: -4.4, z: -25.2, rot: 0.3 },
+  { id: 'sign_peak', area: 'ironridge', model: 'signpost', x: -4.4, z: -29.4, rot: 0.3 },
   // Beacon Peak
-  { id: 'greatBeacon', area: 'beaconPeak', model: 'beacon', x: 0, z: -34.4, solid: { r: 2.2 } },
-  { id: 'peakBrazier1', area: 'beaconPeak', model: 'brazier', x: -2.8, z: -27.0, unlockedBy: 'pad_peakLights' },
-  { id: 'peakBrazier2', area: 'beaconPeak', model: 'brazier', x: 2.8, z: -27.0, unlockedBy: 'pad_peakLights' },
-  { id: 'peakBrazier3', area: 'beaconPeak', model: 'brazier', x: -3.8, z: -32.6, unlockedBy: 'pad_peakLights' },
-  { id: 'peakBrazier4', area: 'beaconPeak', model: 'brazier', x: 3.8, z: -32.6, unlockedBy: 'pad_peakLights' },
-  { id: 'peakRock1', area: 'beaconPeak', model: 'rock', x: -5.4, z: -37.0, scale: 1.2, seed: 3, solid: { r: 0.7 } },
-  { id: 'peakRock2', area: 'beaconPeak', model: 'rock', x: 5.4, z: -37.0, scale: 1.0, seed: 5, solid: { r: 0.6 } },
+  { id: 'greatBeacon', area: 'beaconPeak', model: 'beacon', x: 0, z: -35.4, solid: { r: 2.2 } },
+  { id: 'peakBrazier1', area: 'beaconPeak', model: 'brazier', x: -3.0, z: -31.0, unlockedBy: 'pad_peakLights' },
+  { id: 'peakBrazier2', area: 'beaconPeak', model: 'brazier', x: 3.0, z: -31.0, unlockedBy: 'pad_peakLights' },
+  { id: 'peakBrazier3', area: 'beaconPeak', model: 'brazier', x: -4.4, z: -35.6, unlockedBy: 'pad_peakLights' },
+  { id: 'peakBrazier4', area: 'beaconPeak', model: 'brazier', x: 4.4, z: -35.6, unlockedBy: 'pad_peakLights' },
   // Open Season decorations (camp; drawn once unlocked by their pad).
   ...[60, 120, 240, 300].map((deg, i): DecorDef => {
     const a = (deg * Math.PI) / 180;
     return { id: `decoLantern${i + 1}`, area: 'camp', model: 'lantern', x: Math.cos(a) * 3.4, z: Math.sin(a) * 3.4, unlockedBy: 'deco_lanterns' };
   }),
-  { id: 'decoBench1', area: 'camp', model: 'bench', x: -2.9, z: -0.9, rot: 1.9, unlockedBy: 'deco_benches' },
-  { id: 'decoBench2', area: 'camp', model: 'bench', x: 2.9, z: -0.9, rot: -1.9, unlockedBy: 'deco_benches' },
-  { id: 'decoSnowman1', area: 'camp', model: 'snowman', x: -5.6, z: -7.8, unlockedBy: 'deco_snowmen' },
-  { id: 'decoSnowman2', area: 'camp', model: 'snowman', x: -8.4, z: -8.3, scale: 0.8, unlockedBy: 'deco_snowmen' },
-  { id: 'decoSnowman3', area: 'camp', model: 'snowman', x: 8.4, z: -8.3, scale: 0.6, unlockedBy: 'deco_snowmen' },
-  { id: 'decoFlag1', area: 'camp', model: 'signpost', x: -6.6, z: 7.0, unlockedBy: 'deco_bunting' },
-  { id: 'decoFlag2', area: 'camp', model: 'signpost', x: 6.6, z: 7.0, unlockedBy: 'deco_bunting' },
-  { id: 'decoFlag3', area: 'camp', model: 'signpost', x: -5.4, z: -8.4, unlockedBy: 'deco_bunting' },
-  { id: 'decoFlag4', area: 'camp', model: 'signpost', x: 5.4, z: -8.4, unlockedBy: 'deco_bunting' },
-  { id: 'decoBrazier1', area: 'camp', model: 'brazier', x: -8.3, z: -1.8, unlockedBy: 'deco_braziers' },
-  { id: 'decoBrazier2', area: 'camp', model: 'brazier', x: 8.3, z: -2.8, unlockedBy: 'deco_braziers' },
-  { id: 'decoSled1', area: 'camp', model: 'sled', x: -7.8, z: -7.2, rot: 0.8, unlockedBy: 'deco_sleds' },
-  { id: 'decoBarrel1', area: 'camp', model: 'barrel', x: -8.4, z: -6.0, unlockedBy: 'deco_sleds' },
-  { id: 'decoBarrel2', area: 'camp', model: 'barrel', x: -6.8, z: -8.4, unlockedBy: 'deco_sleds' },
-  { id: 'decoCrate1', area: 'camp', model: 'crate', x: -8.4, z: -4.9, unlockedBy: 'deco_sleds' },
+  { id: 'decoBench1', area: 'camp', model: 'bench', x: -2.6, z: -2.3, rot: 0.85, unlockedBy: 'deco_benches' },
+  { id: 'decoBench2', area: 'camp', model: 'bench', x: 2.6, z: -2.3, rot: -0.85, unlockedBy: 'deco_benches' },
+  { id: 'decoSnowman1', area: 'camp', model: 'snowman', x: -2.4, z: -6.0, unlockedBy: 'deco_snowmen' },
+  { id: 'decoSnowman2', area: 'camp', model: 'snowman', x: 2.4, z: -6.0, scale: 0.8, unlockedBy: 'deco_snowmen' },
+  { id: 'decoSnowman3', area: 'camp', model: 'snowman', x: -2.4, z: 6.4, scale: 0.6, unlockedBy: 'deco_snowmen' },
+  { id: 'decoFlag1', area: 'camp', model: 'signpost', x: -1.8, z: 10.8, unlockedBy: 'deco_bunting' },
+  { id: 'decoFlag2', area: 'camp', model: 'signpost', x: 1.8, z: 10.8, unlockedBy: 'deco_bunting' },
+  { id: 'decoFlag3', area: 'camp', model: 'signpost', x: -1.8, z: -11.6, unlockedBy: 'deco_bunting' },
+  { id: 'decoFlag4', area: 'camp', model: 'signpost', x: 1.8, z: -11.6, unlockedBy: 'deco_bunting' },
+  { id: 'decoBrazier1', area: 'camp', model: 'brazier', x: -13.0, z: 1.8, unlockedBy: 'deco_braziers' },
+  { id: 'decoBrazier2', area: 'camp', model: 'brazier', x: 13.0, z: 1.8, unlockedBy: 'deco_braziers' },
+  { id: 'decoSled1', area: 'camp', model: 'sled', x: -12.4, z: -5.0, rot: 0.8, unlockedBy: 'deco_sleds' },
+  { id: 'decoBarrel1', area: 'camp', model: 'barrel', x: -13.0, z: -3.0, unlockedBy: 'deco_sleds' },
+  { id: 'decoBarrel2', area: 'camp', model: 'barrel', x: -12.0, z: -2.2, unlockedBy: 'deco_sleds' },
+  { id: 'decoCrate1', area: 'camp', model: 'crate', x: -12.9, z: -6.8, unlockedBy: 'deco_sleds' },
 ];
 
 /** Ground kept clear of forest for the Icebound queues and walk-in lanes of the late counters. */
 export const LATE_LANES: Rect[] = [
   { x0: 8.0, x1: 23.5, z0: 7.8, z1: 32.0 },
-  { x0: 8.8, x1: 36.0, z0: -27.0, z1: -12.0 },
+  { x0: 8.8, x1: 36.0, z0: -28.0, z1: -12.0 },
 ];
 
 // ------------------------------------------------------------------ Open Season + finale tuning
