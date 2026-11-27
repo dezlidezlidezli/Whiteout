@@ -84,6 +84,7 @@ export function placeAreas(d: GameData, lanes: Rect[]): { data: GameData; lanes:
     villagers: m.villagers.map((v) => ({ ...v, ...sh(v, v.area) })),
     ice: m.ice.map((r) => shRect(r, 'frozenLake')),
     gripMats: m.gripMats.map((g) => ({ ...g, ...sh(g, 'frozenLake') })),
+    skateLane: m.skateLane.map((q) => sh(q, 'frozenLake')),
     cranks: m.cranks.map((c) => ({ ...c, ...sh(c, c.area) })),
     braziers: m.braziers.map((b) => ({ ...b, ...sh(b, b.area) })),
     windGaps: m.windGaps.map((r) => shRect(r, 'beaconPeak')),

@@ -9,7 +9,7 @@ export const FOOTPRINT: Record<string, number> = {
   hearth: 2.4, iceHole: 1.15, fishCrate: 0.7, storageTable: 0.85, kettle: 1.05, counter: 1.15, sawmill: 1.9,
   woodPile: 1.0, pine: 1.1, smokehouse: 1.5, oreVein: 1.2, crate: 0.5, forge: 1.5, greatKitchen: 3.0,
   noticeBoard: 1.0, cabin: 2.45, signpost: 0.5, lantern: 0.35, bench: 0.8, barrel: 0.45, snowman: 0.65,
-  brazier: 0.6, sled: 0.9, rock: 0.95, pineSnowy: 1.15, beacon: 2.3, tent: 1.65, pad: 0.95,
+  brazier: 0.6, festivalLamp: 0.35, sled: 0.9, rock: 0.95, pineSnowy: 1.15, beacon: 2.3, tent: 1.65, pad: 0.95,
 };
 /** Half-depth of a frost wall section. */
 export const FROST_WALL_HALF = 1.7;

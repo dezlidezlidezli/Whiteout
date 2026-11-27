@@ -63,7 +63,26 @@ export function moveCircle(p: P2, dx: number, dz: number, r: number, solids: rea
     }
     return false;
   };
-  if (tryPos(ox + dx, oz + dz)) return;
+  if (tryPos(ox + dx, oz + dz)) {
+    // Pushing (nearly) head-on into a round solid barely moves: slide round it instead of snagging.
+    const len = Math.hypot(dx, dz);
+    const gain = ((p.x - ox) * dx + (p.z - oz) * dz) / (len || 1);
+    if (len > 1e-4 && gain < len * 0.35) {
+      let best = { x: p.x, z: p.z, g: gain };
+      for (const ang of [0.6, -0.6, 1.1, -1.1]) {
+        const c = Math.cos(ang);
+        const s = Math.sin(ang);
+        const q = { x: ox + dx * c - dz * s, z: oz + dx * s + dz * c };
+        pushOut(q, r, solids);
+        if (!inRects(q.x, q.z, r, rects)) continue;
+        const g = ((q.x - ox) * dx + (q.z - oz) * dz) / len;
+        if (g > best.g + 1e-6) best = { x: q.x, z: q.z, g };
+      }
+      p.x = best.x;
+      p.z = best.z;
+    }
+    return;
+  }
   if (dx !== 0 && tryPos(ox + dx, oz)) return;
   if (dz !== 0 && tryPos(ox, oz + dz)) return;
   // Stuck (e.g. a building appeared on top of us): nudge out but stay inside the walkable space.

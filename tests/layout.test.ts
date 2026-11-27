@@ -117,6 +117,28 @@ export function findProblems(): string[] {
       if (behind > 0 && behind < b.r + 3 && Math.abs(t.x - b.x) < b.r * 0.8) bad.push(`hidden: ${t.kind}:${t.id} behind ${b.kind}:${b.id} at ${at(t)}`);
     }
   }
+  // 7. Readable fronts (notice boards, sign boards, market stalls) face the south camera (within 60°).
+  const READABLE = new Set(['noticeBoard', 'signBoard', 'marketStall']);
+  const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+  for (const s of D.stations) if (READABLE.has((s as { model: string }).model) && Math.abs(wrap(s.rot ?? 0)) > Math.PI / 3) bad.push(`edge-on: ${s.id} rot ${s.rot}`);
+  for (const d of D.decor) if (READABLE.has(d.model) && Math.abs(wrap(d.rot ?? 0)) > Math.PI / 3) bad.push(`edge-on: ${d.id} rot ${d.rot}`);
+  for (const a of D.dressing) for (const l of a.landmarks) if (READABLE.has(l.prop) && Math.abs(wrap(l.yaw ?? 0)) > Math.PI / 3) bad.push(`edge-on: ${l.prop}@${l.x},${l.z}`);
+  // 8. Pads that can show at the same time stand ≥ 3 m apart (their labels must not overlap).
+  const req = new Map(D.pads.map((p) => [p.id, p.requires] as const));
+  const after = (a: string, b: string, seen = new Set<string>()): boolean => {
+    if (seen.has(a)) return false;
+    seen.add(a);
+    return (req.get(a) ?? []).some((r) => r === b || after(r, b, seen));
+  };
+  for (let i = 0; i < D.pads.length; i++) {
+    for (let j = i + 1; j < D.pads.length; j++) {
+      const a = D.pads[i];
+      const b = D.pads[j];
+      const d = Math.hypot(a.x - b.x, a.z - b.z);
+      if (d < 0.05 || d >= 3.0 || after(a.id, b.id) || after(b.id, a.id)) continue;
+      bad.push(`labels: ${a.id} x ${b.id} only ${d.toFixed(2)} m apart`);
+    }
+  }
   return bad;
 }
 

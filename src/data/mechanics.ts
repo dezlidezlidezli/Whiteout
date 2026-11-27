@@ -76,6 +76,8 @@ export interface MechDef {
   gripMats: { x: number; z: number; r: number }[];
   /** Top speed multiplier on ice per skates tier (0 = none, 1 = sharpened). */
   iceTop: number[];
+  /** Two points along open ice the guide skates between to build speed. */
+  skateLane: Vec2[];
   cranks: CrankDef[];
   braziers: FlameBrazierDef[];
   /** Seconds a full flame lasts walking outside warmth; wind gaps burn it windFactor× faster. */
@@ -150,8 +152,9 @@ export const MECH: MechDef = {
   ice: [{ x0: 17.4, x1: 34.8, z0: -9.8, z1: -2.0 }],
   // Grip mats under the ice holes (matching late.ts ICE_HOLES) and the skates pad.
   gripMats: [...[-8.8, -6.2, -3.6].flatMap((z, j) => [19.0, 22.0, 25.0].map((x, i) => ({ x: x + ((j * 3 + i) % 2 ? 0.2 : 0), z, r: 1.6 }))),
-    { x: 27.4, z: -5.2, r: 1.4 }],
+  ],
   iceTop: [1.5, 1.75],
+  skateLane: [{ x: 27.4, z: -9.0 }, { x: 27.4, z: -2.8 }],
   cranks: [
     { id: 'capBellows', area: 'ironridge', x: -13.0, z: -13.0, inner: 1.2, outer: 2.8, use: 'bellows', target: 'forge', unlockedBy: 'capBellows' },
     { id: 'capLift', area: 'ironridge', x: -13.0, z: -21.0, inner: 1.2, outer: 2.8, use: 'lift', target: 'shaftPile', unlockedBy: 'capLift' },
@@ -160,7 +163,7 @@ export const MECH: MechDef = {
     // One optional brazier per earlier yard: lighting it makes that yard a little Cosier for good.
     { id: 'brazierYard', area: 'kettleYard', x: 2.8, z: 6.0, kind: 'yard' },
     { id: 'brazierPine', area: 'pinewood', x: -9.4, z: 9.6, kind: 'yard' },
-    { id: 'brazierLake', area: 'frozenLake', x: 27.8, z: -8.0, kind: 'yard' },
+    { id: 'brazierLake', area: 'frozenLake', x: 28.6, z: -9.2, kind: 'yard' },
     { id: 'brazierRidge', area: 'ironridge', x: -0.4, z: -22.2, kind: 'yard' },
     // The Trail of Light up Beacon Peak (lit in order; legs of ~6–9 m around the rock barriers).
     { id: 'trail1', area: 'beaconPeak', x: 0.0, z: -30.4, kind: 'trail', order: 1 },
@@ -180,10 +183,8 @@ export const MECH: MechDef = {
   ],
   brazierWarm: 3.0,
   beacon: { x: 0, z: -57.0, reach: 3.4 },
-  festivalLamps: [35, 70, 110, 145, 215, 325].map((deg, i) => {
-    const a = (deg * Math.PI) / 180;
-    return { id: `festLamp${i}`, x: Math.cos(a) * 7.6, z: Math.sin(a) * 7.6 };
-  }),
+  // Beside the camp paths (never on tent ground).
+  festivalLamps: [[5.5, 1.6], [-5.5, -1.6], [9.0, -1.6], [-9.0, 1.6], [1.6, -8.0], [-1.6, 6.2]].map(([x, z], i) => ({ id: `festLamp${i}`, x, z })),
   festivalReward: 900,
 };
 
@@ -211,8 +212,8 @@ export function mechDecor(): DecorDef[] {
   for (const l of MECH.festivalLamps) out.push({ id: l.id, area: 'camp', model: 'festivalLamp', x: l.x, z: l.z });
   out.push({ id: 'lm_pineStatue', area: 'pinewood', model: 'statue', x: -24.6, z: 0.2, unlockedBy: 'fPineMark' });
   out.push({ id: 'lm_lakeSculpture', area: 'frozenLake', model: 'iceSculpture', x: 32.2, z: -1.2, unlockedBy: 'fLakeMark' });
-  out.push({ id: 'foundBoard', area: 'camp', model: 'foundBoard', x: -9.4, z: 5.0, unlockedBy: 'pad_lantern' });
-  out.push({ id: 'monument', area: 'camp', model: 'monument', x: 9.4, z: -5.0, unlockedBy: 'allFound' });
+  out.push({ id: 'foundBoard', area: 'camp', model: 'foundBoard', x: -5.0, z: 9.6, unlockedBy: 'pad_lantern' });
+  out.push({ id: 'monument', area: 'camp', model: 'monument', x: 6.2, z: 8.6, unlockedBy: 'allFound' });
   return out;
 }
 
