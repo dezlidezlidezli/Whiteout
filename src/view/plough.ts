@@ -76,7 +76,7 @@ export class PloughView {
     const tex = new THREE.CanvasTexture(this.labelCanvas);
     tex.colorSpace = THREE.SRGBColorSpace;
     this.label = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, toneMapped: false }));
-    this.label.scale.set(2.6, 0.98, 1);
+    this.label.scale.set(3.4, 1.28, 1);
     this.label.renderOrder = 55;
     this.label.visible = false;
     parent.add(this.label);

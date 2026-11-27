@@ -152,12 +152,15 @@ function assert(cond, msg) {
       s.player.stack = [];
     });
     // Wrap up the finale cinematic: skip to the thank-you card and continue into Open Season.
+    await fk(() => window.__fk.cheat.timescale(1));
+    await page.waitForTimeout(3000);
     await page.touchscreen.tap(195, 600);
     await page.waitForSelector('.fk-cr-go', { timeout: 20000 });
     await page.waitForTimeout(800);
     await page.click('.fk-cr-go', { force: true });
     await page.waitForTimeout(1500);
     assert(await page.evaluate(() => !!document.querySelector('.fk-ord.fk-ord-fest')), 'Lantern Festival order card shows a lamp');
+    await fk(() => window.__fk.cheat.timescale(0.0001));
     r = await standAt(H.x + 1.4, H.z + 0.8, 1.2);
     assert(r.held, 'flame taken for the festival');
     const lamps = await fk(() => window.__fk.sim.data.mech.festivalLamps);
