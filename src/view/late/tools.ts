@@ -140,16 +140,16 @@ export class Tools implements LatePart {
     }
     this.handS += ((kind ? 1 : 0) - this.handS) * Math.min(1, dt * 12);
     this.hand.visible = this.handS > 0.02;
-    this.hand.scale.setScalar(Math.max(0.001, this.handS));
+    this.hand.scale.setScalar(Math.max(0.001, this.handS * 1.35));
 
     if (this.aloft) {
       const a = this.aloft;
       a.t += dt;
       const k = Math.min(1, a.t / 0.5);
       const out = a.t > 1.8 ? Math.max(0, 1 - (a.t - 1.8) / 0.35) : 1;
-      a.obj.position.set(p.x, 2.35 + backOut(k) * 0.5, p.z);
+      a.obj.position.set(p.x, 2.6 + backOut(k) * 0.9, p.z);
       a.obj.rotation.y = a.t * 5;
-      a.obj.scale.setScalar(Math.max(0.001, backOut(k) * 1.5 * out));
+      a.obj.scale.setScalar(Math.max(0.001, backOut(k) * 2.4 * out));
       if (a.t > 2.2) {
         a.obj.removeFromParent();
         this.aloft = null;

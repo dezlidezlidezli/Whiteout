@@ -214,6 +214,16 @@ function assert(cond, msg) {
   console.log('js bench', JSON.stringify(bench));
   assert(bench.total.p95 < 8, 'per-frame JS p95 under 8 ms (got ' + bench.total.p95 + ')');
 
+  // ---- snow never rises over a floor slab in any area (open every area first)
+  const snow = await fk(() => {
+    const lv = __fk.sim.state.hearth.level;
+    __fk.cheat.hearth(5);
+    __fk.view.frame(0, 0.016);
+    const r = __fk.view.debugSnowUnderFloors();
+    return { ...r, lv };
+  });
+  assert(snow.samples > 200 && snow.bad.length === 0, 'snow pressed flat under every floor (' + snow.samples + ' samples, bad ' + JSON.stringify(snow.bad.slice(0, 6)) + ')');
+
   // ---- big crowd perf sample
   await fk(() => {
     __fk.cheat.teleport(0, 4);

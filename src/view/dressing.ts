@@ -8,7 +8,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { GameData } from '../data';
 import type { Sim } from '../sim';
 import type { GroundUniforms } from './ground';
-import { MAX_FLAT } from './ground';
+import { SnowMask, type MaskShape } from './snowmask';
 import {
   createFencePath, createFloor, createPathStrip, createProp, createWallPath, getScatterMesh, type ScatterKind, type XZ,
 } from './models';
@@ -198,8 +198,12 @@ export class DressingView {
   private scatter: THREE.InstancedMesh[] = [];
   /** Merged walls/landmarks/clutter/barriers (for debug coverage checks). */
   readonly solidMeshes: THREE.Mesh[] = [];
+  readonly mask: SnowMask;
+  private data: GameData;
 
   constructor(parent: THREE.Object3D, data: GameData, private ground: GroundUniforms, quality: number, surface: SurfaceMap) {
+    this.data = data;
+    this.mask = new SnowMask(data);
     // Things clutter must keep clear of: stations (reach), pads, belts, counter queues.
     const keepOut: { x: number; z: number; r: number }[] = [];
     for (const s of data.stations) keepOut.push({ x: s.x, z: s.z, r: Math.max(1.3, (s.reach ?? 1.5) * 0.85) });
@@ -365,16 +369,22 @@ export class DressingView {
     for (const a of this.areas) key += sim.state.areasOpen[a.area as keyof typeof sim.state.areasOpen] ? '1' : '0';
     if (key === this.openKey) return;
     this.openKey = key;
-    // Show opened areas and press the snow flat under their floors, paths and streams.
-    const u = this.ground.uFlat.value;
-    let n = 0;
+    // Show opened areas; press the snow flat under floors, paths, streams, pads and stations.
+    const shapes: MaskShape[] = [];
     this.areas.forEach((a, i) => {
       const open = key[i] === '1';
       a.group.visible = open;
-      if (!open) return;
-      for (const f of a.flats) if (n < MAX_FLAT) u[n++].set(f.x0, f.z0, f.x1, f.z1);
+      if (open) for (const f of a.flats) shapes.push({ ...f, area: a.area });
     });
-    this.ground.uFlatN.value = n;
+    for (const p of this.data.pads) if (sim.state.areasOpen[p.area as keyof typeof sim.state.areasOpen]) shapes.push({ x0: p.x - 1, z0: p.z - 1, x1: p.x + 1, z1: p.z + 1, area: p.area });
+    for (const st of this.data.stations) {
+      if (!sim.state.areasOpen[st.area as keyof typeof sim.state.areasOpen]) continue;
+      const r = st.type === 'node' ? 0.9 : 1.1;
+      shapes.push({ x0: st.x - r, z0: st.z - r, x1: st.x + r, z1: st.z + r, area: st.area });
+    }
+    this.mask.build(shapes);
+    this.ground.uMask.value = this.mask.tex;
+    this.ground.uMaskRect.value.copy(this.mask.rect);
   }
 
   dispose(): void {

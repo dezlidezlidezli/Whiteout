@@ -233,7 +233,7 @@ function shareIcon(): string {
 
 /** The title screen is up (the tip lives only there, never over game UI). */
 function onTitle(): boolean {
-  return !!document.querySelector('.fk-title:not(.fk-leave)');
+  return !!document.querySelector('.fk-title[data-ui]:not(.fk-leave)');
 }
 
 function showInstallTip(): void {

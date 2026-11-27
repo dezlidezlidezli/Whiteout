@@ -4,12 +4,11 @@
 import * as THREE from 'three';
 import { PALETTE } from './models';
 
-export const MAX_FLAT = 32;
-
 export interface GroundUniforms {
-  /** Rects (x0, z0, x1, z1) where the snow is pressed flat (yard floors, streams, paths). */
-  uFlat: { value: THREE.Vector4[] };
-  uFlatN: { value: number };
+  /** Baked flatten mask: R = tight (colour), G = dilated (no snow height). See SnowMask. */
+  uMask: { value: THREE.Texture | null };
+  /** World x0, z0 of the mask and its size in metres. */
+  uMaskRect: { value: THREE.Vector4 };
   uCenter: { value: THREE.Vector2 };
   uRadius: { value: number };
   uTime: { value: number };
@@ -31,12 +30,18 @@ float fkMelt(vec2 xz) {
 }
 `;
 
+function blankMask(): THREE.DataTexture {
+  const t = new THREE.DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1);
+  t.needsUpdate = true;
+  return t;
+}
+
 export function createGround(size = 240, segs = 96): { mesh: THREE.Mesh; uniforms: GroundUniforms } {
   const geo = new THREE.PlaneGeometry(size, size, segs, segs);
   geo.rotateX(-Math.PI / 2);
   const uniforms: GroundUniforms = {
-    uFlat: { value: Array.from({ length: MAX_FLAT }, () => new THREE.Vector4()) },
-    uFlatN: { value: 0 },
+    uMask: { value: blankMask() },
+    uMaskRect: { value: new THREE.Vector4(-1, -1, 2, 2) },
     uCenter: { value: new THREE.Vector2(0, 0) },
     uRadius: { value: 6 },
     uTime: { value: 0 },
@@ -58,7 +63,7 @@ export function createGround(size = 240, segs = 96): { mesh: THREE.Mesh; uniform
         '#include <common>',
         `#include <common>
 uniform vec2 uCenter; uniform float uRadius; uniform float uTime;
-uniform vec4 uFlat[${MAX_FLAT}]; uniform int uFlatN;
+uniform sampler2D uMask; uniform vec4 uMaskRect;
 varying vec3 vFkWorld;
 varying vec3 vFkN; // per-vertex noise: snow shade, earth tone, dry patches
 varying float vFkFlat;
@@ -70,14 +75,9 @@ ${NOISE}`,
 vec4 fkW = modelMatrix * vec4(transformed, 1.0);
 float fkM = fkMelt(fkW.xz);
 // Snow lies a little deeper than the thawed ground, with soft drifts.
-float fkFl = 0.0;
-for (int i = 0; i < ${MAX_FLAT}; i++) {
-  if (i >= uFlatN) break;
-  vec4 r = uFlat[i];
-  vec2 dd = max(r.xy - fkW.xz, fkW.xz - r.zw);
-  fkFl = max(fkFl, smoothstep(0.9, -0.3, max(dd.x, dd.y)));
-}
-vFkFlat = fkFl;
+vec4 fkMk = texture2D(uMask, (fkW.xz - uMaskRect.xy) / uMaskRect.zw);
+float fkFl = fkMk.g; // dilated past a grid cell: snow can never rise over a slab edge
+vFkFlat = fkMk.r;
 // Snow lies a little deeper than the thawed ground, with soft drifts; pressed flat under yard floors.
 transformed.y += (1.0 - fkM) * (0.05 + fkFbm(fkW.xz * 0.15) * 0.22) * (1.0 - fkFl) - fkFl * 0.03;
 vFkWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;
@@ -89,6 +89,7 @@ vFkN = vec3(fkFbm(fkW.xz * 0.6), fkFbm(fkW.xz * 0.9), fkFbm(fkW.xz * 0.45 + 11.0
         `#include <common>
 uniform vec2 uCenter; uniform float uRadius; uniform float uTime; uniform float uWave;
 uniform vec3 uSnow; uniform vec3 uShade; uniform vec3 uEarth;
+uniform sampler2D uMask; uniform vec4 uMaskRect;
 varying vec3 vFkWorld;
 varying vec3 vFkN;
 varying float vFkFlat;
@@ -116,7 +117,8 @@ ${NOISE}`,
   float wd = abs(length(xz - uCenter) - uWave);
   c += vec3(1.0, 0.55, 0.2) * smoothstep(1.4, 0.0, wd) * 0.45;
   // Trodden, slightly darker snow around floors so slab edges sit in the scene.
-  c = mix(c, c * vec3(0.86, 0.88, 0.94), vFkFlat * (1.0 - m));
+  float fkTight = texture2D(uMask, (xz - uMaskRect.xy) / uMaskRect.zw).r;
+  c = mix(c, c * vec3(0.86, 0.88, 0.94), fkTight * (1.0 - m));
   diffuseColor.rgb = c;
 }`,
       );

@@ -449,6 +449,26 @@ export class View {
     return { total, missing };
   }
 
+  /** Debug/e2e: the snow must be pressed flat at every point of every floor/path of every open area. */
+  debugSnowUnderFloors(): { samples: number; bad: { area: string; x: number; z: number; v: number }[] } {
+    const bad: { area: string; x: number; z: number; v: number }[] = [];
+    let samples = 0;
+    for (const a of this.data.dressing) {
+      if (!this.sim.state.areasOpen[a.area as keyof typeof this.sim.state.areasOpen]) continue;
+      const rects = a.floors.filter((f) => !skipCampFloor(a.area, f.type)).map((f) => ({ x0: f.x - f.w / 2, z0: f.z - f.d / 2, x1: f.x + f.w / 2, z1: f.z + f.d / 2 }));
+      for (const r of rects) {
+        for (let x = r.x0 + 0.1; x <= r.x1 - 0.1; x += 0.7) {
+          for (let z = r.z0 + 0.1; z <= r.z1 - 0.1; z += 0.7) {
+            samples++;
+            const v = this.dressing.mask.flatAt(x, z);
+            if (v < 0.99) bad.push({ area: a.area, x: +x.toFixed(1), z: +z.toFixed(1), v: +v.toFixed(2) });
+          }
+        }
+      }
+    }
+    return { samples, bad };
+  }
+
   /** Debug/e2e: arrow tip/tail and the current guide target. */
   arrowInfo(): { tip: { x: number; z: number }; tail: { x: number; z: number }; visible: boolean; target: { x: number; z: number } | null; next: { x: number; z: number } | null } {
     const g = this.sim.guide();

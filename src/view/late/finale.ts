@@ -306,8 +306,8 @@ export class FinaleDirector implements LatePart, MoodSource {
     const L = this.L;
     const D = this.D;
     const keys: Key[] = [
-      { T: 0, pos: at(B, 29, 4.5), look: B.clone().setY(crownY * 0.6) },
-      { T: L - 0.4, pos: at(B, 23, 6.5, 3.4), look: B.clone().setY(crownY * 0.8 + 1) },
+      { T: 0, pos: at(B, 36, 8), look: B.clone().setY(crownY * 0.5) },
+      { T: L - 0.4, pos: at(B, 30, 9, 4), look: B.clone().setY(crownY * 0.62) },
       { T: L + 3.2, pos: at(B, 34, 21, 1), look: at(B, -18, crownY + 4) },
     ];
     // Glide over every area the player rebuilt, last-opened first, ending at the camp.
