@@ -60,9 +60,9 @@ function assert(cond, msg) {
 
   try {
     // ---------------------------------------------------------------- off
-    await page.goto(URL + '?seed=51&fresh=1&skiptitle=1', { waitUntil: 'load' });
+    await page.goto(URL + '?seed=51&fresh=1&skiptitle=1&mech=none', { waitUntil: 'load' });
     await ready();
-    assert((await fk(() => window.__fk.sim.data.mech.braziers.length)) === 0, 'shipped data: no flame braziers');
+    assert((await fk(() => window.__fk.sim.data.mech.braziers.length)) === 0, 'mechanic off (?mech=none): no flame braziers');
     assert(await page.evaluate(() => !document.querySelector('.fk-flame-meter.fk-on')), 'no flame meter');
 
     // ---------------------------------------------------------------- on

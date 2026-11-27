@@ -70,7 +70,17 @@ async function plough(browser) {
 
 async function rescue(browser) {
   const { page, errors } = await open(browser, 'rescue');
-  const shot = (n) => page.screenshot({ path: path.join(OUT, 'rescue-' + n + '.png'), timeout: 90000 });
+  const shot = async (n, mid) => {
+    // Teleports outrun the smoothed camera: snap it onto the player (or the player and their line) first.
+    await page.evaluate((mid) => {
+      const p = __fk.sim.state.player;
+      let x = p.x, z = p.z;
+      if (mid) { const f = Object.values(__fk.sim.state.rescue.pos); for (const q of f) { x += q.x; z += q.z; } x /= f.length + 1; z /= f.length + 1; }
+      __fk.view.rig.snap(x, z - 1.2);
+    }, !!mid);
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: path.join(OUT, 'rescue-' + n + '.png'), timeout: 90000 });
+  };
   const vs = await page.evaluate(() => {
     __fk.cheat.hearth(2);
     __fk.cheat.quality(0);
@@ -124,14 +134,17 @@ async function rescue(browser) {
   assert(d.mounds === 0 || d.mounds < 3, 'dug-out mounds are gone (' + d.mounds + ' left in view)');
   await shot('conga');
   // Leave them outside the glow: they wait (with a bubble), safe.
-  await page.evaluate(() => { const p = __fk.sim.state.player; __fk.cheat.teleport(p.x + 9, p.z); });
+  await page.evaluate(() => { const p = __fk.sim.state.player; __fk.cheat.teleport(p.x, p.z + 9); });
   await page.waitForFunction(() => Object.values(__fk.sim.state.rescue.status).some((s) => s === 'waiting'), null, { timeout: 10000 });
   await page.waitForTimeout(400);
   d = await dbg();
   assert(d.waiting >= 1, 'followers left outside the glow wait (' + d.waiting + ')');
-  await page.evaluate(() => { const p = __fk.sim.state.player; __fk.cheat.teleport(p.x - 5, p.z); });
+  await page.evaluate(() => { const p = __fk.sim.state.player; __fk.cheat.teleport(p.x, p.z - 2.5); });
   await page.waitForTimeout(500);
-  await shot('waiting');
+  await shot('waiting', true);
+  await page.evaluate(() => { const p = __fk.sim.state.player; __fk.cheat.teleport(p.x, p.z - 3); });
+  await page.waitForFunction(() => Object.values(__fk.sim.state.rescue.status).every((s) => s === 'following'), null, { timeout: 10000 });
+  assert(true, 'waiting followers rejoin when the glow reaches them');
   // Lead them home: bring the line into the warmth (positions put at the camp edge, as if walked in).
   const pop0 = await page.evaluate(() => __fk.sim.state.population);
   await page.evaluate(() => {
@@ -157,8 +170,17 @@ async function rescue(browser) {
 (async () => {
   const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   try {
-    if (!only || only === 'plough') await plough(browser);
-    if (!only || only === 'rescue') await rescue(browser);
+    // The dev server reloads the page when files change under it: retry a test on a lost context.
+    const run = async (fn) => {
+      for (let a = 0; ; a++) {
+        try { return await fn(browser); } catch (e) {
+          if (a < 2 && /context was destroyed|navigation|Target closed/i.test(String(e))) { console.log('(page reloaded, retrying)'); continue; }
+          throw e;
+        }
+      }
+    };
+    if (!only || only === 'plough') await run(plough);
+    if (!only || only === 'rescue') await run(rescue);
     console.log('mechanics OK');
   } finally {
     await browser.close();

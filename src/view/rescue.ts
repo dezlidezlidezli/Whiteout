@@ -48,7 +48,7 @@ interface Mound {
   gone: number;
 }
 
-const LAYERS = [0.25, 1.35, 2.9];
+const LAYERS = [0.25, 1.3, 2.7, 4.6];
 const MAX_WARM = 4;
 
 const veilVert = /* glsl */ `
@@ -181,7 +181,7 @@ export class RescueView {
           uCenter: { value: new THREE.Vector3() },
           uClear: { value: new THREE.Vector2(4, 11) },
           uAmt: { value: 0 },
-          uLayerA: { value: [0.42, 0.34, 0.26][i] },
+          uLayerA: { value: [0.4, 0.32, 0.28, 0.3][i] },
           uTime: { value: 0 },
           uColor: { value: new THREE.Color(0xdde6f2) },
           uWarmTint: { value: new THREE.Color(0xffd7a0) },

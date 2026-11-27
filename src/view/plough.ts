@@ -16,6 +16,34 @@ const _q = new THREE.Quaternion();
 const _e = new THREE.Euler();
 const _p = new THREE.Vector3();
 const _s = new THREE.Vector3();
+const _c = new THREE.Color();
+
+/** Packed snow with parallel blade grooves along +Z (texture V), tiling seamlessly cell to cell. */
+function grooveTexture(): THREE.Texture {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#ffffff';
+  g.fillRect(0, 0, 64, 64);
+  for (let y = 0; y < 64; y += 4) {
+    for (let x = 0; x < 64; x += 4) {
+      const n = h01(x, y);
+      g.fillStyle = `rgba(${n > 0.5 ? '255,255,255' : '150,165,195'},${0.08 + n * 0.1})`;
+      g.fillRect(x, y, 4, 4);
+    }
+  }
+  // grooves: darker furrow with a bright lip on one side
+  for (const gx of [6, 19, 33, 45, 58]) {
+    g.fillStyle = 'rgba(95,112,150,0.42)';
+    g.fillRect(gx, 0, 3, 64);
+    g.fillStyle = 'rgba(255,255,255,0.55)';
+    g.fillRect(gx + 3, 0, 1.5, 64);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
 
 function h01(a: number, b: number): number {
   let x = Math.imul((a * 73856093) ^ (b * 19349663), 0x85ebca6b);
@@ -38,6 +66,12 @@ export interface PloughHooks {
 export class PloughView {
   private deep: THREE.InstancedMesh[] = [];
   private banks: THREE.InstancedMesh;
+  /** Cleared swath: packed blue-grey snow with blade grooves along the direction of travel. */
+  private lane: THREE.InstancedMesh;
+  /** Per zone: last drawn deep-cell map (to spot newly cleared cells) and the yaw each cell was cut at. */
+  private prevDeep = new Map<string, Uint8Array>();
+  private cutYaw = new Map<string, Float32Array>();
+  private facing = 0;
   private key = '';
   private prop: THREE.Object3D;
   private label: THREE.Sprite;
@@ -63,10 +97,23 @@ export class PloughView {
       parent.add(im);
       this.deep.push(im);
     }
+    for (const im of this.deep) {
+      // Fresh, bright pillows (instance colour may exceed 1: it multiplies the vertex colours).
+      im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(total * 3), 3);
+    }
+    const lg = new THREE.PlaneGeometry(0.52, 0.52).rotateX(-Math.PI / 2);
+    const lm = new THREE.MeshLambertMaterial({ color: 0x93a6c2, map: grooveTexture(), polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    this.lane = new THREE.InstancedMesh(lg, lm, total);
+    this.lane.count = 0;
+    this.lane.receiveShadow = true;
+    this.lane.renderOrder = 2;
+    parent.add(this.lane);
     const b = getSnowBankMesh({ seed: 1 });
     this.banks = new THREE.InstancedMesh(b.geometry, b.material, total);
     this.banks.count = 0;
     this.banks.receiveShadow = true;
+    this.banks.castShadow = true;
+    this.banks.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(total * 3), 3);
     parent.add(this.banks);
     this.prop = createProp('plough');
     this.prop.visible = false;
@@ -98,10 +145,18 @@ export class PloughView {
     this.key = key;
     const counts = new Array(VARIANTS).fill(0);
     let nb = 0;
+    let nl = 0;
     for (const z of zones) {
       if (!z.open) continue;
       // Which cells are still deep (for edge banks)?
       const deep = new Uint8Array(z.nx * z.nz);
+      const prev = this.prevDeep.get(z.id);
+      let yaws = this.cutYaw.get(z.id);
+      if (!yaws) {
+        // Cells cut before this view existed (a load): grooves along the lot's long axis.
+        yaws = new Float32Array(z.nx * z.nz).fill(z.nz >= z.nx ? 0 : Math.PI / 2);
+        this.cutYaw.set(z.id, yaws);
+      }
       forEachDeepCell(sim, z.id, (x, zz) => {
         const i = Math.floor((x - z.x0) / z.cell);
         const j = Math.floor((zz - z.z0) / z.cell);
@@ -110,23 +165,52 @@ export class PloughView {
         _e.set(0, Math.floor(h01(j, i) * 4) * (Math.PI / 2), 0);
         _q.setFromEuler(_e);
         _p.set(x, this.hooks.groundAt(x, zz), zz);
-        const k = 0.96 + h01(i + 7, j) * 0.1;
-        _s.set(k, 0.9 + h01(i, j + 3) * 0.2, k);
-        this.deep[v].setMatrixAt(counts[v]++, _m.compose(_p, _q, _s));
+        const k = 0.98 + h01(i + 7, j) * 0.1;
+        _s.set(k, 1.35 + h01(i, j + 3) * 0.3, k);
+        const n = counts[v]++;
+        this.deep[v].setMatrixAt(n, _m.compose(_p, _q, _s));
+        const c = 1.16 + h01(j + 11, i) * 0.08;
+        this.deep[v].setColorAt(n, _c.setRGB(c, c, c * 1.02));
       });
+      // Freshly cut cells remember the blade's heading; draw the packed lane.
+      for (let j = 0; j < z.nz; j++) {
+        for (let i = 0; i < z.nx; i++) {
+          const k = j * z.nx + i;
+          if (deep[k]) continue;
+          if (prev && prev[k]) yaws[k] = Math.round(this.facing / (Math.PI / 8)) * (Math.PI / 8);
+          const x = z.x0 + (i + 0.5) * z.cell;
+          const zz = z.z0 + (j + 0.5) * z.cell;
+          _e.set(0, yaws[k], 0);
+          _q.setFromEuler(_e);
+          _p.set(x, this.hooks.groundAt(x, zz) + 0.02, zz);
+          _s.set(1, 1, 1);
+          this.lane.setMatrixAt(nl++, _m.compose(_p, _q, _s));
+        }
+      }
+      this.prevDeep.set(z.id, deep);
       // Cleared cells that border deep snow get a low curled bank (the clean cut edge).
       for (let j = 0; j < z.nz; j++) {
         for (let i = 0; i < z.nx; i++) {
           if (deep[j * z.nx + i]) continue;
           const nbr = (i > 0 && deep[j * z.nx + i - 1]) || (i < z.nx - 1 && deep[j * z.nx + i + 1]) || (j > 0 && deep[(j - 1) * z.nx + i]) || (j < z.nz - 1 && deep[(j + 1) * z.nx + i]);
-          if (!nbr || h01(i * 3, j * 5) > 0.55) continue;
-          const x = z.x0 + (i + 0.5) * z.cell;
-          const zz = z.z0 + (j + 0.5) * z.cell;
-          _e.set(0, h01(i, j) * Math.PI * 2, 0);
+          if (!nbr || h01(i * 3, j * 5) > 0.8) continue;
+          // Push the bank against the deep wall it was shoved into, so the lane stays clean.
+          let ox = 0;
+          let oz = 0;
+          if (i > 0 && deep[j * z.nx + i - 1]) ox -= 1;
+          if (i < z.nx - 1 && deep[j * z.nx + i + 1]) ox += 1;
+          if (j > 0 && deep[(j - 1) * z.nx + i]) oz -= 1;
+          if (j < z.nz - 1 && deep[(j + 1) * z.nx + i]) oz += 1;
+          const x = z.x0 + (i + 0.5) * z.cell + ox * 0.14;
+          const zz = z.z0 + (j + 0.5) * z.cell + oz * 0.14;
+          _e.set(0, Math.atan2(-ox, -oz) + Math.PI / 2 + (h01(i, j) - 0.5) * 0.6, 0);
           _q.setFromEuler(_e);
           _p.set(x, this.hooks.groundAt(x, zz), zz);
-          _s.set(0.45, 0.5, 0.45);
-          this.banks.setMatrixAt(nb++, _m.compose(_p, _q, _s));
+          const sc = 0.58 + h01(j, i * 7) * 0.14;
+          _s.set(sc, sc * (1.15 + h01(i * 5, j) * 0.3), sc);
+          const n = nb++;
+          this.banks.setMatrixAt(n, _m.compose(_p, _q, _s));
+          this.banks.setColorAt(n, _c.setRGB(1.12, 1.12, 1.15));
         }
       }
     }
@@ -135,12 +219,18 @@ export class PloughView {
       this.deep[v].instanceMatrix.needsUpdate = true;
       this.deep[v].computeBoundingSphere();
     }
+    for (const im of this.deep) if (im.instanceColor) im.instanceColor.needsUpdate = true;
+    this.lane.count = nl;
+    this.lane.instanceMatrix.needsUpdate = true;
+    this.lane.computeBoundingSphere();
     this.banks.count = nb;
     this.banks.instanceMatrix.needsUpdate = true;
+    if (this.banks.instanceColor) this.banks.instanceColor.needsUpdate = true;
     this.banks.computeBoundingSphere();
   }
 
   update(sim: Sim, dt: number, px: number, pz: number, facing: number): void {
+    this.facing = facing;
     this.rebuild(sim);
     const st = sim.state.plough;
     const p = sim.state.player;
@@ -235,13 +325,14 @@ export class PloughView {
   }
 
   /** Debug/e2e. */
-  debug(): { deepCells: number; banks: number; ploughVisible: boolean; level: number } {
-    return { deepCells: this.deep.reduce((a, m) => a + m.count, 0), banks: this.banks.count, ploughVisible: this.prop.visible, level: this.level };
+  debug(): { deepCells: number; banks: number; lane: number; ploughVisible: boolean; level: number } {
+    return { deepCells: this.deep.reduce((a, m) => a + m.count, 0), banks: this.banks.count, lane: this.lane.count, ploughVisible: this.prop.visible, level: this.level };
   }
 
   dispose(): void {
     for (const m of this.deep) m.removeFromParent();
     this.banks.removeFromParent();
+    this.lane.removeFromParent();
     this.prop.removeFromParent();
     this.label.removeFromParent();
   }

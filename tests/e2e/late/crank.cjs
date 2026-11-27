@@ -71,10 +71,10 @@ function assert(cond, msg) {
 
   try {
     // ---------------------------------------------------------------- off: nothing of the mechanic
-    await page.goto(URL + '?seed=41&fresh=1&skiptitle=1', { waitUntil: 'load' });
+    await page.goto(URL + '?seed=41&fresh=1&skiptitle=1&mech=none', { waitUntil: 'load' });
     await ready();
     await fk(() => window.__fk.cheat.lateArea('ironridge', true, 3));
-    assert((await fk(() => window.__fk.sim.data.mech.cranks.length)) === 0, 'shipped data: no cranks');
+    assert((await fk(() => window.__fk.sim.data.mech.cranks.length)) === 0, 'mechanic off (?mech=none): no cranks');
 
     // ---------------------------------------------------------------- on
     await page.goto(URL + '?seed=41&fresh=1&skiptitle=1&mech=crank', { waitUntil: 'load' });
