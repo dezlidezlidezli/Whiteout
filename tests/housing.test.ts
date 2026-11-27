@@ -68,3 +68,17 @@ describe('housing for the HUD', () => {
     expect(housingInfo(new Sim(GAME_DATA, { save: b.serialize() })).rehoused).toBeNull();
   });
 });
+
+describe('housed never exceeds capacity', () => {
+  it('a save that already houses more villagers than its homes keeps them, and capacity reads at least that', async () => {
+    const { GAME_DATA } = await import('../src/data');
+    const { Sim } = await import('../src/sim');
+    const a = new Sim(GAME_DATA, { seed: 3 });
+    for (let i = 0; i < 120; i++) a.step(1 / 60);
+    const raw = JSON.parse(a.serialize());
+    raw.state.population = 162; // more than any early camp can house
+    const b = new Sim(GAME_DATA, { save: JSON.stringify(raw) });
+    expect(b.state.population).toBe(162);
+    expect(b.housingCap()).toBeGreaterThanOrEqual(162);
+  });
+});

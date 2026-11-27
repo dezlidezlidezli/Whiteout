@@ -1178,7 +1178,8 @@ export class Sim {
     const h = this.data.camp.housing;
     if (!h) return Infinity;
     const s = this.state;
-    return h.base + h.perTent * s.tents + h.perCabin * h.cabins.filter((c) => s.unlocked[c]).length + (s.stats.rescued ?? 0);
+    const real = h.base + h.perTent * s.tents + h.perCabin * h.cabins.filter((c) => s.unlocked[c]).length + (s.stats.rescued ?? 0);
+    return Math.max(real, s.popFloor ?? 0);
   }
 
   /** A thawed villager reaches the camp: stays if there is a home (a tent rises when one is allowed), else passes through. */

@@ -33,8 +33,11 @@
   align-items: flex-start;
   gap: 8px;
 }
-.fk-col { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
-.fk-row { display: flex; gap: 8px; align-items: center; }
+.fk-col { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; position: relative; flex: 0 1 auto; min-width: 0; }
+/* The Cosy meter hangs under the ember pill without widening the left column: otherwise it
+   squeezes the top row and pushes the settings button off the right edge on narrow phones. */
+.fk-col > .fk-cosy { position: absolute; top: 50px; left: 0; white-space: nowrap; }
+.fk-row { display: flex; gap: 8px; align-items: center; flex: 0 0 auto; }
 
 .fk-pill {
   display: inline-flex;
@@ -56,8 +59,8 @@
 .fk-pill .fk-ico { width: 32px; height: 32px; flex: none; }
 .fk-pill.fk-bump { transform: scale(1.12); }
 .fk-ember { color: #ffe2a8; min-width: 92px; }
-.fk-pop { color: #dcebff; }
-.fk-pop .fk-cap { font-size: 0.72em; opacity: 0.7; margin-left: 1px; font-variant-numeric: tabular-nums; }
+.fk-pop { color: #dcebff; padding-right: 13px; gap: 5px; white-space: nowrap; }
+.fk-pop .fk-cap { font-size: 0.62em; opacity: 0.7; margin-left: 1px; font-variant-numeric: tabular-nums; }
 .fk-pop.fk-full .fk-cap { color: #ffc070; opacity: 1; }
 
 .fk-cosy {

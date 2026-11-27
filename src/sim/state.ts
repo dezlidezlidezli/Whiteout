@@ -167,6 +167,8 @@ export interface SimState {
   stats: Record<string, number>;
   mods: Record<ModKey, number>;
   guideMemo: ItemKind | null;
+  /** Capacity never reads below this (set when a loaded save housed more villagers than its homes). */
+  popFloor?: number;
   /** Turned-away villagers since the last homesFull event (housing.ts). */
   homesFull?: { t: number; n: number };
   /** Set by the v2 -> v3 migration when population was capped to the homes built (HUD explains, then acks). */
@@ -237,7 +239,10 @@ function reseat(s: SimState, data: GameData): void {
   const keep: SimState['customers'] = [];
   for (const c of s.customers) {
     if (c.phase !== 'queue') {
-      s.population += 1;
+      // Already thawed and walking home: they arrive at once, but only if there is a home for them
+      // (this used to add them regardless, pushing the population above the camp's capacity).
+      if (s.population < realHousingCap(s, data)) s.population += 1;
+      else s.stats.passedThrough = (s.stats.passedThrough ?? 0) + 1;
       s.stats.thawed = (s.stats.thawed ?? 0) + 1;
       continue;
     }
@@ -374,6 +379,9 @@ export function normalizeState(s: SimState, data: GameData): void {
     }
   }
   if ((s.layoutRev ?? 1) !== data.layoutRev) reseat(s, data);
+  // Nobody is ever evicted: a save that already houses more villagers than its homes allow keeps
+  // them, and the camp's capacity reads at least that until real homes catch up (Sim.housingCap).
+  if (data.camp.housing && s.population > realHousingCap(s, data)) s.popFloor = Math.max(s.popFloor ?? 0, s.population);
   s.stats = s.stats ?? {};
   s.guideUnload = !!s.guideUnload;
   s.player.returning = s.player.returning ?? null;
@@ -415,4 +423,11 @@ export function normalizeState(s: SimState, data: GameData): void {
   if (!data.mechanics.plough) s.plough.pushing = false;
   if (!data.mechanics.crank) for (const id in s.crank) s.crank[id].blast = 0;
   s.quest.id = data.quests[s.quest.index]?.id;
+}
+
+/** Homes actually built: base + tents + cabins + one per rescued villager (who bring their own). */
+export function realHousingCap(s: SimState, data: GameData): number {
+  const h = data.camp.housing;
+  if (!h) return Infinity;
+  return h.base + h.perTent * s.tents + h.perCabin * h.cabins.filter((c) => s.unlocked[c]).length + (s.stats?.rescued ?? 0);
 }
