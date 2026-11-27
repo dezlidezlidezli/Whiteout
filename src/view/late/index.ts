@@ -26,6 +26,7 @@ import { patchGround } from './groundfx';
 import { Market } from './market';
 import { Mood } from './mood';
 import { Tools } from './tools';
+import { ToastGate } from './toasts';
 
 export interface LateOptions {
   getView(): View;
@@ -56,7 +57,7 @@ export function createLatePresentation(o: LateOptions): LatePresentation {
     director = new FinaleDirector(ctx, { credits, hudRoot: o.hudRoot, ground });
     const beacon = new BeaconView(ctx);
     director.setBeacon(beacon);
-    parts = [beacon, new Couriers(ctx), new Tools(ctx), new Market(ctx), new Crank(ctx), new Mood(ctx, director), new Flame(ctx, ground, o.hudRoot), director];
+    parts = [new ToastGate(ctx), beacon, new Couriers(ctx), new Tools(ctx), new Market(ctx), new Crank(ctx), new Mood(ctx, director), new Flame(ctx, ground, o.hudRoot), director];
     const scene = ctx.view.scene;
     prevBefore = scene.onBeforeRender;
     scene.onBeforeRender = function (...args) {

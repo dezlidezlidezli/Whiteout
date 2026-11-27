@@ -58,6 +58,10 @@ export class Flame implements LatePart {
   private heldFire: THREE.Object3D | null;
   private heldGlow: THREE.Sprite;
   private heldShown = 0;
+  private shownHeld = false;
+  private offT = 99;
+  private downT = -99;
+  private flare = 0;
   private meter: HTMLDivElement;
   private meterBar: HTMLElement;
   private dots: THREE.InstancedMesh;
@@ -209,15 +213,27 @@ export class Flame implements LatePart {
     const p = this.ctx.sim.state.player;
     switch (e.type) {
       case 'flameTaken': {
+        // Set down and taken straight back (or vice versa): no effects, no flicker.
+        if (this.ctx.time - this.downT < 0.6) {
+          this.downT = -99;
+          break;
+        }
         sfxAt(v, 'flameTaken');
         fx.glint(p.x, 1.9, p.z, 14, 1.6);
         if (this.tookOnce++ < 2) hooksOf(v).float('Carry the flame!', new THREE.Vector3(p.x, 3.2, p.z), 'big');
         break;
       }
-      case 'flameDown':
-        sfxAt(v, 'drop', undefined, { pitch: 0.7 });
-        fx.vapour('smoke', p.x, 2.1, p.z);
+      case 'flameDown': {
+        this.downT = this.ctx.time;
+        const at = this.downT;
+        // Effects only if it really stays down for a moment.
+        window.setTimeout(() => {
+          if (this.downT !== at || this.fs.held) return;
+          sfxAt(v, 'drop', undefined, { pitch: 0.7 });
+          fx.vapour('smoke', this.held.position.x, this.held.position.y + 1, this.held.position.z);
+        }, 450);
         break;
+      }
       case 'flameOut': {
         sfxAt(v, 'flameOut');
         _v.copy(this.held.position);
@@ -349,11 +365,24 @@ export class Flame implements LatePart {
     this.gustK += ((inGap && f.held ? 1 : inGap ? 0.6 : 0) - this.gustK) * Math.min(1, dt * 4);
 
     // Held flame visibility (positioned in post, after the pose).
-    this.heldShown += ((f.held ? 1 : 0) - this.heldShown) * Math.min(1, dt * (f.held ? 10 : 6));
+    // Hysteresis: a set-down that is picked straight back up never blinks the firepan or the meter.
+    this.offT = f.held ? 0 : this.offT + dt;
+    const want = f.held || this.offT < 0.45 ? 1 : 0;
+    this.shownHeld = want > 0;
+    this.heldShown += (want - this.heldShown) * Math.min(1, dt * (want ? 10 : 6));
+    // A relieved flare when the flame tops up at a brazier (or the Hearth).
+    if (f.held && f.level - this.lastLevel > 0.12) {
+      this.flare = 1;
+      fxOf(this.ctx.view).glint(this.held.position.x, this.held.position.y + 1.2, this.held.position.z, 10, 1.4);
+      this.meter.classList.remove('fk-fm-flare');
+      void this.meter.offsetWidth;
+      this.meter.classList.add('fk-fm-flare');
+    }
+    this.flare = Math.max(0, this.flare - dt * 1.6);
     this.held.visible = this.heldShown > 0.02;
     this.heldGlow.visible = this.held.visible;
-    if (!f.held && this.stoleLight) this.releaseLight();
-    this.lastLevel = f.level;
+    if (!this.shownHeld && this.stoleLight) this.releaseLight();
+    if (f.held) this.lastLevel = f.level;
 
     this.updateTrailDots(t);
   }
@@ -446,7 +475,8 @@ export class Flame implements LatePart {
       if (this.heldFire) {
         const low = lvl < 0.3;
         const fl = 1 + Math.sin(t * (low ? 23 : 13)) * (low ? 0.16 : 0.07) + Math.sin(t * 29) * 0.05 * (1 + this.gustK);
-        const size = 0.3 + 0.7 * clamp01(lvl);
+        // The fire visibly shrinks through a leg; a top-up flares it big for a moment.
+        const size = (0.22 + 0.78 * clamp01(lvl)) * (1 + this.flare * 0.45);
         this.heldFire.scale.set(size, size * fl * (1 + this.gustK * 0.25), size);
         this.heldFire.rotation.z = this.gustK * (0.45 + Math.sin(t * 17) * 0.15);
       }
@@ -474,13 +504,14 @@ export class Flame implements LatePart {
       this.ambOn = f.held || this.gustK > 0.01;
     }
     // The flame meter: a small pill above the player while carrying.
-    const show = f.held && !v.title;
+    const show = this.shownHeld && !v.title;
     this.meter.classList.toggle('fk-on', show);
     if (show) {
       const pr = v.project(_v.set(p.x, 3.05, p.z));
       this.meter.style.transform = `translate(${pr.x.toFixed(1)}px, ${pr.y.toFixed(1)}px) translate(-50%, -50%)`;
-      this.meterBar.style.width = `${Math.round(clamp01(f.level) * 100)}%`;
-      this.meter.classList.toggle('fk-fm-low', f.level < 0.3);
+      const lv = f.held ? f.level : this.lastLevel;
+      this.meterBar.style.width = `${Math.round(clamp01(lv) * 100)}%`;
+      this.meter.classList.toggle('fk-fm-low', lv < 0.3);
       this.meter.classList.toggle('fk-fm-wind', this.gustK > 0.3);
     }
   }

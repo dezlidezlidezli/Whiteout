@@ -24,6 +24,7 @@ import { ConveyorView } from './conveyors';
 import { PloughView } from './plough';
 import { RescueView } from './rescue';
 import { SkateView } from './skate';
+import { CookingView } from './cooking';
 import { clearSeeSubject, setSeeSubject } from './occlude';
 import { Sky } from './sky';
 
@@ -85,6 +86,9 @@ export class View {
   private rescue: RescueView | null = null;
   private skate: SkateView | null = null;
   private padNote: { id: string; t: number } | null = null;
+  /** Visible cooking at every working processor. */
+  private cooking: CookingView;
+  private cookTops = new Map<string, { in: Partial<Record<ItemKind, THREE.Vector3>>; out: THREE.Vector3 }>();
   private pads = new Map<string, PadVisual>();
   private actors: Actors;
   private crowd: Crowd;
@@ -220,6 +224,12 @@ export class View {
       });
       this.skate.attach(this.actors.player.root);
     }
+    this.cooking = new CookingView(this.scene, {
+      fly: (kind, from, to, dur, arc, hide, land) => this.fly({ kind, from, to: { t: 'point', x: to.x, y: to.y, z: to.z }, dur, arc, hide, land, spin: 0 }),
+      puff: (x, y, z, n, r, sp, sc) => this.fx.puff(x, y, z, n, r, sp, sc),
+      steam: (x, y, z) => this.fx.vapour('steam', x, y, z),
+      glint: (x, y, z, n, sp) => this.fx.glint(x, y, z, n, sp),
+    });
     this.crowd = new Crowd(this.scene, this.data);
     this.crowd.groundAt = (x, z) => this.surface.heightAt(x, z);
     this.crowd.residentCap = quality >= 1 ? 44 : 30;
@@ -743,6 +753,7 @@ export class View {
           const at = this.stationXZ(e.station);
           this.sfx('craft', { volume: 0.55 }, 0.12, at);
           const d = this.sim.stationDefs.get(e.station);
+          if (this.cooking.craft(this.sim, this.world.stations, e.station, e.item)) break;
           if (d && Math.random() < 0.5) this.fx.puff(d.x + (Math.random() - 0.5) * 0.4, this.world.stationTop(d.id), d.z, 1, 0.2, 0.3, 0.35);
           break;
         }
@@ -1053,6 +1064,7 @@ export class View {
     }
     this.crowd.update(sim, alpha, t, dt, px, pz);
     this.world.update(sim, t, dt);
+    this.cooking.update(sim, this.world.stations, this.items, t, dt, px, pz);
     this.dressing.update(sim);
     this.conveyors.update(sim, dt);
     this.colDebug?.update(sim, dt);
@@ -1198,13 +1210,28 @@ export class View {
         const r = this.data.recipes[d.recipe];
         const kinds = Object.keys(r.inputs) as ItemKind[];
         this.world.itemSpot(d.id, null, _v, 'in');
+        // Visible cooking: the item being worked is drawn in the machine, not on the buffer; it reads the
+        // buffer tops (where ingredients are lifted from) and where the next product lands.
+        let tops = this.cookTops.get(d.id);
+        if (!tops) {
+          tops = { in: {}, out: new THREE.Vector3() };
+          this.cookTops.set(d.id, tops);
+          this.cooking.tops.set(d.id, tops);
+        }
+        const busy = this.cooking.inMachine(sim, d.id);
         kinds.forEach((k, i) => {
-          const n = (st.inputs[k] ?? 0) - (this.hidden.get(`st:${d.id}:${k}`) ?? 0);
+          const n = (st.inputs[k] ?? 0) - (this.hidden.get(`st:${d.id}:${k}`) ?? 0) - busy;
           const off = (i - (kinds.length - 1) / 2) * 0.55;
-          items.grid(k, Math.max(0, n), _v.x + Math.cos(yaw) * off, 0.02, _v.z - Math.sin(yaw) * off, yaw, n > 12 ? 6 : 5, kinds.length > 1 ? 1 : n > 12 ? 3 : 2, 0.42);
+          const top = (tops!.in[k] ??= new THREE.Vector3());
+          const bx = _v.x + Math.cos(yaw) * off;
+          const bz = _v.z - Math.sin(yaw) * off;
+          top.set(bx, 0.25, bz);
+          items.grid(k, Math.max(0, n), bx, 0.02, bz, yaw, n > 12 ? 6 : 5, kinds.length > 1 ? 1 : n > 12 ? 3 : 2, 0.42, top);
         });
         this.world.itemSpot(d.id, r.output, _w, 'out');
-        items.grid(r.output, st.output, _w.x, 0.02, _w.z, yaw, st.output > 12 ? 6 : 5, st.output > 12 ? 3 : 2, 0.42);
+        const no = Math.max(0, st.output - (this.hidden.get(`st:${d.id}:${r.output}`) ?? 0));
+        tops.out.set(_w.x, 0.05, _w.z);
+        items.grid(r.output, no, _w.x, 0.02, _w.z, yaw, st.output > 12 ? 6 : 5, st.output > 12 ? 3 : 2, 0.42, tops.out);
       } else if (st.kind === 'counter' && d.type === 'counter') {
         const n = st.stock - (this.hidden.get(`st:${d.id}:${d.item}`) ?? 0);
         this.world.itemSpot(d.id, d.item, _v, 'in');

@@ -489,7 +489,9 @@ export class WorldView {
       if (parts.emitT <= 0) {
         parts.emitT = working ? 0.28 : 1.1;
         const m = parts.steam ?? parts.smoke;
-        if (m && Math.hypot(v.def.x - p.x, v.def.z - p.z) < 22) {
+        // Idle processors look idle: no steam or smoke until they are cooking again.
+        const proc = v.def.type === 'processor';
+        if (m && (working || !proc) && Math.hypot(v.def.x - p.x, v.def.z - p.z) < 22) {
           m.getWorldPosition(_v);
           this.onEmit(parts.steam ? 'steam' : 'smoke', _v.x, _v.y, _v.z);
         }

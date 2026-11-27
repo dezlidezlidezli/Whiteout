@@ -83,6 +83,8 @@ export class OrdersTracker {
     if (want !== this.visible) {
       this.visible = want;
       this.el.classList.toggle('fk-hidden', !want);
+      // Open Season layout: toasts keep clear of the tracker column.
+      this.el.parentElement?.classList.toggle('fk-os', want);
     }
     if (s.season !== this.seasonLv) {
       this.seasonLv = s.season;
