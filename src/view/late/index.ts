@@ -18,6 +18,7 @@ import type { View } from '../view';
 import { BeaconView } from './beacon';
 import { installLateCheats } from './cheats';
 import { Couriers } from './couriers';
+import { Crank } from './crank';
 import type { LateCtx, LatePart } from './ctx';
 import { FinaleDirector } from './finale';
 import { Market } from './market';
@@ -52,7 +53,7 @@ export function createLatePresentation(o: LateOptions): LatePresentation {
     director = new FinaleDirector(ctx, { credits, hudRoot: o.hudRoot });
     const beacon = new BeaconView(ctx);
     director.setBeacon(beacon);
-    parts = [beacon, new Couriers(ctx), new Tools(ctx), new Market(ctx), new Mood(ctx, director), director];
+    parts = [beacon, new Couriers(ctx), new Tools(ctx), new Market(ctx), new Crank(ctx), new Mood(ctx, director), director];
     const scene = ctx.view.scene;
     prevBefore = scene.onBeforeRender;
     scene.onBeforeRender = function (...args) {
