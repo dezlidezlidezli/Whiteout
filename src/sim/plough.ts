@@ -11,7 +11,11 @@ export interface PloughState {
   zones: Record<string, { bits: number[]; cleared: number }>;
   /** Finds already revealed. */
   revealed: Record<string, true>;
+  /** The plough is deployed: the player moves inside a deep-snow zone with it (with a short hysteresis,
+   * so ploughStart / ploughStop fire once per push, not per cleared cell). */
   pushing: boolean;
+  /** Seconds since the player last pushed inside a zone (drives the hysteresis). */
+  offT?: number;
   /** Cells cleared since the last snowCleared event, and time since. */
   acc: Record<string, number>;
   accT: number;
@@ -96,17 +100,20 @@ export function ploughSpeed(sim: Sim, x: number, z: number, vx: number, vz: numb
   return t <= 0 ? m.wade : m.ploughSpeed[Math.min(t, m.ploughSpeed.length) - 1];
 }
 
+const PUSH_GRACE = 0.35;
+
 /** Each step: clear the blade swath around the player, reveal finds, pay completed zones. */
 export function updatePlough(sim: Sim, dt: number): void {
   const st = sim.state.plough;
   const p = sim.state.player;
   const m = sim.data.mech;
   const moving = Math.hypot(p.vx, p.vz) > 0.3;
-  let pushing = false;
+  let inZone = false;
   if (st.tier > 0 && moving) {
     const r = m.bladeRadius[Math.min(st.tier, m.bladeRadius.length) - 1];
     for (const z of m.deepSnow) {
       if (!sim.state.areasOpen[z.area] || p.x < z.x0 - r || p.x > z.x1 + r || p.z < z.z0 - r || p.z > z.z1 + r) continue;
+      inZone = true;
       const { nx, nz, c } = dims(sim, z);
       const zs = zoneState(sim, z);
       const i0 = Math.max(0, Math.floor((p.x - r - z.x0) / c));
@@ -124,7 +131,6 @@ export function updatePlough(sim: Sim, dt: number): void {
         n++;
       }
       if (n === 0) continue;
-      pushing = true;
       zs.cleared += n;
       st.ver[z.id] = (st.ver[z.id] ?? 0) + 1;
       st.acc[z.id] = (st.acc[z.id] ?? 0) + n;
@@ -137,6 +143,9 @@ export function updatePlough(sim: Sim, dt: number): void {
       }
     }
   }
+  // Start at once; stop only after PUSH_GRACE s outside a zone or standing still (one start/stop per push).
+  st.offT = inZone ? 0 : (st.offT ?? 0) + dt;
+  const pushing = inZone || (st.pushing && st.offT < PUSH_GRACE);
   if (pushing !== st.pushing) {
     st.pushing = pushing;
     sim.emit({ type: pushing ? 'ploughStart' : 'ploughStop' });

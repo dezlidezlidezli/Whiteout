@@ -33,13 +33,14 @@ export function updateCustomers(sim: Sim, dt: number): void {
     }
   }
 
-  const price = (item: ItemKind) => sim.dishPrice(item);
+  // Customers are kept in id order (spawned with rising ids, removed in place): look them up by bisection.
+  const byId = (id: number) => findCustomer(s.customers, id);
 
   // Serving (front of each queue).
   for (const c of counters) {
     const cs = s.stations[c.id] as CounterState;
     const frontId = cs.queue[0];
-    const front = frontId !== undefined ? s.customers.find((x) => x.id === frontId) : undefined;
+    const front = frontId !== undefined ? byId(frontId) : undefined;
     if (!front) {
       cs.serveT = 0;
       continue;
@@ -62,22 +63,27 @@ export function updateCustomers(sim: Sim, dt: number): void {
         sim.addStat('served', 1);
         sim.addStat(`served.${c.item}`, 1);
         sim.emit({ type: 'thaw', customer: front.id, x: front.x, z: front.z });
-        sim.addEmbers(c.emberSpot, Math.round(price(c.item) * front.want), `embers_${c.id}`);
+        sim.addEmbers(c.emberSpot, Math.round(sim.dishPrice(c.item) * front.want), `embers_${c.id}`);
       }
     }
   }
 
-  // Movement.
-  const camp = sim.data.camp;
-  const slots = queueSlots(sim);
+  // Movement: queued customers walk to their slot (straight from each counter's queue), the rest thaw/leave.
+  const qStep = b.customerSpeed * dt;
+  for (const c of counterDefs(sim)) {
+    const q = (s.stations[c.id] as CounterState).queue;
+    for (let k = 0; k < q.length; k++) {
+      const cu = byId(q[k]);
+      if (!cu || cu.phase !== 'queue') continue;
+      const t = queueSlotPos(c, k);
+      if (cu.x !== t.x || cu.z !== t.z) moveTo(cu, t.x, t.z, qStep);
+    }
+  }
   for (let i = s.customers.length - 1; i >= 0; i--) {
     const cu = s.customers[i];
+    if (cu.phase === 'queue') continue; // moved above (every queued customer is in its counter's queue)
     const c = sim.stationDefs.get(cu.counter) as CounterDef;
-    if (cu.phase === 'queue') {
-      const slot = slots.get(cu.id) ?? 0;
-      const t = queueSlotPos(c, slot);
-      moveTo(cu, t.x, t.z, b.customerSpeed * dt);
-    } else if (cu.phase === 'thaw') {
+    if (cu.phase === 'thaw') {
       cu.t += dt;
       if (cu.t >= b.thawTime) {
         cu.phase = 'leave';
@@ -98,10 +104,22 @@ export function updateCustomers(sim: Sim, dt: number): void {
       }
     }
   }
-  void camp;
 }
 
-const slotMap = new Map<number, number>();
+/** Bisection over customers sorted by id. */
+function findCustomer(list: CustomerState[], id: number): CustomerState | undefined {
+  let lo = 0;
+  let hi = list.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const v = list[mid].id;
+    if (v === id) return list[mid];
+    if (v < id) lo = mid + 1;
+    else hi = mid - 1;
+  }
+  return undefined;
+}
+
 const counterCache = new WeakMap<object, CounterDef[]>();
 
 function counterDefs(sim: Sim): CounterDef[] {
@@ -113,17 +131,6 @@ function counterDefs(sim: Sim): CounterDef[] {
   return c;
 }
 const slotCache = new WeakMap<CounterDef, { x: number; z: number }[]>();
-
-/** Customer id → queue slot, for every counter (one pass instead of indexOf per customer). */
-function queueSlots(sim: Sim): Map<number, number> {
-  const m = slotMap;
-  m.clear();
-  for (const d of counterDefs(sim)) {
-    const st = sim.state.stations[d.id] as CounterState;
-    for (let i = 0; i < st.queue.length; i++) m.set(st.queue[i], i);
-  }
-  return m;
-}
 
 /** World position of queue slot `slot`: along queuePath when given, else straight along queueDir. */
 export function queueSlotPos(c: CounterDef, slot: number): { x: number; z: number } {
@@ -237,7 +244,7 @@ export function capOf(sim: Sim, def: HelperDef): number {
 function walk(sim: Sim, def: HelperDef, h: HelperState, tx: number, tz: number, arrive: number, dt: number): boolean {
   const d = Math.hypot(tx - h.x, tz - h.z);
   if (d <= arrive) return true;
-  const solids = sim.allSolids();
+  const solids = sim.solidsNear(h.x, h.z);
   const side = h.sideT > 0 ? -1 : 1;
   const dir = steer(h, tx, tz, 0.35, solids, side);
   const sp = helperSpeed(sim, def) * dt;

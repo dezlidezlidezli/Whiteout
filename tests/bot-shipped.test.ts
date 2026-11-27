@@ -38,5 +38,15 @@ describe('headless campaign bot, shipped data (mechanics off)', () => {
     else expect(r.sim.state.stats.fishLeaps ?? 0).toBe(0);
     if (on.plough) expect(r.sim.state.stats.snowCells ?? 0).toBeGreaterThan(0);
     else expect(r.sim.state.stats.snowCells ?? 0).toBe(0);
+    // The flame gates the finale: the whole Trail of Light was lit in order and carried to the Beacon.
+    if (on.flame) {
+      const trail = GAME_DATA.mech.braziers.filter((b) => b.kind === 'trail');
+      expect(trail.length).toBe(7);
+      for (const b of trail) expect(r.sim.state.flame.lit[b.id], b.id).toBe(true);
+      expect(r.sim.state.stats.beaconLit ?? 0).toBe(1);
+      expect(r.sim.state.flame.beaconLit).toBe(true);
+    } else expect(r.sim.state.stats.trailLit ?? 0).toBe(0);
+    if (on.crank) expect(r.sim.state.stats.crankTurns ?? 0).toBeGreaterThan(0);
+    else expect(r.sim.state.stats.crankTurns ?? 0).toBe(0);
   }, 240_000);
 });

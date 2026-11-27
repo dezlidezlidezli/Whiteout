@@ -167,6 +167,10 @@ export interface SimState {
   stats: Record<string, number>;
   mods: Record<ModKey, number>;
   guideMemo: ItemKind | null;
+  /** Turned-away villagers since the last homesFull event (housing.ts). */
+  homesFull?: { t: number; n: number };
+  /** Set by the v2 -> v3 migration when population was capped to the homes built (HUD explains, then acks). */
+  rehoused?: { from: number; to: number } | null;
   /** Guidance is mid-way through handing in items the goal can't use. */
   guideUnload: boolean;
   // ---- v2: late campaign + Open Season ----
@@ -364,6 +368,7 @@ export function normalizeState(s: SimState, data: GameData): void {
       const cap = h.base + h.perTent * s.tents + h.perCabin * cabins;
       if (s.population > cap) {
         s.stats.passedThrough = (s.stats.passedThrough ?? 0) + (s.population - cap);
+        s.rehoused = { from: s.population, to: cap };
         s.population = cap;
       }
     }
@@ -386,6 +391,17 @@ export function normalizeState(s: SimState, data: GameData): void {
   if (s.quest.id) {
     const i = anchorQuest(data, s.quest.id);
     if (i >= 0) s.quest.index = i;
+  }
+  // A save that finished all four Beacon stages but has not seen the finale, from before the flame gated it
+  // (or from a configuration without the flame): the Beacon stands dark, and the chain waits on
+  // "carry the flame to the Beacon" (its guide lights the rest of the trail first).
+  if (data.mechanics.flame && s.beacon >= 4 && (!s.finale || s.finale.phase === 'none') && !s.flame.beaconLit) {
+    const li = data.quests.findIndex((q) => q.goal.type === 'stat' && q.goal.stat === 'beaconLit');
+    if (li >= 0 && s.quest.index > li) {
+      s.quest.index = li;
+      s.quest.base = s.stats.beaconLit ?? 0;
+      s.quest.id = data.quests[li].id;
+    }
   }
   // Switched-off mechanics let go of anything in hand (saves move freely between configurations).
   if (!data.mechanics.flame) {
