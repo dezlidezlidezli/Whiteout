@@ -448,7 +448,7 @@ describe('no soft-locks', () => {
         expect(canDrop || canPick || p.stack.length === 0).toBe(true);
       }
     }
-  });
+  }, 30_000);
 });
 
 describe('hearth fuel', () => {

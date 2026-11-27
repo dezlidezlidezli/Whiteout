@@ -142,7 +142,56 @@ export function findProblems(): string[] {
   return bad;
 }
 
+/** Every metre of the walkable world's outline is a wall/fence, a frost wall, a counter in its gap, a gate
+ * corridor (into another area) or a declared natural edge: no invisible walls. */
+export function bareEdges(): string[] {
+  const rects = D.areas.flatMap((a) => a.rects);
+  const inside = (x: number, z: number, m: number) => rects.some((r) => x > r.x0 + m && x < r.x1 - m && z > r.z0 + m && z < r.z1 - m);
+  const solids = wallSolids(D.dressing);
+  const counters = D.stations.filter((s) => s.type === 'counter');
+  const lines: { a: Vec2; b: Vec2; tol: number }[] = [];
+  for (const w of D.walls) for (let k = 0; k + 1 < w.points.length; k++) lines.push({ a: w.points[k], b: w.points[k + 1], tol: 1.0 });
+  for (const a of D.dressing) for (const e of a.edges ?? []) {
+    for (let k = 0; k + 1 < e.points.length; k++) lines.push({ a: { x: e.points[k][0], z: e.points[k][1] }, b: { x: e.points[k + 1][0], z: e.points[k + 1][1] }, tol: 0.6 });
+  }
+  const bad: string[] = [];
+  for (const r of rects) {
+    const edge: [number, number, number, number][] = [[r.x0, r.z0, r.x1, r.z0], [r.x1, r.z0, r.x1, r.z1], [r.x1, r.z1, r.x0, r.z1], [r.x0, r.z1, r.x0, r.z0]];
+    for (const [ax, az, bx, bz] of edge) {
+      const n = Math.max(1, Math.round(Math.hypot(bx - ax, bz - az) / 0.5));
+      for (let k = 0; k <= n; k++) {
+        const x = ax + ((bx - ax) * k) / n;
+        const z = az + ((bz - az) * k) / n;
+        // Interior (shared with another rect: a gate or an overlap) is not an outline.
+        const ox = (bz - az) !== 0 ? 0.3 : 0;
+        const oz = (bx - ax) !== 0 ? 0.3 : 0;
+        if (inside(x + ox, z + oz, 0) && inside(x - ox, z - oz, 0)) continue;
+        if (solids.some((s) => Math.max(Math.abs(x - s.x) - s.hw, 0) ** 2 + Math.max(Math.abs(z - s.z) - s.hd, 0) ** 2 < 0.6 * 0.6)) continue;
+        if (lines.some((l) => segDist(x, z, l.a, l.b) < l.tol)) continue;
+        if (counters.some((c) => Math.hypot(c.x - x, c.z - z) < 1.8)) continue;
+        bad.push(`bare edge at (${x.toFixed(1)}, ${z.toFixed(1)})`);
+      }
+    }
+  }
+  return bad;
+}
+
 describe('world layout', () => {
+  it('every edge of the walkable world is drawn (no invisible walls); every gate has an arch and a path', () => {
+    const bare = bareEdges();
+    if (bare.length) (globalThis as any).process?.stdout?.write?.(`BARE ${bare.length}\n${bare.slice(0, 60).join('\n')}\nEND\n`);
+    expect(bare).toEqual([]);
+    for (const a of D.areas) {
+      if (a.id === 'camp' || a.id === 'beaconPeak' || a.id === 'kettleYard') continue;
+      const gate = a.rects[1];
+      expect(gate, a.id).toBeDefined();
+      const d = D.dressing.find((x) => x.area === a.id)!;
+      const inGate = (x: number, z: number) => x >= gate.x0 - 1 && x <= gate.x1 + 1 && z >= gate.z0 - 1 && z <= gate.z1 + 1;
+      expect(d.landmarks.some((l) => l.prop === 'woodenArch' && inGate(l.x, l.z)), `${a.id} arch`).toBe(true);
+      expect(d.paths.some((p) => p.points.some(([x, z]) => inGate(x, z))), `${a.id} path`).toBe(true);
+    }
+  });
+
   it('has no clipping, no wall/conveyor/lane intrusions and nothing hidden behind buildings', () => {
     const bad = findProblems();
     if (bad.length) (globalThis as any).process?.stdout?.write?.(`LAYOUT ${bad.length} problems\n${bad.join('\n')}\nEND\n`);

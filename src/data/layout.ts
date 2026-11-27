@@ -70,6 +70,7 @@ export function placeAreas(d: GameData, lanes: Rect[]): { data: GameData; lanes:
       walls: a.walls.map((w) => ({ ...w, points: w.points.map(xz) })),
       paths: a.paths.map((p) => ({ ...p, points: p.points.map(xz) })),
       streams: a.streams.map((s) => ({ ...s, points: s.points.map(xz) })),
+      edges: a.edges?.map((e) => ({ ...e, points: e.points.map(xz) })),
       clutterZones: a.clutterZones.map((c) => ({ ...c, x: c.x + o.x, z: c.z + o.z })),
       landmarks: a.landmarks.map((l) => ({ ...l, x: l.x + o.x, z: l.z + o.z })),
     };

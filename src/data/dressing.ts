@@ -23,6 +23,10 @@ export interface AreaDressing {
   }[];
   /** Hand-placed decor (arches, watch towers, lamp posts, sign boards…). Decorative, no collision. */
   landmarks: { prop: string; x: number; z: number; yaw?: number; seed?: number }[];
+  /** Natural boundaries where a built wall would look wrong (mountain rims, lake shelves): drawn, not solid
+   * (the walkable area already ends there). Every edge of the walkable world has a wall, fence, frost wall,
+   * counter gap, gate corridor or one of these. */
+  edges?: { kind: 'snowBank' | 'rocks' | 'trees' | 'iceShelf'; points: XZ[] }[];
 }
 
 /** Rect (x0..x1, z0..z1) → centre + size. */
@@ -35,7 +39,10 @@ export const DRESSING: AreaDressing[] = [
       { type: 'packedEarth', ...box(-19.4, 19.4, -18, 12) },
       { type: 'cobble', ...box(-2.6, 2.6, -2.6, 2.6) },
     ],
-    walls: [],
+    walls: [
+      { kind: 'fence', points: [[-19.4, 12.2], [-6.8, 12.2]] },
+      { kind: 'fence', points: [[6.8, 12.2], [19.4, 12.2]] },
+    ],
     paths: [
       { type: 'planks', width: 2.0, points: [[0, 2.8], [0, 12.0]] },
       { type: 'trampled', width: 2.2, points: [[-2.8, 0], [-19.4, 0]] },
@@ -61,7 +68,9 @@ export const DRESSING: AreaDressing[] = [
     ],
     walls: [
       // Open to the camp (north); the two counters fill gaps in the south palisade.
-      { kind: 'palisade', points: [[-6.8, 7.4], [-6.8, 16.2], [6.8, 16.2], [6.8, 7.4]], gaps: [{ at: 13.4, width: 2.3 }, { at: 18.6, width: 2.3 }] },
+      { kind: 'palisade', points: [[-6.8, 7.4], [-6.8, 16.2]] },
+      { kind: 'fence', points: [[-6.8, 16.2], [6.8, 16.2]], gaps: [{ at: 4.6, width: 2.3 }, { at: 9.8, width: 2.3 }] },
+      { kind: 'palisade', points: [[6.8, 16.2], [6.8, 7.4]] },
     ],
     paths: [{ type: 'planks', width: 1.6, points: [[-2.2, 7.6], [-2.2, 9.0]] }],
     streams: [{ points: [[-5.9, 5.6], [-5.9, 16.2]], width: 1.4 }],
@@ -76,12 +85,16 @@ export const DRESSING: AreaDressing[] = [
       { type: 'packedEarth', ...box(-13.4, -7.6, -6.0, 8.0) },
       { type: 'planks', ...box(-12.8, -10.0, 2.0, 5.4) },
     ],
-    walls: [{ kind: 'palisade', points: [[-7.8, 10.6], [-27.8, 10.6], [-27.8, -10.2], [-10.2, -10.2]] }],
-    paths: [],
+    walls: [
+      { kind: 'palisade', points: [[-4.6, -3.2], [-7.8, -3.2], [-7.8, -10.2], [-27.8, -10.2], [-27.8, 10.6]] },
+      { kind: 'fence', points: [[-27.8, 10.6], [-7.8, 10.6]] },
+      { kind: 'palisade', points: [[-7.8, 10.6], [-7.8, 3.2], [-4.6, 3.2]] },
+    ],
+    paths: [{ type: 'trampled', width: 2.0, points: [[-4.6, 0], [-9.6, 0]] }],
     streams: [],
     clutterZones: [
     ],
-    landmarks: [{ prop: 'firewoodRack', x: -9.6, z: -8.4, yaw: Math.PI / 2 }, { prop: 'watchTower', x: -21.0, z: 9.8 }],
+    landmarks: [{ prop: 'woodenArch', x: -9.0, z: 0, yaw: Math.PI / 2 }, { prop: 'firewoodRack', x: -9.6, z: -8.4, yaw: Math.PI / 2 }, { prop: 'watchTower', x: -21.0, z: 9.8 }],
   },
   {
     area: 'frozenLake',
@@ -93,12 +106,16 @@ export const DRESSING: AreaDressing[] = [
     ],
     walls: [
       // Counters fill the two gaps in the south palisade; open to the camp (west).
-      { kind: 'palisade', points: [[7.8, 8.0], [35.2, 8.0], [35.2, -10.2], [9.0, -10.2]], gaps: [{ at: 5.8, width: 2.3 }, { at: 13.8, width: 2.3 }] },
+      { kind: 'palisade', points: [[4.6, -3.2], [7.4, -3.2], [7.4, -10.2], [35.2, -10.2], [35.2, 8.0]] },
+      { kind: 'fence', points: [[35.2, 8.0], [7.4, 8.0]], gaps: [{ at: 13.6, width: 2.3 }, { at: 21.6, width: 2.3 }] },
+      { kind: 'palisade', points: [[7.4, 8.0], [7.4, 3.2], [4.6, 3.2]] },
     ],
-    paths: [],
+    paths: [{ type: 'trampled', width: 2.0, points: [[4.6, 0], [8.6, 0]] }],
     streams: [{ points: [[17.4, -1.6], [29.0, -1.6]], width: 0.8 }],
     clutterZones: [{ theme: 'fishing', ...box(28.0, 29, -7.8, -6.4) }],
-    landmarks: [{ prop: 'dryingRack', x: 28.4, z: -2.6, yaw: Math.PI / 2 }],
+    landmarks: [{ prop: 'dryingRack', x: 28.4, z: -2.6, yaw: Math.PI / 2 }, { prop: 'woodenArch', x: 9.0, z: 0, yaw: Math.PI / 2 },
+      // The market lot stands ready (its pads appear at dawn): a closed stall marks it from the start.
+      { prop: 'marketStall', x: 14.8, z: -8.0, yaw: 0 }],
   },
   {
     area: 'ironridge',
@@ -108,22 +125,28 @@ export const DRESSING: AreaDressing[] = [
       { type: 'planks', ...box(5.6, 8.8, -23.6, -15.4) },
     ],
     walls: [
-      { kind: 'palisade', points: [[9.0, -10.2], [9.0, -34.2], [6.5, -34.2]], gaps: [{ at: 6.8, width: 2.3 }, { at: 11.8, width: 2.3 }] },
-      { kind: 'palisade', points: [[-6.5, -34.2], [-16.6, -34.2], [-16.6, -10.2]] },
+      { kind: 'fence', points: [[-16.6, -7.4], [-3.2, -7.4]] },
+      { kind: 'palisade', points: [[-3.2, -7.4], [-3.2, -4.2]] },
+      { kind: 'palisade', points: [[3.2, -4.2], [3.2, -7.4]] },
+      { kind: 'fence', points: [[3.2, -7.4], [9.0, -7.4]] },
+      { kind: 'palisade', points: [[9.0, -7.4], [9.0, -34.2], [8.3, -34.2]], gaps: [{ at: 9.6, width: 2.3 }, { at: 14.6, width: 2.3 }] },
+      { kind: 'palisade', points: [[-8.3, -34.2], [-16.6, -34.2], [-16.6, -7.4]] },
     ],
-    paths: [],
+    paths: [{ type: 'trampled', width: 2.0, points: [[-2.2, -4.2], [-2.2, -8.0]] }],
     streams: [],
     clutterZones: [
       { theme: 'mining', ...box(-10, -8.6, -34, -32.6) },
       { theme: 'mining', ...box(-10, -8.8, -11.2, -10.4) },
       { theme: 'kitchen', ...box(6.6, 8.8, -34, -30.0) },
     ],
-    landmarks: [{ prop: 'toolRack', x: -9.6, z: -23.2, yaw: Math.PI / 2 }, { prop: 'bellows', x: -1.0, z: -10.4 }],
+    landmarks: [{ prop: 'toolRack', x: -9.6, z: -23.2, yaw: Math.PI / 2 }, { prop: 'bellows', x: -1.0, z: -10.4 },
+      { prop: 'woodenArch', x: -2.2, z: -9.0 }],
   },
   {
     area: 'beaconPeak',
     floors: [{ type: 'stone', ...box(-8, 8, -60, -25) }],
-    walls: [{ kind: 'palisade', points: [[-8.3, -26.2], [-8.3, -60.3], [8.3, -60.3], [8.3, -26.2]] }],
+    walls: [],
+    edges: [{ kind: 'rocks', points: [[-8.3, -25.6], [-8.3, -60.3], [8.3, -60.3], [8.3, -25.6]] }],
     paths: [],
     streams: [],
     clutterZones: [],

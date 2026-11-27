@@ -624,6 +624,8 @@ function rescueGuide(sim: Sim): GuideTarget | null {
 /** Skate: chase a fish leap, else build speed along the open ice lane. */
 function skateGuide(sim: Sim): GuideTarget | null {
   const st = sim.state.skate;
+  // A leaping fish needs room in the pack.
+  if (full(sim)) return emptyHands(sim) ?? earn(sim);
   let best: GuideTarget | null = null;
   let bd = Infinity;
   for (const l of st.leaps) {
