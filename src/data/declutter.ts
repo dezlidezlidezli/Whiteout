@@ -14,7 +14,7 @@ export const FOOTPRINT: Record<string, number> = {
 /** Half-depth of a frost wall section. */
 export const FROST_WALL_HALF = 1.7;
 /** Ground-hugging things that may overlap anything. */
-export const FLAT_DECOR = new Set(['snowDrift', 'rugMat']);
+export const FLAT_DECOR = new Set(['snowDrift', 'rugMat', 'gripMat', 'windGap']);
 /** Natural scatter: may overlap each other (a dense forest is fine) but nothing built. */
 export const NATURAL_DECOR = new Set(['pineSnowy', 'rock']);
 /** Small set-dressing that is simply removed if it would stand inside something. */

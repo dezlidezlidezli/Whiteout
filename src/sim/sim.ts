@@ -12,6 +12,11 @@ import { queueSlot, updateCustomers, updateHelpers, hireHelper } from './agents'
 import { computeGuide, type GuideTarget } from './guide';
 import { deliverOrder, orderRoom, updateTotals } from './endless';
 import { finaleWarmRadius, setBeaconStage, updateFinale } from './finale';
+import { procBoost, updateCrank } from './crank';
+import { updateFlame } from './flame';
+import { ploughSpeed, updatePlough } from './plough';
+import { updateRescue } from './rescue';
+import { skateBounce, skateVelocity, updateSkate } from './skate';
 import { migrate } from './save';
 import { nextRandom } from './rng';
 import {
@@ -128,6 +133,11 @@ export class Sim {
     this.updateLinks(dt);
     updateHelpers(this, dt);
     updateCustomers(this, dt);
+    updatePlough(this, dt);
+    updateRescue(this, dt);
+    updateSkate(this, dt);
+    updateCrank(this, dt);
+    updateFlame(this, dt);
     updateFinale(this, dt);
     updateTotals(this, dt);
     this.updateQuest();
@@ -472,18 +482,24 @@ export class Sim {
   private updatePlayer(dt: number): void {
     const p = this.state.player;
     const b = this.data.balance;
-    const speed = b.playerSpeed * this.state.mods.moveSpeed;
+    // Deep snow slows (wading, or pushing the plough); lake ice has momentum (skate.ts).
+    const speed = b.playerSpeed * this.state.mods.moveSpeed * ploughSpeed(this, p.x, p.z, p.vx, p.vz);
     const tx = this.moveX * speed;
     const tz = this.moveZ * speed;
-    const k = Math.min(1, dt * 16);
-    p.vx += (tx - p.vx) * k;
-    p.vz += (tz - p.vz) * k;
+    if (!skateVelocity(this, dt, this.moveX, this.moveZ, speed)) {
+      const k = Math.min(1, dt * 16);
+      p.vx += (tx - p.vx) * k;
+      p.vz += (tz - p.vz) * k;
+    }
     if (Math.abs(p.vx) < 1e-3 && Math.abs(p.vz) < 1e-3) {
       p.vx = 0;
       p.vz = 0;
     }
     if (p.vx !== 0 || p.vz !== 0) {
+      const ox = p.x;
+      const oz = p.z;
       moveCircle(p, p.vx * dt, p.vz * dt, b.playerRadius, this.allSolids(), this.walkRects());
+      skateBounce(this, p.vx * dt, p.vz * dt, p.x - ox, p.z - oz);
       if (Math.hypot(tx, tz) > 0.3) p.facing = Math.atan2(p.vx, p.vz);
     }
   }
@@ -542,7 +558,7 @@ export class Sim {
     }
     if (best) {
       const st = this.state.stations[best.id] as NodeState;
-      if (p.stack.length < p.capacity || st.ground < best.groundCap) {
+      if ((p.stack.length < p.capacity || st.ground < best.groundCap) && !s.flame.held) {
         p.working = best.id;
         st.work += dt * s.mods[best.speedMod ?? 'chopSpeed'];
         if (st.work >= best.hitTime) {
@@ -715,7 +731,7 @@ export class Sim {
 
   private playerPick(): boolean {
     const p = this.state.player;
-    if (p.stack.length >= p.capacity) return false;
+    if (p.stack.length >= p.capacity || this.state.flame.held) return false; // both hands hold the flame
     for (const d of this.stationsInReach()) {
       if (d.id === p.returning) continue;
       const it = this.takeable(d.id);
@@ -836,6 +852,12 @@ export class Sim {
       }
       case 'beacon':
         setBeaconStage(this, e.stage);
+        break;
+      case 'grant':
+        if (e.what === 'plough') s.plough.tier = Math.min(2, s.plough.tier + 1);
+        else if (e.what === 'lantern') s.rescue.lantern = Math.min(2, s.rescue.lantern + 1);
+        else s.skate.tier = 1;
+        this.emit({ type: 'toolUpgrade', tool: e.what === 'skates' ? 'auger' : e.what === 'plough' ? 'axe' : 'kettle', level: 0 });
         break;
       case 'decorate':
         for (const id of e.ids) s.unlocked[id] = true;
@@ -972,7 +994,7 @@ export class Sim {
     if (d.operator === 'required' && !st.operated) can = false;
     st.active = can;
     if (!can) return;
-    let speed = d.speedMod ? this.state.mods[d.speedMod] : 1;
+    let speed = (d.speedMod ? this.state.mods[d.speedMod] : 1) * procBoost(this, d.id);
     if (d.operator === 'boost' && helperOp) speed *= d.boost ?? 1.5;
     st.progress += dt * speed;
     if (st.progress >= r.time) {
@@ -1103,10 +1125,41 @@ export class Sim {
     this.updateQuest();
   }
 
+  /** Homes in the camp: base + tents + cabins (+ every rescued villager, who brings their own). */
+  housingCap(): number {
+    const h = this.data.camp.housing;
+    if (!h) return Infinity;
+    const s = this.state;
+    return h.base + h.perTent * s.tents + h.perCabin * h.cabins.filter((c) => s.unlocked[c]).length + (s.stats.rescued ?? 0);
+  }
+
+  /** A thawed villager reaches the camp: stays if there is a home (a tent rises when one is allowed), else passes through. */
+  welcome(): boolean {
+    const s = this.state;
+    const h = this.data.camp.housing;
+    if (!h) {
+      this.addPopulation(1);
+      return true;
+    }
+    const allowed = Math.min(this.data.camp.tentSpots.length, h.tentsPerLevel[Math.max(0, Math.min(h.tentsPerLevel.length, s.hearth.level) - 1)]);
+    if (s.population >= this.housingCap() && s.tents < allowed) {
+      this.emit({ type: 'tent', index: s.tents });
+      s.tents++;
+      this.invalidateSolids();
+    }
+    if (s.population >= this.housingCap()) {
+      this.addStat('passedThrough', 1);
+      return false;
+    }
+    s.population += 1;
+    return true;
+  }
+
   addPopulation(n: number): void {
     const s = this.state;
     if (n <= 0) return;
     s.population += n;
+    if (this.data.camp.housing) return; // homes rise as villagers need them (welcome())
     const at = this.data.camp.tentAt;
     while (s.tents < at.length && s.tents < this.data.camp.tentSpots.length && s.population >= at[s.tents]) {
       this.emit({ type: 'tent', index: s.tents });

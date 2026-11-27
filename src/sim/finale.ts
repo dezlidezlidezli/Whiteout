@@ -17,10 +17,15 @@ export function setBeaconStage(sim: Sim, stage: number): void {
   if (stage <= s.beacon) return;
   s.beacon = stage;
   sim.emit({ type: 'beaconStage', stage });
-  if (stage >= 4 && s.finale.phase === 'none') {
-    s.finale = { phase: 'lighting', t: 0, progress: 0 };
-    sim.emit({ type: 'finale', phase: 'lighting' });
-  }
+  // Stage 4 completes the Beacon, which then stands dark: carrying the flame to its crown starts the finale (flame.ts).
+}
+
+/** The finale's first phase (called when the carried flame lights the finished Beacon). */
+export function startFinale(sim: Sim): void {
+  const s = sim.state;
+  if (s.finale.phase !== 'none') return;
+  s.finale = { phase: 'lighting', t: 0, progress: 0 };
+  sim.emit({ type: 'finale', phase: 'lighting' });
 }
 
 export function updateFinale(sim: Sim, dt: number): void {

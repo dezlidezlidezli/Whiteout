@@ -195,7 +195,9 @@ export type Effect =
   /** Great Beacon stage complete (1..4); stage 4 starts the finale. */
   | { type: 'beacon'; stage: number }
   /** Cosmetic camp decoration: unlocks these decor ids. */
-  | { type: 'decorate'; ids: string[] };
+  | { type: 'decorate'; ids: string[] }
+  /** Signature-mechanic tools: plough (tier up), rescue lantern (tier up), sharpened skates. */
+  | { type: 'grant'; what: 'plough' | 'lantern' | 'skates' };
 
 export type ToolKind = 'axe' | 'pick' | 'kettle' | 'auger';
 
@@ -234,7 +236,7 @@ export interface PadDef {
   group?: 'upgrade' | 'decor';
 }
 
-export type HelperRole = 'haul' | 'harvest' | 'operate' | 'courier';
+export type HelperRole = 'haul' | 'harvest' | 'operate' | 'courier' | 'crank';
 
 export interface HelperDef {
   id: string;
@@ -294,6 +296,11 @@ export type QuestGuide =
   | { type: 'pad'; pad: string }
   | { type: 'orders' }
   | { type: 'openSeason' }
+  | { type: 'plough'; zone: string }
+  | { type: 'rescue' }
+  | { type: 'skate' }
+  | { type: 'crank'; id: string }
+  | { type: 'flame'; target: 'trail' | 'beacon' | 'festival' }
   | { type: 'none' };
 
 export interface QuestDef {
@@ -315,6 +322,8 @@ export interface CampDef {
   /** Where arriving villagers settle (ring around the hearth). */
   settleMin: number;
   settleMax: number;
+  /** Homes: population is capped by housing (the rest pass through to the valley). Tents rise as needed, up to tentsPerLevel[hearth-1]. */
+  housing?: { base: number; perTent: number; perCabin: number; cabins: string[]; tentsPerLevel: number[] };
 }
 
 export interface Balance {
@@ -401,4 +410,6 @@ export interface GameData {
   dressing: import('./dressing').AreaDressing[];
   /** Bumped whenever world placement changes: saves from an older layout re-seat player, helpers and walkers. */
   layoutRev: number;
+  /** Signature mechanics (plough, rescue, skate, crank, flame). */
+  mech: import('./mechanics').MechDef;
 }

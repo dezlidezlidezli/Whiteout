@@ -62,7 +62,7 @@ function grid<T>(xs: number[], zs: number[], skip: (x: number, z: number) => boo
 
 // Thawed villagers walk round the outside of the palisade to camp.
 const LAKE_EXIT_A: Vec2[] = [{ x: 10.8, z: 8.9 }, { x: 7.4, z: 8.9 }, { x: 6.0, z: 6.0 }, { x: 4.0, z: 4.8 }];
-const LAKE_EXIT_B: Vec2[] = [{ x: 23.8, z: 8.9 }, { x: 29.6, z: 8.9 }, { x: 29.6, z: -10.6 }, { x: 9.6, z: -10.6 }, { x: 3.0, z: -3.0 }];
+const LAKE_EXIT_B: Vec2[] = [{ x: 23.8, z: 8.9 }, { x: 35.6, z: 8.9 }, { x: 35.6, z: -10.6 }, { x: 9.6, z: -10.6 }, { x: 3.0, z: -3.0 }];
 
 const ICE_HOLES: StationDef[] = grid(
   [19.0, 22.0, 25.0], [-8.8, -6.2, -3.6], () => false,
@@ -120,7 +120,7 @@ const ORE_VEINS: StationDef[] = grid(
 );
 
 const PEAK_STATIONS: StationDef[] = [
-  { id: 'shelfPeak', type: 'shelf', area: 'beaconPeak', name: 'Bin', model: 'barrel', x: -5.0, z: -37.0, rot: Math.PI / 2,
+  { id: 'shelfPeak', type: 'shelf', area: 'beaconPeak', name: 'Bin', model: 'barrel', x: -7.0, z: -38.0, rot: Math.PI / 2,
     solid: { hw: 0.4, hd: 0.6 }, reach: 1.3 },
 ];
 
@@ -250,6 +250,10 @@ export const LATE_HELPERS: HelperDef[] = [
     from: ['smokehouseA', 'smokehouseB'], to: ['greatKitchen'], item: 'smokedFish', transferTime: 0.08, route: ROUTE_KITCHEN,
   },
   {
+    id: 'winder', name: 'Winder', role: 'crank', model: 'miner', home: { x: -11.0, z: -23.4 }, capacity: 0, speed: 3,
+    station: 'capLift', transferTime: 0.2,
+  },
+  {
     id: 'chef', name: 'Chef', role: 'operate', model: 'cook', home: { x: 6.2, z: -14.6 }, capacity: 0, speed: 3,
     station: 'greatKitchen', transferTime: 0.2,
   },
@@ -258,9 +262,26 @@ export const LATE_HELPERS: HelperDef[] = [
 // ------------------------------------------------------------------ pads
 
 const HEARTH_SPOT = { x: 4.2, z: 4.2 };
-const BEACON_PAD = { x: 0, z: -30.4 };
+const BEACON_PAD = { x: 0, z: -52.0 };
 
 export const LATE_PADS: PadDef[] = [
+  // ---- Signature mechanics ----
+  { id: 'pad_plough', area: 'pinewood', x: -9.4, z: -5.6, label: 'Snow plough', cost: 450, materials: { plank: 10 }, requires: ['pad_woodbelt'],
+    effects: [{ type: 'grant', what: 'plough' }], icon: { prop: 'plough' } },
+  { id: 'pad_lantern', area: 'camp', x: 4.2, z: -4.2, label: 'Rescue lantern', cost: 600, requires: ['pad_stoker'],
+    effects: [{ type: 'grant', what: 'lantern' }, { type: 'unlock', id: 'foundBoard' }], icon: { prop: 'lanternHeld' } },
+  { id: 'pad_lantern2', area: 'camp', x: 4.2, z: -4.2, label: 'Brighter lantern', cost: 2600, requires: ['pad_lantern', 'pad_hearth4'],
+    effects: [{ type: 'grant', what: 'lantern' }], icon: { prop: 'lanternHeld' } },
+  { id: 'pad_skates', area: 'frozenLake', x: 27.4, z: -5.2, label: 'Sharpened skates', cost: 2200, materials: { ingot: 6 }, requires: ['pad_forge'],
+    effects: [{ type: 'grant', what: 'skates' }], icon: { prop: 'iceHole' } },
+  { id: 'pad_bellows', area: 'ironridge', x: -13.0, z: -13.0, label: 'Forge bellows', cost: 1400, requires: ['pad_forge'],
+    effects: [{ type: 'unlock', id: 'capBellows' }], icon: { prop: 'bellows' } },
+  { id: 'pad_mineLift', area: 'ironridge', x: -13.0, z: -21.0, label: 'Mine lift', cost: 2000, requires: ['pad_miner'],
+    effects: [{ type: 'unlock', id: 'capLift' }, { type: 'unlock', id: 'shaftPile' }, { type: 'unlock', id: 'mineLiftFrame' }], icon: { prop: 'mineLift' } },
+  { id: 'pad_winder', area: 'ironridge', x: -11.4, z: -17.0, label: 'Hire a winder', cost: 3200, requires: ['pad_mineLift'],
+    effects: [{ type: 'hire', helper: 'winder' }], icon: { character: 'miner' } },
+  { id: 'pad_ploughBlade', area: 'ironridge', x: -13.8, z: -17.0, label: 'Wide plough blade', cost: 2000, materials: { ingot: 6 }, requires: ['pad_mineLift'],
+    effects: [{ type: 'grant', what: 'plough' }], icon: { prop: 'plough' } },
   // ---- Frozen Lake ----
   { id: 'pad_smokehouseA', area: 'frozenLake', x: 13.6, z: 1.4, label: 'Smokehouse', cost: 550, requires: ['pad_hearth3'],
     effects: [{ type: 'unlock', id: 'smokehouseA' }], icon: { prop: 'smokehouse' } },
@@ -337,16 +358,15 @@ export const LATE_PADS: PadDef[] = [
   // ---- Beacon Peak ----
   { id: 'pad_beacon1', area: 'beaconPeak', ...BEACON_PAD, label: 'Beacon: timber frame', cost: 2800, materials: { plank: 60 },
     requires: ['pad_hearth5'], effects: [{ type: 'beacon', stage: 1 }], icon: { prop: 'beacon', level: 1 } },
-  { id: 'pad_peakLights', area: 'beaconPeak', x: -5.0, z: -31.2, label: 'Trail braziers', cost: 4200, requires: ['pad_beacon1'],
-    effects: [{ type: 'unlock', id: 'peakBrazier1' }, { type: 'unlock', id: 'peakBrazier2' }, { type: 'unlock', id: 'peakBrazier3' },
-      { type: 'unlock', id: 'peakBrazier4' }, { type: 'mod', key: 'moveSpeed', mul: 1.1 }], icon: { prop: 'brazier' } },
+  { id: 'pad_peakLights', area: 'beaconPeak', x: 5.0, z: -30.6, label: 'Warm cloaks', cost: 4200, requires: ['pad_beacon1'],
+    effects: [{ type: 'mod', key: 'moveSpeed', mul: 1.1 }], icon: { prop: 'brazier' } },
   { id: 'pad_beacon2', area: 'beaconPeak', ...BEACON_PAD, label: 'Beacon: iron crown', cost: 4800, materials: { ingot: 40 },
     requires: ['pad_beacon1'], effects: [{ type: 'beacon', stage: 2 }], icon: { prop: 'beacon', level: 2 } },
   { id: 'pad_feastCounterB', area: 'ironridge', x: 7.6, z: -22.0, label: 'Second feast counter', cost: 5600, requires: ['pad_beacon1'],
     effects: [{ type: 'unlock', id: 'feastCounterB' }], icon: { prop: 'counter' } },
   { id: 'pad_chef', area: 'ironridge', x: 6.4, z: -13.2, label: 'Hire a chef', cost: 5000, requires: ['pad_beacon2'],
     effects: [{ type: 'hire', helper: 'chef' }], icon: { character: 'cook' } },
-  { id: 'pad_pack7', area: 'beaconPeak', x: 5.0, z: -31.2, label: 'Summit pack', cost: 5400, materials: { ingot: 12, plank: 20 },
+  { id: 'pad_pack7', area: 'beaconPeak', x: -5.0, z: -31.2, label: 'Summit pack', cost: 5400, materials: { ingot: 12, plank: 20 },
     requires: ['pad_beacon2'], effects: [{ type: 'capacity', add: 5 }], icon: { item: 'plank' } },
   { id: 'pad_beacon3', area: 'beaconPeak', ...BEACON_PAD, label: 'Beacon: fire bed', cost: 4600, materials: { log: 60 },
     requires: ['pad_beacon2'], effects: [{ type: 'beacon', stage: 3 }], icon: { prop: 'beacon', level: 3 } },
@@ -392,22 +412,15 @@ export const LATE_DECOR: DecorDef[] = [
   { id: 'lakeLantern1', area: 'frozenLake', model: 'lantern', x: 10.6, z: 7.4 },
   { id: 'lakeLantern2', area: 'frozenLake', model: 'lantern', x: 15.2, z: 7.4 },
   { id: 'lakeLantern3', area: 'frozenLake', model: 'lantern', x: 28.4, z: -9.4 },
-  { id: 'lakeBrazier', area: 'frozenLake', model: 'brazier', x: 28.0, z: -5.0 },
   { id: 'lakeSled', area: 'frozenLake', model: 'sled', x: 28.0, z: -0.4, rot: 1.2, solid: { r: 0.6 } },
-  { id: 'lakeBarrel', area: 'frozenLake', model: 'barrel', x: 27.6, z: -8.8, solid: { r: 0.35 } },
   // Ironridge
   { id: 'cabin5', area: 'ironridge', model: 'cabin', x: -8.4, z: -28.0, rot: 1.2, scale: 0.72, unlockedBy: 'pad_cabin5', solid: { hw: 0.94, hd: 0.8 } },
   { id: 'ridgeLantern1', area: 'ironridge', model: 'lantern', x: -1.0, z: -26.0 },
   { id: 'ridgeLantern2', area: 'ironridge', model: 'lantern', x: 6.4, z: -24.6 },
-  { id: 'ridgeBrazier', area: 'ironridge', model: 'brazier', x: -0.4, z: -22.2 },
   { id: 'ridgeCrate', area: 'ironridge', model: 'crate', x: -9.3, z: -25.3, solid: { r: 0.4 } },
   { id: 'sign_peak', area: 'ironridge', model: 'signpost', x: -4.4, z: -29.4, rot: 0.3 },
   // Beacon Peak
-  { id: 'greatBeacon', area: 'beaconPeak', model: 'beacon', x: 0, z: -35.4, solid: { r: 2.2 } },
-  { id: 'peakBrazier1', area: 'beaconPeak', model: 'brazier', x: -3.0, z: -31.0, unlockedBy: 'pad_peakLights' },
-  { id: 'peakBrazier2', area: 'beaconPeak', model: 'brazier', x: 3.0, z: -31.0, unlockedBy: 'pad_peakLights' },
-  { id: 'peakBrazier3', area: 'beaconPeak', model: 'brazier', x: -4.4, z: -35.6, unlockedBy: 'pad_peakLights' },
-  { id: 'peakBrazier4', area: 'beaconPeak', model: 'brazier', x: 4.4, z: -35.6, unlockedBy: 'pad_peakLights' },
+  { id: 'greatBeacon', area: 'beaconPeak', model: 'beacon', x: 0, z: -57.0, solid: { r: 2.2 } },
   // Open Season decorations (camp; drawn once unlocked by their pad).
   ...[60, 120, 240, 300].map((deg, i): DecorDef => {
     const a = (deg * Math.PI) / 180;
@@ -417,7 +430,7 @@ export const LATE_DECOR: DecorDef[] = [
   { id: 'decoBench2', area: 'camp', model: 'bench', x: 2.6, z: -2.3, rot: -0.85, unlockedBy: 'deco_benches' },
   { id: 'decoSnowman1', area: 'camp', model: 'snowman', x: -2.4, z: -6.0, unlockedBy: 'deco_snowmen' },
   { id: 'decoSnowman2', area: 'camp', model: 'snowman', x: 2.4, z: -6.0, scale: 0.8, unlockedBy: 'deco_snowmen' },
-  { id: 'decoSnowman3', area: 'camp', model: 'snowman', x: -2.4, z: 6.4, scale: 0.6, unlockedBy: 'deco_snowmen' },
+  { id: 'decoSnowman3', area: 'camp', model: 'snowman', x: -4.6, z: 7.2, scale: 0.6, unlockedBy: 'deco_snowmen' },
   { id: 'decoFlag1', area: 'camp', model: 'signpost', x: -1.8, z: 10.8, unlockedBy: 'deco_bunting' },
   { id: 'decoFlag2', area: 'camp', model: 'signpost', x: 1.8, z: 10.8, unlockedBy: 'deco_bunting' },
   { id: 'decoFlag3', area: 'camp', model: 'signpost', x: -1.8, z: -11.6, unlockedBy: 'deco_bunting' },
@@ -461,6 +474,6 @@ export const FINALE: FinaleDef = {
   lightingTime: 5,
   dawnTime: 9,
   reward: 5000,
-  rewardSpot: { x: 0, z: -29.0 },
+  rewardSpot: { x: 2.6, z: -53.6 },
   warmRadius: 120,
 };

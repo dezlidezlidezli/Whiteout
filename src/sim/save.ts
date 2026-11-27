@@ -31,6 +31,9 @@ const MIGRATIONS: Record<number, (s: any) => any> = {
     },
     mods: { ...s.mods, fishSpeed: 1, mineSpeed: 1, priceMul: 1 },
   }),
+  // v2 -> v3: the five signature mechanics (fresh state, filled in by normalizeState: a save past the finale
+  // keeps the Trail of Light and the Beacon lit) and housed population (rehoused by normalizeState).
+  2: (s) => ({ ...s, version: 3, rehouse: true }),
 };
 
 export function migrate(raw: { v?: number; state?: any }): SimState {

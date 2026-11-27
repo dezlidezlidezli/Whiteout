@@ -75,9 +75,23 @@ export function placeAreas(d: GameData, lanes: Rect[]): { data: GameData; lanes:
     };
   });
   const finale = { ...d.finale, rewardSpot: sh(d.finale.rewardSpot, 'beaconPeak') };
+  const m = d.mech;
+  const zoneArea = new Map(m.deepSnow.map((z) => [z.id, z.area] as const));
+  const mech = {
+    ...m,
+    deepSnow: m.deepSnow.map((z) => shRect(z, z.area)),
+    finds: m.finds.map((f) => ({ ...f, ...sh(f, zoneArea.get(f.zone) ?? 'camp') })),
+    villagers: m.villagers.map((v) => ({ ...v, ...sh(v, v.area) })),
+    ice: m.ice.map((r) => shRect(r, 'frozenLake')),
+    gripMats: m.gripMats.map((g) => ({ ...g, ...sh(g, 'frozenLake') })),
+    cranks: m.cranks.map((c) => ({ ...c, ...sh(c, c.area) })),
+    braziers: m.braziers.map((b) => ({ ...b, ...sh(b, b.area) })),
+    windGaps: m.windGaps.map((r) => shRect(r, 'beaconPeak')),
+    beacon: { ...m.beacon, ...sh(m.beacon, 'beaconPeak') },
+  };
   const outLanes = [shRect(lanes[0], 'frozenLake'), shRect(lanes[1], 'ironridge')];
   return {
-    data: { ...d, stations, decor, pads, links, helpers, areas, dressing, finale, playerStart: sh(d.playerStart, 'kettleYard') },
+    data: { ...d, stations, decor, pads, links, helpers, areas, dressing, finale, mech, playerStart: sh(d.playerStart, 'kettleYard') },
     lanes: outLanes,
   };
 }

@@ -52,6 +52,38 @@ export type SimEvent =
   | { type: 'orderComplete'; order: number; item: ItemKind; reward: number }
   | { type: 'seasonUp'; level: number }
   /** An item thrown away at a bin (after a 'drop' event to the bin station). */
-  | { type: 'binned'; bin: string; item: ItemKind };
+  | { type: 'binned'; bin: string; item: ItemKind }
+  // ---- signature mechanics ----
+  | { type: 'ploughStart' }
+  | { type: 'ploughStop' }
+  | { type: 'snowCleared'; zone: string; cells: number }
+  | { type: 'findRevealed'; find: string; kind: 'embers' | 'crate' | 'villager' | 'landmark'; x: number; z: number }
+  | { type: 'zoneCleared'; zone: string }
+  | { type: 'lanternOn' }
+  | { type: 'lanternOff' }
+  | { type: 'digStart'; id: string }
+  | { type: 'rescued'; id: string }
+  | { type: 'followerWait'; id: string }
+  | { type: 'followerHome'; id: string }
+  | { type: 'areaAllFound'; area: AreaId }
+  | { type: 'allFound' }
+  | { type: 'skateStart' }
+  | { type: 'skateStop' }
+  | { type: 'fishLeapSpawn'; id: number; x: number; z: number }
+  | { type: 'fishLeapCatch'; combo: number; x: number; z: number }
+  | { type: 'skateBounce' }
+  | { type: 'crankNotch'; id: string }
+  | { type: 'crankTurn'; id: string }
+  | { type: 'blast'; id: string; level: number }
+  | { type: 'liftArrive'; id: string; n: number }
+  | { type: 'flameTaken' }
+  | { type: 'flameDown' }
+  | { type: 'flameLevel'; v: number }
+  | { type: 'flameOut' }
+  | { type: 'brazierLit'; id: string }
+  | { type: 'trailComplete' }
+  | { type: 'beaconLit' }
+  /** A thawed villager found no free home and walked on to the valley. */
+  | { type: 'passThrough'; customer: number };
 
 export type SimEventType = SimEvent['type'];

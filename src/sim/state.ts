@@ -1,6 +1,11 @@
 import type { AreaId, GameData, ItemCounts, ItemKind, ModKey } from '../data/types';
+import { createCrank, type CrankState } from './crankstate';
+import { createFlame, type FlameState } from './flame';
+import { createPlough, type PloughState } from './plough';
+import { createRescue, type RescueState } from './rescue';
+import { createSkate, type SkateState } from './skate';
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export interface PlayerState {
   x: number;
@@ -111,6 +116,8 @@ export interface OrderState {
   n: number;
   got: number;
   reward: number;
+  /** Lantern Festival order: light `n` festival lamps with a carried flame (item unused). */
+  festival?: boolean;
 }
 
 /** Lifetime stats for the stats page. */
@@ -174,6 +181,12 @@ export interface SimState {
   totals: Totals;
   /** World layout revision this state was laid out for (GameData.layoutRev). */
   layoutRev?: number;
+  // ---- v3: signature mechanics ----
+  plough: PloughState;
+  rescue: RescueState;
+  skate: SkateState;
+  crank: CrankState;
+  flame: FlameState;
 }
 
 export const DEFAULT_MODS: Record<ModKey, number> = {
@@ -303,6 +316,11 @@ export function createState(data: GameData, seed: number): SimState {
     season: 1,
     totals: createTotals(),
     layoutRev: data.layoutRev,
+    plough: createPlough(),
+    rescue: createRescue(),
+    skate: createSkate(),
+    crank: createCrank(),
+    flame: createFlame(),
   };
   normalizeState(s, data);
   return s;
@@ -322,6 +340,31 @@ export function normalizeState(s: SimState, data: GameData): void {
     s.player.z = s.player.pz = data.playerStart.z;
     s.player.vx = s.player.vz = 0;
     delete (s as { relocatePlayer?: boolean }).relocatePlayer;
+  }
+  s.plough = { ...createPlough(), ...(s.plough ?? {}) };
+  s.rescue = { ...createRescue(), ...(s.rescue ?? {}) };
+  s.skate = { ...createSkate(), ...(s.skate ?? {}) };
+  s.crank = s.crank ?? createCrank();
+  s.flame = { ...createFlame(), ...(s.flame ?? {}) };
+  // A save that already lit the Beacon (or started the finale) keeps the whole Trail of Light lit.
+  if (s.finale && s.finale.phase !== 'none') {
+    s.flame.beaconLit = true;
+    for (const b of data.mech.braziers) if (b.kind === 'trail') s.flame.lit[b.id] = true;
+  }
+  // v2 -> v3: population becomes housed villagers (capped by the homes built); the rest passed through.
+  if ((s as { rehouse?: boolean }).rehouse) {
+    delete (s as { rehouse?: boolean }).rehouse;
+    const h = data.camp.housing;
+    if (h) {
+      const lv = Math.max(1, Math.min(h.tentsPerLevel.length, s.hearth.level));
+      s.tents = Math.min(s.tents, h.tentsPerLevel[lv - 1], data.camp.tentSpots.length);
+      const cabins = h.cabins.filter((c) => s.unlocked[c]).length;
+      const cap = h.base + h.perTent * s.tents + h.perCabin * cabins;
+      if (s.population > cap) {
+        s.stats.passedThrough = (s.stats.passedThrough ?? 0) + (s.population - cap);
+        s.population = cap;
+      }
+    }
   }
   if ((s.layoutRev ?? 1) !== data.layoutRev) reseat(s, data);
   s.stats = s.stats ?? {};

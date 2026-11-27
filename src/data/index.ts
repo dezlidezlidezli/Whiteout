@@ -2,6 +2,7 @@ import { BALANCE } from './balance';
 import { ITEMS, RECIPES } from './items';
 import { QUESTS } from './quests';
 import { DRESSING } from './dressing';
+import { MECH, mechDecor, mechStations } from './mechanics';
 import { ENDLESS, FINALE, LATE_DECOR, LATE_HELPERS, LATE_LANES, LATE_LINKS, LATE_PADS, LATE_STATIONS } from './late';
 import { growForest, LAYOUT_REV, packTents, placeAreas } from './layout';
 import type { GameData } from './types';
@@ -11,6 +12,8 @@ export * from './types';
 export { declutter, FLAT_DECOR, FOOTPRINT, FROST_WALL_HALF, NATURAL_DECOR, TOLERANCE, segDist } from './declutter';
 export { ITEM_KINDS, ITEMS, RECIPES } from './items';
 export { ORDER_BOARD } from './late';
+export { MECH } from './mechanics';
+export type { MechDef } from './mechanics';
 export { DRESSING, wallSolids } from './dressing';
 export type { AreaDressing, FloorType, XZ } from './dressing';
 
@@ -23,8 +26,8 @@ const AUTHORED: GameData = {
   balance: BALANCE,
   areas: AREAS,
   walls: WALLS,
-  stations: [...STATIONS, ...LATE_STATIONS],
-  decor: [...DECOR, ...LATE_DECOR],
+  stations: [...STATIONS, ...LATE_STATIONS, ...mechStations()],
+  decor: [...DECOR, ...LATE_DECOR, ...mechDecor()],
   pads: [...PADS, ...LATE_PADS],
   helpers: [...HELPERS, ...LATE_HELPERS],
   links: [...LINKS, ...LATE_LINKS],
@@ -35,6 +38,7 @@ const AUTHORED: GameData = {
   finale: FINALE,
   dressing: DRESSING,
   layoutRev: LAYOUT_REV,
+  mech: MECH,
 };
 
 /** Every area placed at its world offset, tent plots packed into the camp, the forest grown around it all. */

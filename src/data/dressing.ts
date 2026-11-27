@@ -76,11 +76,10 @@ export const DRESSING: AreaDressing[] = [
       { type: 'packedEarth', ...box(-13.4, -7.6, -6.0, 8.0) },
       { type: 'planks', ...box(-12.8, -10.0, 2.0, 5.4) },
     ],
-    walls: [{ kind: 'palisade', points: [[-7.8, 10.6], [-21.8, 10.6], [-21.8, -10.2], [-10.2, -10.2]] }],
+    walls: [{ kind: 'palisade', points: [[-7.8, 10.6], [-27.8, 10.6], [-27.8, -10.2], [-10.2, -10.2]] }],
     paths: [],
     streams: [],
     clutterZones: [
-      { theme: 'lumber', ...box(-21.5, -20.7, -10, 7.4) },
     ],
     landmarks: [{ prop: 'firewoodRack', x: -9.6, z: -8.4, yaw: Math.PI / 2 }, { prop: 'watchTower', x: -21.0, z: 9.8 }],
   },
@@ -94,7 +93,7 @@ export const DRESSING: AreaDressing[] = [
     ],
     walls: [
       // Counters fill the two gaps in the south palisade; open to the camp (west).
-      { kind: 'palisade', points: [[7.8, 8.0], [29.2, 8.0], [29.2, -10.2], [9.0, -10.2]], gaps: [{ at: 5.8, width: 2.3 }, { at: 13.8, width: 2.3 }] },
+      { kind: 'palisade', points: [[7.8, 8.0], [35.2, 8.0], [35.2, -10.2], [9.0, -10.2]], gaps: [{ at: 5.8, width: 2.3 }, { at: 13.8, width: 2.3 }] },
     ],
     paths: [],
     streams: [{ points: [[17.4, -1.6], [29.0, -1.6]], width: 0.8 }],
@@ -110,7 +109,7 @@ export const DRESSING: AreaDressing[] = [
     ],
     walls: [
       { kind: 'palisade', points: [[9.0, -10.2], [9.0, -34.2], [6.5, -34.2]], gaps: [{ at: 6.8, width: 2.3 }, { at: 11.8, width: 2.3 }] },
-      { kind: 'palisade', points: [[-6.5, -34.2], [-10.2, -34.2], [-10.2, -10.2]] },
+      { kind: 'palisade', points: [[-6.5, -34.2], [-16.6, -34.2], [-16.6, -10.2]] },
     ],
     paths: [],
     streams: [],
@@ -119,16 +118,16 @@ export const DRESSING: AreaDressing[] = [
       { theme: 'mining', ...box(-10, -8.8, -11.2, -10.4) },
       { theme: 'kitchen', ...box(6.6, 8.8, -34, -30.0) },
     ],
-    landmarks: [{ prop: 'toolRack', x: -9.6, z: -19.6, yaw: Math.PI / 2 }],
+    landmarks: [{ prop: 'toolRack', x: -9.6, z: -23.2, yaw: Math.PI / 2 }, { prop: 'bellows', x: -1.0, z: -10.4 }],
   },
   {
     area: 'beaconPeak',
-    floors: [{ type: 'stone', ...box(-6.5, 6.5, -38, -25) }],
-    walls: [{ kind: 'palisade', points: [[-6.8, -26.2], [-6.8, -38.2], [6.8, -38.2], [6.8, -26.2]] }],
+    floors: [{ type: 'stone', ...box(-8, 8, -60, -25) }],
+    walls: [{ kind: 'palisade', points: [[-8.3, -26.2], [-8.3, -60.3], [8.3, -60.3], [8.3, -26.2]] }],
     paths: [],
     streams: [],
-    clutterZones: [{ theme: 'beacon', ...box(4.8, 6.5, -38, -36.6) }],
-    landmarks: [{ prop: 'flagPole', x: -5.8, z: -33.0 }, { prop: 'flagPole', x: 5.8, z: -33.0 }],
+    clutterZones: [],
+    landmarks: [{ prop: 'flagPole', x: -7.0, z: -30.2 }, { prop: 'flagPole', x: 7.0, z: -30.6 }],
   },
 ];
 

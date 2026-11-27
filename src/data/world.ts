@@ -15,10 +15,10 @@ export const AREAS: AreaDef[] = [
   // A village-sized camp (authored in world space; the other areas are placed around it by layout.ts).
   { id: 'camp', name: 'Camp', rects: [{ x0: -19.4, x1: 19.4, z0: -18, z1: 12 }], hearth: 1, focus: { x: 0, z: 0 } },
   { id: 'kettleYard', name: 'Kettle Yard', rects: [{ x0: -6.5, x1: 6.5, z0: 5.5, z1: 16.2 }], hearth: 1, focus: { x: 0, z: 11 } },
-  { id: 'pinewood', name: 'Pinewood', rects: [{ x0: -21.5, x1: -7.6, z0: -10, z1: 10.4 }, { x0: -8.4, x1: -4.6, z0: -3, z1: 3 }], hearth: 2, focus: { x: -14, z: 0 } },
-  { id: 'frozenLake', name: 'Frozen Lake', rects: [{ x0: 7.6, x1: 29, z0: -10, z1: 7.8 }, { x0: 4.6, x1: 8.4, z0: -3, z1: 3 }], hearth: 3, focus: { x: 18, z: 0 } },
-  { id: 'ironridge', name: 'Ironridge', rects: [{ x0: -10, x1: 8.8, z0: -34, z1: -7.6 }, { x0: -3, x1: 3, z0: -8.4, z1: -4.2 }], hearth: 4, focus: { x: 0, z: -16 } },
-  { id: 'beaconPeak', name: 'Beacon Peak', rects: [{ x0: -6.5, x1: 6.5, z0: -38, z1: -25 }], hearth: 5, focus: { x: 0, z: -32 } },
+  { id: 'pinewood', name: 'Pinewood', rects: [{ x0: -27.5, x1: -7.6, z0: -10, z1: 10.4 }, { x0: -8.4, x1: -4.6, z0: -3, z1: 3 }], hearth: 2, focus: { x: -14, z: 0 } },
+  { id: 'frozenLake', name: 'Frozen Lake', rects: [{ x0: 7.6, x1: 35, z0: -10, z1: 7.8 }, { x0: 4.6, x1: 8.4, z0: -3, z1: 3 }], hearth: 3, focus: { x: 18, z: 0 } },
+  { id: 'ironridge', name: 'Ironridge', rects: [{ x0: -16.4, x1: 8.8, z0: -34, z1: -7.6 }, { x0: -3, x1: 3, z0: -8.4, z1: -4.2 }], hearth: 4, focus: { x: 0, z: -16 } },
+  { id: 'beaconPeak', name: 'Beacon Peak', rects: [{ x0: -8, x1: 8, z0: -60, z1: -25 }], hearth: 5, focus: { x: 0, z: -40 } },
 ];
 
 export const WALLS: WallDef[] = [
@@ -176,9 +176,11 @@ export const PADS: PadDef[] = [
     effects: [{ type: 'unlock', id: 'kettleB' }], icon: { prop: 'kettle' } },
   { id: 'pad_counterB', area: 'kettleYard', x: 3.2, z: 14.4, label: 'Second counter', cost: 120, requires: ['pad_kettleB'],
     effects: [{ type: 'unlock', id: 'counterB' }], icon: { prop: 'counter' } },
+  { id: 'pad_ladles', area: 'camp', x: -4.0, z: 9.0, label: 'Iron ladles', cost: 140, requires: ['pad_counterB'],
+    effects: [{ type: 'mod', key: 'cookSpeed', mul: 1.25 }, { type: 'mod', key: 'transferRate', mul: 1.15 }], icon: { prop: 'kettle' } },
   { id: 'pad_fisherYard', area: 'kettleYard', x: -4.0, z: 7.2, label: 'Hire a fisher', cost: 150, requires: ['pad_counterB'],
     requiresPop: 6, effects: [{ type: 'hire', helper: 'yardFisher' }], icon: { character: 'fisher' } },
-  { id: 'pad_porter', area: 'kettleYard', x: 4.4, z: 7.6, label: 'Hire a porter', cost: 210, requires: ['pad_fisherYard'],
+  { id: 'pad_porter', area: 'kettleYard', x: 4.4, z: 7.6, label: 'Hire a porter', cost: 170, requires: ['pad_fisherYard'],
     requiresPop: 10, effects: [{ type: 'hire', helper: 'porter' }], icon: { character: 'porter' } },
   { id: 'pad_crateB', area: 'kettleYard', x: -4.4, z: 15.2, label: 'Cut another fishing hole', cost: 180, requires: ['pad_porter'],
     effects: [{ type: 'unlock', id: 'streamHole2' }], icon: { prop: 'iceHole' } },
@@ -232,6 +234,7 @@ export const CAMP: CampDef = {
     const a = (deg * Math.PI) / 180;
     return { x: Math.cos(a) * r, z: Math.sin(a) * r };
   }).concat(TENT_EXTRA).map(({ x, z }) => ({ x, z, rot: Math.atan2(-x, -z) })),
+  housing: { base: 8, perTent: 5, perCabin: 12, cabins: ['cabin1', 'cabin2', 'cabin3', 'cabin4', 'cabin5'], tentsPerLevel: [4, 8, 11, 14, 16] },
   settleMin: 3.6,
   settleMax: 9.0,
 };
@@ -240,14 +243,13 @@ export const DECOR: DecorDef[] = [
   { id: 'cabin1', area: 'camp', model: 'cabin', x: -12.4, z: -11.4, rot: 0.5, scale: 0.72, unlockedBy: 'pad_cabin1', solid: { hw: 0.94, hd: 0.8 } },
   { id: 'cabin2', area: 'camp', model: 'cabin', x: 12.4, z: -11.4, rot: -0.5, scale: 0.72, unlockedBy: 'pad_cabin2', solid: { hw: 0.94, hd: 0.8 } },
   { id: 'cabin3', area: 'camp', model: 'cabin', x: 12.4, z: 8.0, rot: -2.4, scale: 0.72, unlockedBy: 'pad_cabin3', solid: { hw: 0.94, hd: 0.8 } },
-  { id: 'sign_yard', area: 'camp', model: 'signpost', x: 3.6, z: 10.6, rot: 0.3 },
+  { id: 'sign_yard', area: 'camp', model: 'signpost', x: 5.6, z: 10.4, rot: 0.3 },
   { id: 'lantern2', area: 'kettleYard', model: 'lantern', x: 6.2, z: 8.4 },
   { id: 'lantern3', area: 'kettleYard', model: 'lantern', x: -6.2, z: 15.9 },
   { id: 'bench1', area: 'camp', model: 'bench', x: -2.6, z: 2.3, rot: 2.3 },
   { id: 'bench2', area: 'camp', model: 'bench', x: 2.6, z: 2.3, rot: -2.3 },
   { id: 'barrel1', area: 'kettleYard', model: 'barrel', x: -5.0, z: 6.2, solid: { r: 0.4 } },
   { id: 'snowman1', area: 'camp', model: 'snowman', x: -12.8, z: 10.0, solid: { r: 0.45 } },
-  { id: 'brazier1', area: 'pinewood', model: 'brazier', x: -9.4, z: 9.6 },
   { id: 'sled1', area: 'pinewood', model: 'sled', x: -12.0, z: -9.4, rot: 0.6, solid: { r: 0.6 } },
   { id: 'sign_lake', area: 'frozenLake', model: 'signpost', x: 9.4, z: 4.0, rot: -0.4 },
   { id: 'sign_ridge', area: 'ironridge', model: 'signpost', x: -4.0, z: -9.6, rot: 0.2 },
