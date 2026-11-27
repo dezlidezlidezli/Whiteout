@@ -79,6 +79,31 @@ describe('snow plough', () => {
     expect(sim.state.unlocked.crateFindPine).toBe(true);
     expect(sim.state.rescue.revealed.lv_pine5).toBe(true);
   });
+  it('one ploughStart / ploughStop per push, even over half-cleared ground', () => {
+    const sim = fresh();
+    unlockTo(sim, 'pad_woodbelt');
+    sim.completePad('pad_plough');
+    const z = M.deepSnow.find((d) => d.id === 'dsPine')!;
+    const zx = (z.x0 + z.x1) / 2;
+    // Clear every other lane first, so the push below crosses cleared and deep cells in turn.
+    for (let x = z.x0 + 0.4; x < z.x1; x += 2.4) {
+      tp(sim, x, z.z0 + 0.4);
+      walk(sim, 0, 1, (z.z1 - z.z0) / 5);
+    }
+    stand(sim, 1);
+    sim.drainEvents();
+    // Zig-zag across the cleared lanes (deep, clear, deep, ...) and turn round, all inside the zone.
+    tp(sim, zx - 1.5, z.z0 + 2);
+    sim.setMove(0.5, 1);
+    sim.advance(1.2);
+    sim.setMove(0.5, -1);
+    sim.advance(1.0);
+    sim.setMove(0, 0);
+    sim.advance(1);
+    const ev = sim.drainEvents().filter((e) => e.type === 'ploughStart' || e.type === 'ploughStop').map((e) => e.type);
+    expect(ev).toEqual(['ploughStart', 'ploughStop']);
+    expect(sim.state.plough.pushing).toBe(false);
+  });
   it('deep snow never lies on a helper home or courier trail', () => {
     for (const z of M.deepSnow) {
       for (const h of GAME_DATA.helpers) {

@@ -45,7 +45,7 @@ export class Autopilot {
     }
     // Give other stations a wide berth so we don't grab things we don't need on the way.
     const near = (x: number, z: number) => Math.abs(x - p.x) < 6 && Math.abs(z - p.z) < 6;
-    const avoid = sim.allSolids().filter((s) => near(s.x, s.z));
+    const avoid = sim.solidsNear(p.x, p.z).filter((s) => near(s.x, s.z));
     for (const d of sim.data.stations) {
       if (d.id === t.id || d.type === 'node' || !near(d.x, d.z) || !sim.isUsable(d.id)) continue;
       avoid.push({ kind: 'circle', x: d.x, z: d.z, r: Math.max(0.5, d.reach - (d.type === 'pile' ? 0.25 : 0.45)) });

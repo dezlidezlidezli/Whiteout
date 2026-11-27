@@ -392,6 +392,17 @@ export function normalizeState(s: SimState, data: GameData): void {
     const i = anchorQuest(data, s.quest.id);
     if (i >= 0) s.quest.index = i;
   }
+  // A save that finished all four Beacon stages but has not seen the finale, from before the flame gated it
+  // (or from a configuration without the flame): the Beacon stands dark, and the chain waits on
+  // "carry the flame to the Beacon" (its guide lights the rest of the trail first).
+  if (data.mechanics.flame && s.beacon >= 4 && (!s.finale || s.finale.phase === 'none') && !s.flame.beaconLit) {
+    const li = data.quests.findIndex((q) => q.goal.type === 'stat' && q.goal.stat === 'beaconLit');
+    if (li >= 0 && s.quest.index > li) {
+      s.quest.index = li;
+      s.quest.base = s.stats.beaconLit ?? 0;
+      s.quest.id = data.quests[li].id;
+    }
+  }
   // Switched-off mechanics let go of anything in hand (saves move freely between configurations).
   if (!data.mechanics.flame) {
     s.flame.held = false;

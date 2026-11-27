@@ -1,7 +1,7 @@
 // Deterministic game simulation. Pure TypeScript: no three.js, no DOM, no Date/Math.random.
 
 import type {
-  CounterDef, DepositDef, Effect, GameData, ItemKind, LinkDef, NodeDef, PadDef, PileDef, ProcessorDef, Rect, Solid,
+  CounterDef, DepositDef, Effect, GameData, HelperDef, ItemKind, LinkDef, NodeDef, PadDef, PileDef, ProcessorDef, Rect, Solid,
   StationDef, Vec2,
 } from '../data/types';
 import { moveCircle, navNext, pushOut } from './collision';
@@ -62,6 +62,9 @@ export class Sim {
   private navSolids: Solid[] | null = null;
   private navRects: Rect[] | null = null;
   private allCache: Solid[] | null = null;
+  /** Spatial index over allSolids(): 4 m cells, each listing every solid within SOLID_REACH of the cell. */
+  private gridOf: Solid[] | null = null;
+  private grid = new Map<number, Solid[]>();
   private allCacheBase: Solid[] | null = null;
   private allCacheVer = -1;
   /** Bumped whenever a node falls or regrows (invalidates allSolids). */
@@ -144,6 +147,21 @@ export class Sim {
     updateFinale(this, dt);
     updateTotals(this, dt);
     this.updateQuest();
+  }
+
+  private operators: Map<string, HelperDef[]> | null = null;
+  /** Operator helpers (hired or not) that work this station. */
+  private operatorsOf(station: string): HelperDef[] {
+    if (!this.operators) {
+      this.operators = new Map();
+      for (const h of this.data.helpers) {
+        if (h.role !== 'operate' || !h.station) continue;
+        const l = this.operators.get(h.station) ?? [];
+        l.push(h);
+        this.operators.set(h.station, l);
+      }
+    }
+    return this.operators.get(station) ?? NO_HELPERS;
   }
 
   /** Run many fixed steps (headless). */
@@ -291,6 +309,34 @@ export class Sim {
       if (st.alive) out.push({ kind: 'circle', x: d.x, z: d.z, r: d.solid.r });
     }
     return out;
+  }
+
+  /**
+   * The solids that can matter for something at (x, z): pushing out (any radius) and steering with up to
+   * ~6 m of look-ahead. A superset of what is near; never allocates per call.
+   */
+  solidsNear(x: number, z: number): Solid[] {
+    const all = this.allSolids();
+    if (this.gridOf !== all) {
+      this.gridOf = all;
+      this.grid.clear();
+      for (const s of all) {
+        const ext = (s.kind === 'circle' ? s.r : Math.hypot(s.hw, s.hd)) + SOLID_REACH;
+        const x0 = Math.floor((s.x - ext) / SOLID_CELL);
+        const x1 = Math.floor((s.x + ext) / SOLID_CELL);
+        const z0 = Math.floor((s.z - ext) / SOLID_CELL);
+        const z1 = Math.floor((s.z + ext) / SOLID_CELL);
+        for (let i = x0; i <= x1; i++) {
+          for (let j = z0; j <= z1; j++) {
+            const k = cellKey(i, j);
+            let l = this.grid.get(k);
+            if (!l) this.grid.set(k, (l = []));
+            l.push(s);
+          }
+        }
+      }
+    }
+    return this.grid.get(cellKey(Math.floor(x / SOLID_CELL), Math.floor(z / SOLID_CELL))) ?? NO_SOLIDS;
   }
 
   walkRects(): Rect[] {
@@ -501,7 +547,7 @@ export class Sim {
     if (p.vx !== 0 || p.vz !== 0) {
       const ox = p.x;
       const oz = p.z;
-      moveCircle(p, p.vx * dt, p.vz * dt, b.playerRadius, this.allSolids(), this.walkRects());
+      moveCircle(p, p.vx * dt, p.vz * dt, b.playerRadius, this.solidsNear(p.x, p.z), this.walkRects());
       skateBounce(this, p.vx * dt, p.vz * dt, p.x - ox, p.z - oz);
       if (Math.hypot(tx, tz) > 0.3) p.facing = Math.atan2(p.vx, p.vz);
     }
@@ -983,10 +1029,9 @@ export class Sim {
   private updateProcessor(d: ProcessorDef, st: ProcState, dt: number, playerNear: boolean): void {
     const r = this.data.recipes[d.recipe];
     let helperOp = false;
-    for (const id in this.state.helpers) {
-      const hd = this.data.helpers.find((h) => h.id === id);
-      const h = this.state.helpers[id];
-      if (hd && hd.role === 'operate' && hd.station === d.id && h.phase === 'work') helperOp = true;
+    for (const hd of this.operatorsOf(d.id)) {
+      const h = this.state.helpers[hd.id];
+      if (h && h.phase === 'work') helperOp = true;
     }
     st.operated = helperOp || playerNear;
     let can = st.output + r.outputCount <= Math.max(d.outputCap, MIN_OUTPUT_CAP);
@@ -1172,6 +1217,13 @@ export class Sim {
     }
   }
 }
+
+const SOLID_CELL = 4;
+/** Reach covered by solidsNear: pushes (radius + up to ~1 m) and steering look-ahead (3.2 m + solid size). */
+const SOLID_REACH = 6.5;
+const NO_SOLIDS: Solid[] = [];
+const NO_HELPERS: HelperDef[] = [];
+const cellKey = (i: number, j: number) => (i + 4096) * 8192 + (j + 4096);
 
 export function sumCounts(c: Partial<Record<ItemKind, number>> | undefined): number {
   let n = 0;
