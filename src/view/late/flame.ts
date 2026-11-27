@@ -352,7 +352,7 @@ export class Flame implements LatePart {
     }
     const s = this.ctx.sim.state;
     const open = !!s.areasOpen[trail[0].area];
-    const key = trail.map((l) => (this.isLit(l) ? 1 : 0)).join('') + (open ? 'o' : 'c') + (s.beacon >= 4 ? 'b' : '');
+    const key = trail.map((l) => (this.isLit(l) ? 1 : 0)).join('') + (open ? 'o' : 'c') + (s.beacon >= 4 ? 'b' : '') + (this.fs.beaconLit ? 'L' : '');
     if (key !== this.dotKey) {
       this.dotKey = key;
       const pts: { x: number; z: number; next: boolean }[] = [];

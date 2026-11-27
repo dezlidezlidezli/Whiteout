@@ -31,8 +31,12 @@ describe('headless campaign bot, shipped data (mechanics off)', () => {
     expect(r.longestNoGuide).toBeLessThan(10);
     expect(r.ordersDone).toBeGreaterThanOrEqual(10);
     expect(r.upgradesBought).toBeGreaterThanOrEqual(3);
-    expect(r.sim.state.orders.every((o) => !o.festival)).toBe(true);
-    expect(r.sim.state.stats.fishLeaps ?? 0).toBe(0);
-    expect(r.sim.state.stats.snowCells ?? 0).toBe(0);
+    // A mechanic that is switched off must leave no trace; one that is on must actually get used.
+    const on = GAME_DATA.mechanics;
+    if (!on.flame) expect(r.sim.state.orders.every((o) => !o.festival)).toBe(true);
+    if (on.skate) expect(r.sim.state.stats.fishLeaps ?? 0).toBeGreaterThan(0);
+    else expect(r.sim.state.stats.fishLeaps ?? 0).toBe(0);
+    if (on.plough) expect(r.sim.state.stats.snowCells ?? 0).toBeGreaterThan(0);
+    else expect(r.sim.state.stats.snowCells ?? 0).toBe(0);
   }, 240_000);
 });

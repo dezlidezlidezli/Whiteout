@@ -109,9 +109,18 @@ function assert(cond, msg) {
     // Let it go out in the cold: nothing lost, relight at a brazier.
     await fk(() => window.__fk.sim.drainEvents());
     const cold = await fk(() => {
-      const m = window.__fk.sim.data.mech;
-      const b = m.beacon;
-      return { x: b.x + 5.5, z: b.z + 4 };
+      // A spot on the peak well away from every lit brazier (and outside the Hearth's warmth).
+      const sim = window.__fk.sim;
+      const m = sim.data.mech;
+      const a = sim.data.areas.find((x) => x.id === 'beaconPeak').rects[0];
+      let best = null;
+      for (let x = a.x0 + 1; x <= a.x1 - 1; x += 0.5)
+        for (let z = a.z0 + 1; z <= a.z1 - 1; z += 0.5) {
+          let d = Infinity;
+          for (const b of m.braziers) d = Math.min(d, Math.hypot(b.x - x, b.z - z));
+          if (!best || d > best.d) best = { x, z, d };
+        }
+      return best;
     });
     r = await standAt(cold.x, cold.z, 22, false);
     assert(!r.held, 'the flame goes out in the cold');
@@ -131,6 +140,36 @@ function assert(cond, msg) {
     await page.waitForTimeout(1800);
     await shot('flame-beacon-lit');
     assert(await page.evaluate(() => !!document.querySelector('.fk-ui.fk-cinema')), 'finale cinematic runs');
+    // ---------------------------------------------------------------- Lantern Festival (Open Season)
+    await fk(() => {
+      window.__fk.cheat.lateOpenSeason(false);
+      const s = window.__fk.sim.state;
+      // Make sure a festival order is on the board (they are drawn at random).
+      if (!s.orders.some((o) => o.festival)) {
+        s.orders.pop();
+        s.orders.push({ id: s.nextOrderId++, item: 'fish', n: window.__fk.sim.data.mech.festivalLamps.length, got: 0, reward: 900, festival: true });
+      }
+      s.player.stack = [];
+    });
+    // Wrap up the finale cinematic: skip to the thank-you card and continue into Open Season.
+    await fk(() => window.__fk.cheat.timescale(1));
+    await page.waitForTimeout(3000);
+    await page.touchscreen.tap(195, 600);
+    await page.waitForSelector('.fk-cr-go', { timeout: 20000 });
+    await page.waitForTimeout(800);
+    await page.click('.fk-cr-go', { force: true });
+    await page.waitForTimeout(1500);
+    assert(await page.evaluate(() => !!document.querySelector('.fk-ord.fk-ord-fest')), 'Lantern Festival order card shows a lamp');
+    await fk(() => window.__fk.cheat.timescale(0.0001));
+    r = await standAt(H.x + 1.4, H.z + 0.8, 1.2);
+    assert(r.held, 'flame taken for the festival');
+    const lamps = await fk(() => window.__fk.sim.data.mech.festivalLamps);
+    for (let i = 0; i < lamps.length - 1; i++) await standAt(lamps[i].x + 0.5, lamps[i].z + 0.4, 0.15, false);
+    const got = await fk(() => (window.__fk.sim.state.orders.find((o) => o.festival) || { got: -1 }).got);
+    assert(got >= lamps.length - 1, `festival lamps light the order (${got}/${lamps.length})`);
+    await fk(() => window.__fk.cheat.lateGo(window.__fk.sim.data.camp.hearth.x, window.__fk.sim.data.camp.hearth.z + 3));
+    await page.waitForTimeout(1800);
+    await shot('flame-festival');
     assert(errors.length === 0, 'no console errors' + (errors.length ? ': ' + errors.slice(0, 5).join(' | ') : ''));
     console.log('flame e2e: all good. Screenshots in', OUT);
   } finally {

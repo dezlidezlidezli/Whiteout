@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import type { NodeDef, ToolKind } from '../../data/types';
 import type { SimEvent } from '../../sim';
 import { animateCharacter, type CharacterRig } from '../models';
-import { backOut, fxOf, hooksOf, sfxAt, type LateCtx, type LatePart } from './ctx';
+import { backOut, fxOf, hooksOf, sfxAt, worldOf, type LateCtx, type LatePart } from './ctx';
 
 type HandTool = 'axe' | 'pick' | 'auger';
 
@@ -117,7 +117,39 @@ export class Tools implements LatePart {
     sfxAt(v, 'hammer', undefined, { pitch: 1.3, volume: 0.8 });
   }
 
+  /** Steel kettles: recolour the copper of every kettle prop to brushed steel (vertex colours, once). */
+  private steelKettles(): void {
+    const sim = this.ctx.sim;
+    if ((sim.state.tools.kettle ?? 0) < 1) return;
+    for (const d of sim.data.stations) {
+      if (d.type !== 'processor' || !/kettle/i.test(d.model)) continue;
+      const sv = worldOf(this.ctx.view).stations.get(d.id);
+      if (!sv || sv.obj.userData.fkSteel) continue;
+      sv.obj.userData.fkSteel = true;
+      sv.obj.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (!m.isMesh || o.name === 'flame' || o.name === 'coals' || o.parent?.name === 'flame' || o.parent?.name === 'coals') return;
+        const col = m.geometry.getAttribute('color') as THREE.BufferAttribute | undefined;
+        if (!col) return;
+        m.geometry = m.geometry.clone();
+        const c = m.geometry.getAttribute('color') as THREE.BufferAttribute;
+        for (let i = 0; i < c.count; i++) {
+          const r = c.getX(i);
+          const g = c.getY(i);
+          const b = c.getZ(i);
+          // Copper (warm orange-brown) -> brushed steel; wood, stone and bowls are left alone.
+          if (r > 0.25 && r > g * 1.35 && g > b * 1.05 && r - b > 0.2) {
+            const l = 0.3 * r + 0.59 * g + 0.11 * b;
+            c.setXYZ(i, Math.min(1, l * 0.9 + 0.3), Math.min(1, l * 0.95 + 0.33), Math.min(1, l + 0.38));
+          }
+        }
+        c.needsUpdate = true;
+      });
+    }
+  }
+
   frame(dt: number): void {
+    this.steelKettles();
     const sim = this.ctx.sim;
     const s = sim.state;
     const p = s.player;
@@ -140,7 +172,7 @@ export class Tools implements LatePart {
     }
     this.handS += ((kind ? 1 : 0) - this.handS) * Math.min(1, dt * 12);
     this.hand.visible = this.handS > 0.02;
-    this.hand.scale.setScalar(Math.max(0.001, this.handS * 1.35));
+    this.hand.scale.setScalar(Math.max(0.001, this.handS * 1.75));
 
     if (this.aloft) {
       const a = this.aloft;

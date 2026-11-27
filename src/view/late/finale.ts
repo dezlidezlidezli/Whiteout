@@ -34,7 +34,7 @@ const MORNING = {
   fog: C(0xcbd6e4), horizon: C(0xf6dcc0), zenith: C(0x4f86c8), glow: C(0xffc48a),
   hemiSky: C(0xfff1de), hemiGround: C(0x7c6c54), hemiI: 1.22, sun: C(0xffe4bc), sunI: 2.0, near: 34, far: 96,
 };
-const DAWN = { fog: C(0xf2c4a2), horizon: C(0xffc48e), glow: C(0xffb070), sun: C(0xffc490), hemiSky: C(0xffdcc0) };
+const DAWN = { fog: C(0xf4cdb0), horizon: C(0xffd2a0), glow: C(0xffb878), sun: C(0xffc490), hemiSky: C(0xffdcc0) };
 
 const _c = new THREE.Color();
 const _v = new THREE.Vector3();
@@ -153,7 +153,10 @@ export class FinaleDirector implements LatePart, MoodSource {
     this.applyGrade(true);
   }
 
+  private startedAt = 0;
+
   private start(fromEvent: boolean): void {
+    this.startedAt = this.ctx.time;
     this.active = true;
     this.live = fromEvent;
     this.buildKeys();
@@ -182,7 +185,7 @@ export class FinaleDirector implements LatePart, MoodSource {
     if (!this.active || this.deps.credits.open) return;
     const t = e.target as HTMLElement | null;
     if (t && t.closest('.fk-sheet, .fk-sheet-back')) return;
-    if (this.camT < 2) return;
+    if (this.ctx.time - this.startedAt < 2) return;
     const end = this.L + this.D + 6;
     if (this.camT < end - 1) this.camT = end - 1;
     this.showCredits();
@@ -289,8 +292,18 @@ export class FinaleDirector implements LatePart, MoodSource {
     const t1 = L + D + 4.4;
     areas.forEach((a, i) => {
       const T = t0 + ((t1 - t0) * (i + 0.5)) / Math.max(1, areas.length);
-      const f = new THREE.Vector3(a.focus.x, 0, a.focus.z);
-      keys.push({ T, pos: at(f, 21, 25), look: at(f, -2, 0.5) });
+      // Frame the whole yard: centre and size from its walkable rects.
+      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+      for (const r of a.rects) {
+        x0 = Math.min(x0, r.x0);
+        x1 = Math.max(x1, r.x1);
+        z0 = Math.min(z0, r.z0);
+        z1 = Math.max(z1, r.z1);
+      }
+      const f = Number.isFinite(x0) ? new THREE.Vector3((x0 + x1) / 2, 0, (z0 + z1) / 2) : new THREE.Vector3(a.focus.x, 0, a.focus.z);
+      const span = Number.isFinite(x0) ? Math.max(x1 - x0, (z1 - z0) * 0.8) : 18;
+      const dist = THREE.MathUtils.clamp(span * 0.85, 13, 30);
+      keys.push({ T, pos: at(f, dist * 0.78, dist * 0.92), look: at(f, -0.5, 0.5) });
     });
     keys.push({ T: L + D + 6.6, pos: at(H, 24, 18, 2), look: H.clone().setY(1.0) });
     keys.push({ T: L + D + 9, pos: at(H, 15.5, 9.5, 3), look: H.clone().setY(1.4) });
@@ -347,7 +360,7 @@ export class FinaleDirector implements LatePart, MoodSource {
 
     if (this.active) {
       this.camT += sdt;
-      if (this.camT > 2 && !this.deps.credits.open && !this.creditsDone) this.skipEl.classList.add('fk-on');
+      if (this.ctx.time - this.startedAt > 2 && !this.deps.credits.open && !this.creditsDone) this.skipEl.classList.add('fk-on');
       if (this.camT >= this.L + this.D + 8.6 && f.phase === 'done') this.showCredits();
     }
     const want = this.active ? 1 : 0;
@@ -405,7 +418,8 @@ export class FinaleDirector implements LatePart, MoodSource {
     fog.near = THREE.MathUtils.lerp(NIGHT.near, MORNING.near, g) + cin * 14;
     fog.far = THREE.MathUtils.lerp(NIGHT.far, MORNING.far, g) + cin * (60 + 30 * g);
     su.uHorizon.value.copy(NIGHT.fog).lerp(MORNING.horizon, g).lerp(DAWN.horizon, peak * 0.7);
-    su.uZenith.value.copy(NIGHT.zenith).lerp(MORNING.zenith, smooth(g * 1.7));
+    // Blue climbs the sky early so the warm colour stays a band on the horizon (no orange wall).
+    su.uZenith.value.copy(NIGHT.zenith).lerp(MORNING.zenith, smooth(g * 2.4));
     su.uGlow.value.copy(NIGHT.glow).lerp(MORNING.glow, g).lerp(DAWN.glow, peak * 0.6);
     su.uAurora.value = 1 - g;
     const aurora = sky['aurora'] as THREE.Object3D | null;
