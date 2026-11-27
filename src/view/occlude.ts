@@ -24,8 +24,20 @@ export function seeThrough(m: THREE.Material): THREE.Material {
   c.onBeforeCompile = (sh, r) => {
     prev?.call(m, sh, r);
     sh.uniforms.uSee = seeUniforms.uSee;
+    // World height of each fragment: the bottom of walls/props never dissolves (barriers stay readable).
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', `#include <common>\nvarying float vFkWY;`)
+      .replace(
+        '#include <project_vertex>',
+        `#include <project_vertex>
+#ifdef USE_INSTANCING
+  vFkWY = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).y;
+#else
+  vFkWY = (modelMatrix * vec4(transformed, 1.0)).y;
+#endif`,
+      );
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', `#include <common>\nuniform vec4 uSee[${MAX}];`)
+      .replace('#include <common>', `#include <common>\nuniform vec4 uSee[${MAX}];\nvarying float vFkWY;`)
       .replace(
         '#include <clipping_planes_fragment>',
         `#include <clipping_planes_fragment>
@@ -41,7 +53,7 @@ export function seeThrough(m: THREE.Material): THREE.Material {
     vec4 s = uSee[i];
     if (s.z <= 0.0) continue;
     float r = length(gl_FragCoord.xy - s.xy) / s.z;
-    if (r < 1.0 && gl_FragCoord.z < s.w - 0.0006) {
+    if (r < 1.0 && gl_FragCoord.z < s.w - 0.0006 && vFkWY > 0.45) {
       float cut = smoothstep(1.0, 0.55, r) * 0.82;
       if (bayer < cut) discard;
     }
