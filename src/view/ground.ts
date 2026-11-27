@@ -4,7 +4,12 @@
 import * as THREE from 'three';
 import { PALETTE } from './models';
 
+export const MAX_FLAT = 32;
+
 export interface GroundUniforms {
+  /** Rects (x0, z0, x1, z1) where the snow is pressed flat (yard floors, streams, paths). */
+  uFlat: { value: THREE.Vector4[] };
+  uFlatN: { value: number };
   uCenter: { value: THREE.Vector2 };
   uRadius: { value: number };
   uTime: { value: number };
@@ -30,6 +35,8 @@ export function createGround(size = 240, segs = 96): { mesh: THREE.Mesh; uniform
   const geo = new THREE.PlaneGeometry(size, size, segs, segs);
   geo.rotateX(-Math.PI / 2);
   const uniforms: GroundUniforms = {
+    uFlat: { value: Array.from({ length: MAX_FLAT }, () => new THREE.Vector4()) },
+    uFlatN: { value: 0 },
     uCenter: { value: new THREE.Vector2(0, 0) },
     uRadius: { value: 6 },
     uTime: { value: 0 },
@@ -51,8 +58,10 @@ export function createGround(size = 240, segs = 96): { mesh: THREE.Mesh; uniform
         '#include <common>',
         `#include <common>
 uniform vec2 uCenter; uniform float uRadius; uniform float uTime;
+uniform vec4 uFlat[${MAX_FLAT}]; uniform int uFlatN;
 varying vec3 vFkWorld;
 varying vec3 vFkN; // per-vertex noise: snow shade, earth tone, dry patches
+varying float vFkFlat;
 ${NOISE}`,
       )
       .replace(
@@ -61,7 +70,16 @@ ${NOISE}`,
 vec4 fkW = modelMatrix * vec4(transformed, 1.0);
 float fkM = fkMelt(fkW.xz);
 // Snow lies a little deeper than the thawed ground, with soft drifts.
-transformed.y += (1.0 - fkM) * (0.05 + fkFbm(fkW.xz * 0.15) * 0.22);
+float fkFl = 0.0;
+for (int i = 0; i < ${MAX_FLAT}; i++) {
+  if (i >= uFlatN) break;
+  vec4 r = uFlat[i];
+  vec2 dd = max(r.xy - fkW.xz, fkW.xz - r.zw);
+  fkFl = max(fkFl, smoothstep(0.9, -0.3, max(dd.x, dd.y)));
+}
+vFkFlat = fkFl;
+// Snow lies a little deeper than the thawed ground, with soft drifts; pressed flat under yard floors.
+transformed.y += (1.0 - fkM) * (0.05 + fkFbm(fkW.xz * 0.15) * 0.22) * (1.0 - fkFl) - fkFl * 0.03;
 vFkWorld = (modelMatrix * vec4(transformed, 1.0)).xyz;
 vFkN = vec3(fkFbm(fkW.xz * 0.6), fkFbm(fkW.xz * 0.9), fkFbm(fkW.xz * 0.45 + 11.0));`,
       );
@@ -73,6 +91,7 @@ uniform vec2 uCenter; uniform float uRadius; uniform float uTime; uniform float 
 uniform vec3 uSnow; uniform vec3 uShade; uniform vec3 uEarth;
 varying vec3 vFkWorld;
 varying vec3 vFkN;
+varying float vFkFlat;
 ${NOISE}`,
       )
       .replace(
@@ -96,6 +115,8 @@ ${NOISE}`,
   // Warm shockwave band.
   float wd = abs(length(xz - uCenter) - uWave);
   c += vec3(1.0, 0.55, 0.2) * smoothstep(1.4, 0.0, wd) * 0.45;
+  // Trodden, slightly darker snow around floors so slab edges sit in the scene.
+  c = mix(c, c * vec3(0.86, 0.88, 0.94), vFkFlat * (1.0 - m));
   diffuseColor.rgb = c;
 }`,
       );

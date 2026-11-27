@@ -6,7 +6,7 @@ import { audio, ladderPitch } from '../audio';
 import type { GameData, ItemKind, RenderKind } from '../data/types';
 import type { SimEvent } from '../sim';
 import type { Sim } from '../sim';
-import { Actors } from './actors';
+import { Actors, nodeAction } from './actors';
 import { GuideArrow } from './arrow';
 import { CameraRig } from './camera';
 import { Crowd } from './crowd';
@@ -16,6 +16,10 @@ import { ItemBatcher } from './items';
 import { PALETTE } from './models';
 import { PadVisual } from './pads';
 import { WorldView } from './world';
+import { DressingView, skipCampFloor } from './dressing';
+import { SurfaceMap } from './surface';
+import { ConveyorView } from './conveyors';
+import { clearSeeSubject, setSeeSubject } from './occlude';
 import { Sky } from './sky';
 
 export type Quality = 0 | 1 | 2;
@@ -53,6 +57,7 @@ interface Flyer {
 const _v = new THREE.Vector3();
 const _w = new THREE.Vector3();
 const _tmp = new THREE.Vector3();
+const _size = new THREE.Vector2();
 
 export class View {
   private lastCosyToast = -1e9;
@@ -67,6 +72,9 @@ export class View {
   private sun: THREE.DirectionalLight;
   private hemi: THREE.HemisphereLight;
   private world: WorldView;
+  private dressing: DressingView;
+  readonly surface: SurfaceMap;
+  private conveyors: ConveyorView;
   private pads = new Map<string, PadVisual>();
   private actors: Actors;
   private crowd: Crowd;
@@ -78,6 +86,8 @@ export class View {
   private arrow: GuideArrow;
   private sky: Sky;
   private fuelBubble: THREE.Sprite;
+  /** Soft warm ring under the player so they always stand out in a crowd. */
+  private playerRing: THREE.Mesh;
   private heat = 1;
   private breathT = 0;
   private flyers: Flyer[] = [];
@@ -142,6 +152,11 @@ export class View {
     this.ground = createGround();
     this.scene.add(this.ground.mesh);
     this.world = new WorldView(this.scene, this.data, quality);
+    this.surface = new SurfaceMap(this.data, skipCampFloor);
+    this.dressing = new DressingView(this.scene, this.data, this.ground.uniforms, quality, this.surface);
+    this.world.setSurface(this.surface);
+    this.conveyors = new ConveyorView(this.scene, this.data);
+    this.conveyors.onAppear = (x, z) => this.world.onAppear(x, z, 0.5);
     this.world.onAppear = (x, z, size) => {
       this.fx.puff(x, 0.1, z, Math.round(10 + size * 6), size, 1.8 + size);
       this.fx.ring(x, z, 1.6 + size, 0xffd9a0, 0.6);
@@ -151,12 +166,17 @@ export class View {
     this.scene.add(this.fuelBubble);
     for (const p of this.data.pads) {
       const pv = new PadVisual(p);
+      // Seat the pad on the highest surface under its footprint (floors, paths, streams).
+      let py = 0;
+      for (const [ox, oz] of [[0, 0], [-0.9, -0.9], [0.9, -0.9], [-0.9, 0.9], [0.9, 0.9]]) py = Math.max(py, this.surface.heightAt(p.x + ox, p.z + oz));
+      pv.root.position.y = py + 0.02;
       this.pads.set(p.id, pv);
       this.scene.add(pv.root);
     }
     this.items = new ItemBatcher(this.scene);
     this.actors = new Actors(this.scene, this.data);
     this.crowd = new Crowd(this.scene, this.data);
+    this.crowd.groundAt = (x, z) => this.surface.heightAt(x, z);
     this.crowd.residentCap = quality >= 1 ? 44 : 30;
     this.crowd.onEnterHome = (x, z) => {
       this.fx.puff(x, 0.3, z, 5, 0.5, 0.9);
@@ -171,6 +191,8 @@ export class View {
     this.prints = new Footprints(this.scene);
     this.arrow = new GuideArrow(this.scene);
     this.sky = new Sky(this.scene, fogC);
+    this.playerRing = makePlayerRing();
+    this.scene.add(this.playerRing);
     this.setSim(sim);
     this.resize();
   }
@@ -179,6 +201,7 @@ export class View {
   setSim(sim: Sim): void {
     this.sim = sim;
     this.world.sync(sim);
+    this.conveyors.sync(sim);
     this.actors.reset();
     this.flyers = [];
     this.hidden.clear();
@@ -291,6 +314,44 @@ export class View {
     }
   }
 
+  private dwell = 0;
+  private dwellRing: THREE.Mesh | null = null;
+
+  /** A ring fills around the player while they stand at a bin with a full pack (it is about to take things). */
+  private updateBinDwell(dt: number, px: number, pz: number): void {
+    const p = this.sim.state.player;
+    let bin: { x: number; z: number } | null = null;
+    if (p.stack.length > 0 && Math.hypot(p.vx, p.vz) < 0.25) {
+      for (const d of this.data.stations) {
+        if (d.type === 'shelf' && this.sim.isUsable(d.id) && Math.hypot(d.x - px, d.z - pz) <= d.reach) {
+          bin = d;
+          break;
+        }
+      }
+    }
+    this.dwell = bin ? Math.min(1, this.dwell + dt / 0.8) : 0;
+    if (!this.dwellRing) {
+      const geo = new THREE.RingGeometry(0.62, 0.78, 48, 1, Math.PI / 2, -Math.PI * 2).rotateX(-Math.PI / 2);
+      this.dwellRing = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xff8a6a, transparent: true, opacity: 0.9, depthWrite: false, toneMapped: false }));
+      this.dwellRing.renderOrder = 4;
+      this.scene.add(this.dwellRing);
+    }
+    const r = this.dwellRing;
+    r.visible = this.dwell > 0.02 && !this.title;
+    if (r.visible) {
+      r.position.set(px, this.surface.heightAt(px, pz) + 0.05, pz);
+      const idx = r.geometry.index!.count;
+      r.geometry.setDrawRange(0, Math.floor((idx / 6) * this.dwell) * 6);
+    }
+  }
+
+  /** Debug/e2e: arrow tip/tail and the current guide target. */
+  arrowInfo(): { tip: { x: number; z: number }; tail: { x: number; z: number }; visible: boolean; target: { x: number; z: number } | null; next: { x: number; z: number } | null } {
+    const g = this.sim.guide();
+    const w = g ? this.sim.navFromPlayer(g.x, g.z) : null;
+    return { ...this.arrow.tipTail(), target: g ? { x: g.x, z: g.z } : null, next: w };
+  }
+
   setSnow(level: 0 | 1 | 2): void {
     this.snow.setLevel(level);
   }
@@ -355,7 +416,8 @@ export class View {
     }
     if (place.kind === 'ground') {
       const d = this.sim.stationDefs.get(place.id)!;
-      return out.set(d.x, 1.6, d.z);
+      // Fish leap out of the water; logs and ore come from the top of the tree/vein.
+      return out.set(d.x, nodeAction(d.model) === 'fish' ? 0.15 : 1.6, d.z);
     }
     this.world.itemSpot(place.id, item, out, role);
     const d = this.sim.stationDefs.get(place.id);
@@ -395,9 +457,13 @@ export class View {
         case 'drop': {
           let from: THREE.Vector3;
           if (e.by.kind === 'link') {
-            const l = this.data.links.find((x) => x.id === (e.by as { id: string }).id)!;
-            const end = l.path[l.path.length - 1];
-            from = new THREE.Vector3(end.x, 0.55, end.z);
+            const lid = (e.by as { id: string }).id;
+            from = new THREE.Vector3();
+            if (!this.conveyors.endPos(lid, from)) {
+              const l = this.data.links.find((x) => x.id === lid)!;
+              const end = l.path[l.path.length - 1];
+              from.set(end.x, 0.55, end.z);
+            }
           } else from = this.actorPos(e, new THREE.Vector3());
           const to: Target = e.to.kind === 'pad' ? { t: 'pad', id: e.to.id } : { t: 'station', id: e.to.id, item: e.item, role: 'in' };
           const hide = e.to.kind === 'station' ? `st:${e.to.id}:${e.item}` : null;
@@ -472,7 +538,7 @@ export class View {
           this.fx.ring(d.x, d.z, 3, 0xffc86a, 0.7);
           this.fx.glint(d.x, 0.4, d.z, 18, 3);
           this.rig.shake(0.25, 0.25);
-          this.sfx('padComplete');
+          this.sfx(d.repeat ? 'upgrade' : 'padComplete'); // LATE-GAME HOOK: repeatable pads use the lighter sfx
           this.hooks.toast(d.label, 'unlock');
           break;
         }
@@ -483,6 +549,7 @@ export class View {
         }
         case 'unlock':
           this.world.unlock(e.id);
+          this.conveyors.unlock(e.id);
           this.sfx('hammer', { volume: 0.8 });
           break;
         case 'hire': {
@@ -571,6 +638,19 @@ export class View {
           this.sfx('hammer', { volume: 0.6 }, 0.1);
           this.hooks.toast('A new tent goes up!', 'info');
           break;
+        case 'binned': {
+          // Toss-and-poof: the item vanishes into the bin with a little puff.
+          const d = this.sim.stationDefs.get(e.bin);
+          if (d) {
+            const top = this.world.stationTop(e.bin);
+            this.later(0.22, () => {
+              this.fx.puff(d.x, top, d.z, 4, 0.35, 0.8, 0.5);
+              this.fx.glint(d.x, top, d.z, 3, 1);
+            });
+            this.sfx('drop', { pitch: 0.7, volume: 0.6 }, 0.05);
+          }
+          break;
+        }
         case 'cosy':
           // Announce Cosy at most once every few minutes; the HUD pill shows the state.
           if (e.on && performance.now() - this.lastCosyToast > 240000) {
@@ -692,8 +772,11 @@ export class View {
     this.actors.update(sim, this.items, alpha, t, dt);
     this.crowd.update(sim, alpha, t, dt, px, pz);
     this.world.update(sim, t, dt);
+    this.dressing.update(sim);
+    this.conveyors.update(sim, dt);
     for (const pv of this.pads.values()) {
       pv.update(sim, t, dt, p.onPad === pv.def.id);
+      pv.keepOnScreen(this.rig.camera);
       if (this.title) pv.root.visible = false; // nothing in-world competes with the title buttons
     }
     this.drawBuffers(t);
@@ -711,6 +794,12 @@ export class View {
     this.sparks.points.position.set(this.data.camp.hearth.x, 0, this.data.camp.hearth.z);
     this.sparks.update(t, this.renderer.getPixelRatio(), 0.8 + s.hearth.level * 0.25 + (sim.cosy ? 0.5 : 0));
     this.prints.update(dt, px, pz, p.facing, distHearth > this.radius + 0.5);
+
+    this.playerRing.position.set(px, this.surface.heightAt(px, pz) + 0.03, pz);
+    this.updateBinDwell(dt, px, pz);
+    this.playerRing.visible = !this.title;
+    const rs = 1 + Math.sin(t * 2.4) * 0.04;
+    this.playerRing.scale.set(rs, 1, rs);
 
     // Hearth heat: dims visibly with no fuel (once logs exist), glows warmer when Cosy.
     const fuelGame = this.data.stations.some((d) => d.type === 'node' && d.item === 'log' && sim.isUsable(d.id));
@@ -744,6 +833,20 @@ export class View {
       const my = g.kind === 'station' ? this.world.stationTop(g.id) : g.kind === 'node' ? 2.6 : 0.4;
       this.arrow.update(dt, t, px, pz, w.x, w.z, g.x, g.z, my);
     } else this.arrow.update(dt, t, px, pz, px, pz, null, 0, 0);
+
+    // See-through bubbles: scenery in front of the player (and the guide target) dissolves.
+    const cam = this.rig.camera;
+    cam.updateMatrixWorld();
+    this.renderer.getDrawingBufferSize(_size);
+    const dprNow = this.renderer.getPixelRatio();
+    if (this.title) {
+      clearSeeSubject(0);
+      clearSeeSubject(1);
+    } else {
+      setSeeSubject(0, cam, px, 0.9, pz, 72, _size, dprNow);
+      if (g && Math.hypot(g.x - px, g.z - pz) > 2.5) setSeeSubject(1, cam, g.x, 0.6, g.z, 46, _size, dprNow);
+      else clearSeeSubject(1);
+    }
 
     // Audio: footsteps, ambience, music mood.
     const speed = Math.hypot(p.vx, p.vz);
@@ -813,22 +916,13 @@ export class View {
       } else if (st.kind === 'counter' && d.type === 'counter') {
         const n = st.stock - (this.hidden.get(`st:${d.id}:${d.item}`) ?? 0);
         this.world.itemSpot(d.id, d.item, _v, 'in');
-        items.grid(d.item, Math.max(0, n), _v.x, _v.y, _v.z, yaw, 3, 4, 0.42);
+        // Low, wide stacks along the counter lip (rows never spill off the front).
+        items.grid(d.item, Math.min(Math.max(0, n), 25), _v.x, _v.y, _v.z, yaw, 5, 5, 0.4);
       } else if (st.kind === 'deposit' && d.type === 'deposit') {
         const k = d.accepts[0];
         const n = st.count - (this.hidden.get(`st:${d.id}:${k}`) ?? 0);
         this.world.itemSpot(d.id, k, _v, 'in');
         items.grid(k, Math.max(0, n), _v.x, 0.02, _v.z, yaw + 0.6, 4, 4, 0.36);
-      } else if (st.kind === 'shelf') {
-        // Spare shelf: a mix of kinds, one small stack per kind.
-        this.world.itemSpot(d.id, null, _v, 'in');
-        const kinds: ItemKind[] = [];
-        for (const it of st.items) if (!kinds.includes(it)) kinds.push(it);
-        kinds.forEach((k, i) => {
-          let n = 0;
-          for (const it of st.items) if (it === k) n++;
-          items.grid(k, n, _v.x + (i - (kinds.length - 1) / 2) * 0.45, _v.y, _v.z, yaw, 2, 2, 0.36);
-        });
       }
     }
     // Conveyor belts.
@@ -836,8 +930,11 @@ export class View {
       if (!sim.isActive(l.id)) continue;
       const ls = sim.state.links[l.id];
       for (const it of ls.belt) {
-        pathPoint(l.path, it.p, _v);
-        items.add(it.item, _v.x, 0.42, _v.z, 0);
+        if (!this.conveyors.itemPos(l.id, it.p, _v)) {
+          pathPoint(l.path, it.p, _v);
+          _v.y = 0.42;
+        }
+        items.add(it.item, _v.x, _v.y, _v.z, 0);
       }
     }
     // Ember piles: a glowing heap that bobs.
@@ -893,6 +990,27 @@ export class View {
   dispose(): void {
     this.renderer.dispose();
   }
+}
+
+function makePlayerRing(): THREE.Mesh {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d')!;
+  const grd = g.createRadialGradient(64, 64, 20, 64, 64, 62);
+  grd.addColorStop(0, 'rgba(255,200,120,0)');
+  grd.addColorStop(0.62, 'rgba(255,190,100,0.10)');
+  grd.addColorStop(0.8, 'rgba(255,214,150,0.55)');
+  grd.addColorStop(0.9, 'rgba(255,190,100,0.25)');
+  grd.addColorStop(1, 'rgba(255,190,100,0)');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 128, 128);
+  const tex = new THREE.CanvasTexture(c);
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.5, 1.5).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false, blending: THREE.AdditiveBlending }),
+  );
+  m.renderOrder = 3;
+  return m;
 }
 
 /** Friendly "needs a log" bubble that floats over a cold Hearth (no popups, no nagging). */

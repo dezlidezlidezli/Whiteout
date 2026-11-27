@@ -145,7 +145,8 @@
   background: linear-gradient(90deg, #ff8a3a, #ffc04a);
   transition: width 0.25s;
 }
-.fk-quest .fk-qnum { font-size: 16px; color: #7a4a24; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fk-quest .fk-qnum { font-size: 16px; color: #7a4a24; font-variant-numeric: tabular-nums; white-space: nowrap; display: inline-flex; align-items: center; gap: 2px; }
+.fk-quest .fk-qe { width: 18px; height: 18px; display: inline-block; }
 .fk-quest.fk-pop-in { transform: translateX(-50%) scale(1.08); }
 
 /* Toasts */
@@ -221,7 +222,7 @@
 .fk-hint {
   position: absolute;
   left: 50%;
-  bottom: calc(var(--fk-bottom) + 70px);
+  bottom: calc(var(--fk-bottom) + 24vh);
   transform: translateX(-50%);
   padding: 10px 18px;
   border-radius: 18px;
@@ -253,7 +254,7 @@
   overflow-y: auto;
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
-  padding: 18px calc(var(--fk-right) + 20px) calc(var(--fk-bottom) + 22px) calc(var(--fk-left) + 20px);
+  padding: 0 calc(var(--fk-right) + 20px) calc(max(var(--fk-bottom), 20px) + 34px) calc(var(--fk-left) + 20px);
   border-radius: 26px 26px 0 0;
   background: linear-gradient(180deg, #2a3a62, #1b2644);
   box-shadow: 0 -6px 30px rgba(0, 0, 0, 0.4), inset 0 2px 0 rgba(255, 214, 160, 0.35);
@@ -262,7 +263,13 @@
   transition: transform 0.28s cubic-bezier(0.2, 1.2, 0.4, 1);
 }
 .fk-sheet.fk-open { transform: none; }
-.fk-sheet h2 { margin: 0 0 12px; font-size: 26px; display: flex; justify-content: space-between; align-items: center; }
+.fk-sheet h2 {
+  /* Stays pinned while the sheet scrolls, so the title and close button are always reachable. */
+  position: sticky; top: 0; z-index: 2;
+  margin: 0 -20px 12px; padding: 16px 20px 10px;
+  background: linear-gradient(180deg, #2a3a62 70%, rgba(42, 58, 98, 0));
+  font-size: 26px; display: flex; justify-content: space-between; align-items: center;
+}
 .fk-sheet h3 { margin: 18px 0 8px; font-size: 16px; color: #ffd9a8; text-transform: uppercase; letter-spacing: 0.08em; }
 .fk-sheet label { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; font-size: 18px; margin: 10px 0; }
 .fk-sheet input[type='range'] { flex: 1; max-width: 220px; accent-color: #ffb347; height: 30px; }

@@ -231,15 +231,21 @@ function shareIcon(): string {
   );
 }
 
+/** The title screen is up (the tip lives only there, never over game UI). */
+function onTitle(): boolean {
+  return !!document.querySelector('.fk-title:not(.fk-leave)');
+}
+
 function showInstallTip(): void {
-  if (standalone || !ios || storageGet(A2HS_KEY)) return;
+  if (standalone || !ios || storageGet(A2HS_KEY) || !onTitle() || document.getElementById('fk-a2hs')) return;
   const tip = document.createElement('div');
   tip.id = 'fk-a2hs';
   tip.setAttribute('role', 'note');
   tip.style.cssText = [
     'position:fixed',
     'left:50%',
-    'bottom:calc(14px + var(--safe-bottom, 0px))',
+    // Above the title's Begin / New game buttons (clear of the thumb and of the wordmark).
+    'bottom:calc(var(--safe-bottom, 0px) + 8vh + 150px)',
     'transform:translate(-50%, 20px)',
     'opacity:0',
     'transition:opacity .35s ease, transform .35s ease',
@@ -266,13 +272,20 @@ function showInstallTip(): void {
     ' then <b>Add to Home Screen</b>.</div>' +
     '<button type="button" aria-label="Dismiss" style="flex:none;width:36px;height:36px;border:0;border-radius:10px;' +
     'background:rgba(255,255,255,.08);color:inherit;font:600 18px/1 system-ui;cursor:pointer">&times;</button>';
-  const close = () => {
-    storageSet(A2HS_KEY, '1');
+  let watch = 0;
+  const hide = (remember: boolean) => {
+    window.clearInterval(watch);
+    if (remember) storageSet(A2HS_KEY, '1');
     tip.style.opacity = '0';
     tip.style.transform = 'translate(-50%, 20px)';
+    tip.style.pointerEvents = 'none';
     window.setTimeout(() => tip.remove(), 400);
   };
-  tip.querySelector('button')!.addEventListener('click', close);
+  tip.querySelector('button')!.addEventListener('click', () => hide(true));
+  // Gone as soon as the game begins (it comes back on a later visit to the title, until dismissed).
+  watch = window.setInterval(() => {
+    if (!onTitle()) hide(false);
+  }, 200);
   document.body.appendChild(tip);
   requestAnimationFrame(() =>
     requestAnimationFrame(() => {
@@ -304,7 +317,7 @@ void requestPersistentStorage();
   const show = () => {
     if (shown) return;
     shown = true;
-    window.setTimeout(showInstallTip, 1500);
+    window.setTimeout(showInstallTip, 1200);
   };
   window.addEventListener('fk-ready', show, { once: true });
   window.setTimeout(show, 6000);

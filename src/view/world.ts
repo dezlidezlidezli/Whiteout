@@ -2,11 +2,11 @@
 // conveyors and the Hearth. Station props come from createProp; repeated props are instanced.
 
 import * as THREE from 'three';
-import { TENT_SCALE, visibleTents } from './camplayout';
 import type { DecorDef, GameData, ItemKind, StationDef } from '../data/types';
 import type { NodeState, Sim } from '../sim';
 import { PropInstancer, trs } from './instancer';
 import { createProp } from './models';
+import { makeSeeThrough } from './occlude';
 
 export interface StationView {
   def: StationDef;
@@ -89,7 +89,7 @@ export class WorldView {
   private tentInst: PropInstancer;
   private tentAppear: number[] = [];
   private tentDone: boolean[] = [];
-  private tentShown: boolean[] = [];
+  private shelfMats: { mesh: THREE.Mesh; x: number; z: number }[] = [];
   private walls: WallView[] = [];
   private beltInst = new Map<string, PropInstancer>();
   private hearthObj: THREE.Object3D | null = null;
@@ -151,6 +151,7 @@ export class WorldView {
         obj.visible = false;
         this.root.add(obj);
         const ghost = makeGhost(d.model, d.x, d.z, d.rot ?? 0);
+        ghost.scale.setScalar(d.scale ?? 1); // DecorDef.scale everywhere (cabins are 0.72)
         this.root.add(ghost);
         this.decor.set(d.id, { def: d, obj, ghost, appear: 1, shown: false });
         continue;
@@ -215,27 +216,19 @@ export class WorldView {
       this.walls.push({ id: w.id, area: w.area, inst, pieces, state: 'up', t: 0 });
     }
 
-    // ---- conveyors
-    for (const l of data.links) {
-      const segs: { x: number; z: number; rot: number }[] = [];
-      for (let i = 0; i < l.path.length - 1; i++) {
-        const a = l.path[i];
-        const b = l.path[i + 1];
-        const len = Math.hypot(b.x - a.x, b.z - a.z);
-        const n = Math.max(1, Math.round(len / 1.0));
-        const rot = Math.atan2(b.x - a.x, b.z - a.z);
-        for (let k = 0; k < n; k++) {
-          const t = (k + 0.5) / n;
-          segs.push({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, rot });
-        }
-      }
-      const inst = new PropInstancer(this.root, 'conveyor', { seed: 1 }, segs.length);
-      segs.forEach((s, i) => inst.set(i, trs(_m, s.x, 0, s.z, s.rot, 1)));
-      inst.commit();
-      inst.setVisible(false);
-      this.beltInst.set(l.id, inst);
-      (inst as unknown as { segs: typeof segs }).segs = segs;
+    // Conveyors are drawn by ConveyorView (one continuous curved belt per link).
+    // Spare shelves: a teal "put things here" mat, distinct from the warm pads.
+    for (const d of data.stations) {
+      if (d.type !== 'shelf') continue;
+      const mat = makeShelfMat();
+      mat.position.set(d.x, 0.035, d.z);
+      mat.rotation.y = d.rot ?? 0;
+      this.root.add(mat);
+      this.shelfMats.push({ mesh: mat, x: d.x, z: d.z });
     }
+
+    // Everything that can stand between the camera and the player dissolves around them.
+    makeSeeThrough(this.root);
   }
 
   /** Apply the current sim state instantly (on load). */
@@ -261,7 +254,6 @@ export class WorldView {
     for (const [id, inst] of this.beltInst) inst.setVisible(sim.isActive(id));
     this.tentAppear = [];
     this.tentDone = [];
-    this.tentShown = [];
     for (let i = 0; i < sim.state.tents; i++) this.tentAppear[i] = 1;
     this.setHearthLevel(sim.state.hearth.level);
   }
@@ -274,6 +266,7 @@ export class WorldView {
     this.hearthObj = createProp('hearth', { level });
     this.hearthObj.position.set(hd.def.x, 0, hd.def.z);
     this.root.add(this.hearthObj);
+    makeSeeThrough(this.hearthObj);
     hd.obj = this.hearthObj;
     this.hearthParts = findParts(this.hearthObj);
     hd.top = Math.max(0.8, new THREE.Box3().setFromObject(this.hearthObj).max.y);
@@ -320,9 +313,13 @@ export class WorldView {
   private updateGhosts(sim: Sim, time: number): void {
     const pending = this.pendingBuf;
     pending.clear();
+    // Preview a pad's building only while the player is close to that pad, so the translucent
+    // ghost never sits over neighbours the rest of the time.
+    const pl = sim.state.player;
     for (const p of this.data.pads) {
       const ps = sim.state.pads[p.id];
       if (!ps.visible || ps.done) continue;
+      if (Math.hypot(p.x - pl.x, p.z - pl.z) > 4.5) continue;
       for (const e of p.effects) if (e.type === 'unlock') pending.add(e.id);
     }
     for (const v of this.stations.values()) {
@@ -387,7 +384,7 @@ export class WorldView {
         const sh = Math.sin(time * 45) * n.shake * 0.08;
         const o = n.occ;
         _m2.makeScale(1 + o * 0.1, 1 - o * 0.55, 1 + o * 0.1);
-        trs(_m, n.def.x, 0, n.def.z, rot, Math.max(0.001, s), sh, sh * 0.6);
+        trs(_m, n.def.x, this.groundY(n.def.x, n.def.z), n.def.z, rot, Math.max(0.001, s), sh, sh * 0.6);
         inst.set(n.index, _m.multiply(_m2));
       } else if (tree) {
         n.fall = Math.min(1.6, n.fall + dt);
@@ -400,7 +397,7 @@ export class WorldView {
         this.stumpInst.set(stumps++, trs(_m, n.def.x, 0, n.def.z, rot, 1));
       } else {
         n.fall = Math.min(1, n.fall + dt * 2);
-        inst.set(n.index, trs(_m, n.def.x, -n.fall * 0.3, n.def.z, rot, Math.max(0.001, 1 - n.fall * 0.7)));
+        inst.set(n.index, trs(_m, n.def.x, this.groundY(n.def.x, n.def.z) - n.fall * 0.3, n.def.z, rot, Math.max(0.001, 1 - n.fall * 0.7)));
       }
       this.nodeCount.set(n.key, Math.max(this.nodeCount.get(n.key) ?? 0, n.index + 1));
     }
@@ -410,24 +407,19 @@ export class WorldView {
     }
     this.stumpInst.setCount(stumps);
     this.stumpInst.commit();
+    this.updateRipples(sim, time);
 
     // Tents pop in as the population grows.
     const spots = this.data.camp.tentSpots;
     const nt = Math.min(sim.state.tents, spots.length);
-    const tentVis = visibleTents(this.data, sim.state);
     for (let i = 0; i < nt; i++) {
       if (this.tentAppear[i] === undefined) {
         this.tentAppear[i] = 0;
         this.onAppear(spots[i].x, spots[i].z, 1.3);
       }
-      const shown = tentVis[i];
-      if (this.tentShown[i] !== shown) {
-        this.tentShown[i] = shown;
-        this.tentDone[i] = false;
-      }
       if (this.tentAppear[i] >= 1 && this.tentDone[i]) continue;
       this.tentAppear[i] = Math.min(1, this.tentAppear[i] + dt / 0.7);
-      this.tentInst.set(i, trs(_m, spots[i].x, 0, spots[i].z, spots[i].rot, shown ? backOut(this.tentAppear[i]) * TENT_SCALE : 0));
+      this.tentInst.set(i, trs(_m, spots[i].x, 0, spots[i].z, spots[i].rot, backOut(this.tentAppear[i])));
       this.tentDone[i] = this.tentAppear[i] >= 1;
     }
     this.tentInst.setCount(nt);
@@ -562,6 +554,7 @@ export class WorldView {
       const cur = (v.obj.userData.fkLevel as number | undefined) ?? -1;
       if (cur === lvl) continue;
       const next = createProp(v.def.model, { seed: hashId(v.def.id), level: lvl });
+      makeSeeThrough(next);
       next.position.copy(v.obj.position);
       next.rotation.copy(v.obj.rotation);
       next.visible = v.obj.visible;
@@ -576,6 +569,46 @@ export class WorldView {
         this.onAppear(v.def.x, v.def.z, 2.5);
       }
     }
+  }
+
+  private ripples: THREE.InstancedMesh | null = null;
+
+  /** Gentle expanding ripples in every open fishing hole so the water reads as alive. */
+  private updateRipples(sim: Sim, time: number): void {
+    const holes = this.nodes.filter((n) => /ice|hole|water/i.test(n.def.model));
+    if (!holes.length) return;
+    if (!this.ripples) {
+      const geo = new THREE.RingGeometry(0.28, 0.33, 28).rotateX(-Math.PI / 2);
+      const mat = new THREE.MeshBasicMaterial({ color: 0xcfefff, transparent: true, opacity: 0.55, depthWrite: false, toneMapped: false });
+      this.ripples = new THREE.InstancedMesh(geo, mat, holes.length * 2);
+      this.ripples.frustumCulled = false;
+      this.ripples.renderOrder = 3;
+      this.root.add(this.ripples);
+    }
+    let k = 0;
+    for (const n of holes) {
+      if (!n.alive || !sim.isUsable(n.def.id)) continue;
+      const y = this.groundY(n.def.x, n.def.z) + 0.1;
+      for (let j = 0; j < 2; j++) {
+        const t = (time * 0.45 + j * 0.5 + (n.index % 7) * 0.13) % 1;
+        const sc = 0.6 + t * 1.6;
+        _m.makeScale(sc * (1 - t * 0.2), 1, sc * (1 - t * 0.2)).setPosition(n.def.x, y, n.def.z);
+        this.ripples.setMatrixAt(k++, _m);
+      }
+    }
+    this.ripples.count = k;
+    this.ripples.instanceMatrix.needsUpdate = true;
+  }
+
+  private surface: { heightAt(x: number, z: number): number } | null = null;
+  /** Ground surface (floors/streams) so nodes and mats sit on top of dressing. */
+  setSurface(s: { heightAt(x: number, z: number): number }): void {
+    this.surface = s;
+    for (const m of this.shelfMats) m.mesh.position.y = s.heightAt(m.x, m.z) + 0.02;
+  }
+
+  private groundY(x: number, z: number): number {
+    return this.surface ? this.surface.heightAt(x, z) : 0;
   }
 
   bump(id: string): void {
@@ -603,6 +636,12 @@ export class WorldView {
     if (marker) {
       marker.getWorldPosition(out);
       if (d.type === 'processor') out.y = 0;
+      if (d.type === 'counter') {
+        // Front lip of the counter (queue side), clear of the awning behind it.
+        const r = d.rot ?? 0;
+        out.x += Math.sin(r) * 0.28;
+        out.z += Math.cos(r) * 0.28;
+      }
       return out;
     }
     const l = localSpot(d, item, role, v.top);
@@ -628,6 +667,8 @@ export function localSpot(d: StationDef, item: ItemKind | null, role: 'in' | 'ou
       return _v.set(0, top, 0);
     case 'deposit':
       return _v.set(1.55, 0, 1.0);
+    case 'shelf':
+      return _v.set(0, top, 0); // items arc into the top of the bin
     default:
       void item;
       return _v.set(0, 0, 0);
@@ -660,6 +701,59 @@ function distToPlay(data: GameData, x: number, z: number): number {
     }
   }
   return best;
+}
+
+let shelfTex: THREE.CanvasTexture | null = null;
+function makeShelfMat(): THREE.Mesh {
+  // The bin's mat: muted brick red with a "toss it" icon and label, clearly not a build pad.
+  if (!shelfTex) {
+    const c = document.createElement('canvas');
+    c.width = 256;
+    c.height = 192;
+    const g = c.getContext('2d')!;
+    g.fillStyle = 'rgba(120,50,40,0.30)';
+    g.beginPath();
+    g.roundRect(8, 8, 240, 176, 34);
+    g.fill();
+    g.setLineDash([20, 12]);
+    g.lineWidth = 8;
+    g.strokeStyle = 'rgba(255,150,120,0.85)';
+    g.stroke();
+    g.setLineDash([]);
+    // Icon: an item arcing into a bin.
+    g.strokeStyle = 'rgba(255,220,200,0.95)';
+    g.fillStyle = 'rgba(255,220,200,0.95)';
+    g.lineWidth = 6;
+    g.beginPath();
+    g.moveTo(26, 150);
+    g.lineTo(32, 108);
+    g.lineTo(68, 108);
+    g.lineTo(74, 150);
+    g.closePath();
+    g.stroke();
+    g.beginPath();
+    g.moveTo(20, 104);
+    g.lineTo(80, 104);
+    g.stroke();
+    g.beginPath();
+    g.setLineDash([8, 8]);
+    g.moveTo(96, 52);
+    g.quadraticCurveTo(70, 40, 52, 92);
+    g.stroke();
+    g.setLineDash([]);
+    g.fillRect(92, 42, 20, 20);
+    g.font = '900 34px system-ui, -apple-system, sans-serif';
+    g.textAlign = 'center';
+    g.fillText('BIN', 176, 160);
+    shelfTex = new THREE.CanvasTexture(c);
+    shelfTex.colorSpace = THREE.SRGBColorSpace;
+  }
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.5, 1.85).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ map: shelfTex, transparent: true, depthWrite: false, toneMapped: false }),
+  );
+  m.renderOrder = 2;
+  return m;
 }
 
 export function backOut(t: number): number {

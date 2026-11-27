@@ -60,6 +60,16 @@ function assert(cond, msg) {
   assert(await page.evaluate(() => !document.querySelector('.fk-title:not(.fk-leave)')), 'Begin leaves the title');
   await shot('01-start');
 
+  // ---- the guide arrow points TOWARDS the target (tip nearer the next waypoint than the tail)
+  await fk(() => __fk.cheat.teleport(2.5, 9));
+  await page.waitForTimeout(1500);
+  const ar = await fk(() => __fk.view.arrowInfo());
+  if (ar.next && ar.visible) {
+    const dTip = Math.hypot(ar.tip.x - ar.next.x, ar.tip.z - ar.next.z);
+    const dTail = Math.hypot(ar.tail.x - ar.next.x, ar.tail.z - ar.next.z);
+    assert(dTip < dTail, 'guide arrow points towards its target (tip ' + dTip.toFixed(2) + ' < tail ' + dTail.toFixed(2) + ')');
+  } else assert(false, 'guide arrow visible with a target (' + JSON.stringify(ar) + ')');
+
   // ---- joystick under real touch events
   let a = await pos();
   await touch('touchStart', [[200, 600, 1]]);
@@ -90,13 +100,16 @@ function assert(cond, msg) {
   await page.waitForTimeout(400);
   // Touch that starts on a HUD button never moves the player.
   const gear = await page.$eval('.fk-btn', (e) => { const r = e.getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; });
+  // Let any momentum from the previous drag die out first.
+  await page.waitForFunction(() => Math.hypot(__fk.sim.state.player.vx, __fk.sim.state.player.vz) < 0.02, null, { timeout: 15000 }).catch(() => {});
   a = await pos();
   await touch('touchStart', [[gear[0], gear[1], 3]]);
   await touch('touchMove', [[gear[0] - 120, gear[1] + 200, 3]]);
   await page.waitForTimeout(500);
   await touch('touchEnd', []);
   b = await pos();
-  assert(moved(a, b) < 0.05, 'touch starting on a HUD button does not move the player');
+  const dbg = await fk((g) => ({ el: document.elementFromPoint(g[0], g[1])?.className, move: __fk.sim.getMove(), v: [__fk.sim.state.player.vx, __fk.sim.state.player.vz] }), gear);
+  assert(moved(a, b) < 0.05, 'touch starting on a HUD button does not move the player (' + JSON.stringify({ a, b, gear, dbg }) + ')');
   await page.waitForTimeout(400);
   const sheetOpen = await page.$eval('.fk-sheet', (e) => e.classList.contains('fk-open'));
   if (sheetOpen) {

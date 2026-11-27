@@ -7,6 +7,7 @@ import type { Sim } from '../sim';
 import { createCharacter, createProp, getItemMesh, PALETTE, type CharacterRole } from './models';
 
 const SIZE = 1.8;
+const _lp = new THREE.Vector3();
 
 function roundedRect(w: number, h: number, r: number): THREE.Shape {
   const s = new THREE.Shape();
@@ -140,7 +141,8 @@ class PadLabel {
     this.tex.colorSpace = THREE.SRGBColorSpace;
     this.tex.anisotropy = 4;
   }
-  draw(title: string, embers: number, mats: [ItemKind, number, number][], lockedPop: number): void {
+  draw(title: string, embers: number, mats: [ItemKind, number, number][], lockedPop: number, level = 0): void {
+    if (level > 0) title = `${title} · Lv ${level + 1}`;
     const key = `${title}|${embers}|${mats.map((m) => m.join(':')).join(',')}|${lockedPop}`;
     if (key === this.key) return;
     this.key = key;
@@ -150,7 +152,7 @@ class PadLabel {
     c.clearRect(0, 0, W, H);
     // Bubble.
     const rows = (embers > 0 || lockedPop > 0 ? 1 : 0) + (mats.length ? 1 : 0);
-    const bh = 54 + rows * 62;
+    const bh = 50 + rows * 62;
     const by = H - bh - 6;
     c.fillStyle = 'rgba(22,30,52,0.82)';
     c.beginPath();
@@ -161,23 +163,29 @@ class PadLabel {
     c.stroke();
     c.textAlign = 'center';
     c.textBaseline = 'middle';
-    c.fillStyle = '#fff6e6';
-    c.font = '800 34px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
-    c.fillText(title, W / 2, by + 32, W - 44);
-    let y = by + 32 + 58;
+    // The cost is the most legible thing on a pad; the name sits small underneath.
+    let y = by + 36;
     if (lockedPop > 0) {
-      drawPerson(c, W / 2 - 70, y, 24, '#c9d6ea');
+      drawPerson(c, W / 2 - 78, y, 24, '#c9d6ea');
       c.fillStyle = '#c9d6ea';
-      c.font = '900 46px system-ui, -apple-system, sans-serif';
-      c.fillText(`needs ${lockedPop}`, W / 2 + 26, y + 2);
-      y += 62;
+      c.font = '900 48px system-ui, -apple-system, sans-serif';
+      c.fillText(`needs ${lockedPop}`, W / 2 + 22, y + 2);
+      y += 60;
     } else if (embers > 0) {
-      drawEmber(c, W / 2 - 58, y, 22);
+      c.font = '900 64px system-ui, -apple-system, sans-serif';
+      const tw = c.measureText(String(embers)).width;
+      drawEmber(c, W / 2 - tw / 2 - 26, y, 24);
+      c.lineWidth = 8;
+      c.strokeStyle = 'rgba(40,16,4,0.85)';
+      c.strokeText(String(embers), W / 2 + 14, y + 3);
       c.fillStyle = '#ffd27a';
-      c.font = '900 54px system-ui, -apple-system, sans-serif';
-      c.fillText(String(embers), W / 2 + 18, y + 3);
-      y += 62;
+      c.fillText(String(embers), W / 2 + 14, y + 3);
+      y += 60;
     }
+    c.fillStyle = '#fff6e6';
+    c.font = '800 28px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+    c.fillText(title, W / 2, y - 4, W - 44);
+    y += 50;
     if (mats.length) {
       const seg = (W - 40) / mats.length;
       mats.forEach(([it, have, need], i) => {
@@ -221,14 +229,17 @@ export class PadVisual {
     fill.position.y = 0.095;
     fill.renderOrder = 2;
     this.root.add(fill);
-    const lmat = new THREE.MeshBasicMaterial({ map: this.label.tex, transparent: true, depthWrite: false, toneMapped: false });
+    // Labels are always readable: drawn over roofs and scenery, never depth-tested.
+    const lmat = new THREE.MeshBasicMaterial({ map: this.label.tex, transparent: true, depthWrite: false, depthTest: false, toneMapped: false });
     this.labelMesh = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.5), lmat);
-    this.labelMesh.position.set(0, 1.25, -0.55);
+    this.labelMesh.position.set(0, 1.55, -0.55);
     this.labelMesh.rotation.x = -0.55;
-    this.labelMesh.renderOrder = 20;
+    this.labelMesh.renderOrder = 60;
     this.root.add(this.labelMesh);
     this.icon = makeIcon(def);
-    this.icon.position.set(0, 0.35, 0.1);
+    // Small and to the front corner, clear of the cost label.
+    this.icon.scale.setScalar(0.75);
+    this.icon.position.set(0.5, 0.3, 0.45);
     this.root.add(this.icon);
     this.root.position.set(def.x, 0.02, def.z);
     this.root.visible = false;
@@ -268,11 +279,27 @@ export class PadVisual {
     // Canvas redraw + texture upload is costly on phones: at most ~10x/s while the number ticks.
     if (time - this.labelT > 0.1) {
       this.labelT = time;
-      this.label.draw(def.label, rem.embers, mats, locked ? def.requiresPop ?? 0 : 0);
+      this.label.draw(def.label, rem.embers, mats, locked ? def.requiresPop ?? 0 : 0, sim.padLevel(def.id));
     }
+    // Pulse when the player can afford it right now.
+    const affordable = !locked && rem.embers > 0 && sim.state.embers >= rem.embers;
+    const pulse = affordable ? 1 + Math.max(0, Math.sin(time * 5)) * 0.08 : 1;
+    this.labelMesh.scale.setScalar(pulse);
+    if (affordable) this.fillMat.uniforms.uHot.value = Math.max(this.fillMat.uniforms.uHot.value, 0.25 + Math.sin(time * 5) * 0.15);
     this.icon.rotation.y = time * 0.9;
-    this.icon.position.y = 0.45 + Math.sin(time * 2.2) * 0.08 + this.hot * 0.2;
-    this.labelMesh.position.y = 1.25 + this.hot * 0.15;
+    this.icon.position.y = 0.32 + Math.sin(time * 2.2) * 0.05 + this.hot * 0.15;
+    this.labelMesh.position.y = 1.55 + this.hot * 0.15;
+  }
+
+  /** Nudge the label sideways so it never clips the screen edge. */
+  keepOnScreen(cam: THREE.Camera): void {
+    if (!this.root.visible) return;
+    _lp.set(this.def.x, 1.6, this.def.z).project(cam);
+    const lim = 0.62;
+    const over = _lp.x > lim ? _lp.x - lim : _lp.x < -lim ? _lp.x + lim : 0;
+    // ~4.8 m of world per half-screen at the default zoom.
+    const want = -over * 4.8;
+    this.labelMesh.position.x += (want - this.labelMesh.position.x) * 0.25;
   }
 }
 
