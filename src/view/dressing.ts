@@ -106,6 +106,58 @@ function stripRects(points: XZ[], w: number): Rect[] {
   return out;
 }
 
+const DEBUG = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
+
+/** Props for a data-authored edge run, spaced along the polyline with natural jitter. */
+const EDGE_KIT: Record<string, { props: string[]; step: number; jitter: number; along: boolean }> = {
+  snowBank: { props: ['snowBank', 'snowBank', 'snowyBoulderCluster'], step: 3.4, jitter: 0.35, along: true },
+  rocks: { props: ['snowyBoulderCluster', 'rock', 'snowyBoulderCluster', 'snowBank'], step: 2.0, jitter: 0.5, along: false },
+  trees: { props: ['pineSnowy', 'pineSnowy', 'bush', 'pineSnowy'], step: 2.3, jitter: 0.6, along: false },
+  iceShelf: { props: ['iceShards', 'snowBank', 'iceShards'], step: 2.2, jitter: 0.3, along: true },
+};
+
+function edgeRun(kind: string, points: XZ[], rand: () => number): THREE.Object3D[] {
+  const kit = EDGE_KIT[kind] ?? EDGE_KIT.snowBank;
+  const out: THREE.Object3D[] = [];
+  for (let i = 1; i < points.length; i++) {
+    const [ax, az] = points[i - 1];
+    const [bx, bz] = points[i];
+    const len = Math.hypot(bx - ax, bz - az);
+    const n = Math.max(1, Math.round(len / kit.step));
+    const yaw = Math.atan2(bx - ax, bz - az);
+    for (let k = 0; k <= n; k++) {
+      if (k === n && i < points.length - 1) continue; // corner shared with the next leg
+      const t = k / n;
+      const nx = Math.cos(yaw);
+      const nz = -Math.sin(yaw);
+      const j = (rand() - 0.5) * 2 * kit.jitter;
+      const o = createProp(kit.props[Math.floor(rand() * kit.props.length)], { seed: Math.floor(rand() * 999) });
+      o.position.set(ax + (bx - ax) * t + nx * j, 0, az + (bz - az) * t + nz * j);
+      o.rotation.y = (kit.along ? yaw + Math.PI / 2 : rand() * Math.PI * 2) + (rand() - 0.5) * 0.3;
+      o.scale.setScalar(0.85 + rand() * 0.35);
+      out.push(o);
+    }
+  }
+  return out;
+}
+
+/** A post where a fence run meets a palisade run, so the junction reads tidy and solid. */
+function junctionPosts(a: AreaD): THREE.Object3D[] {
+  const out: THREE.Object3D[] = [];
+  const pal = a.walls.filter((w) => w.kind === 'palisade');
+  for (const f of a.walls) {
+    if (f.kind !== 'fence') continue;
+    for (const end of [f.points[0], f.points[f.points.length - 1]]) {
+      const near = pal.some((w) => w.points.some((_, i) => i > 0 && segDist(end[0], end[1], w.points[i - 1], w.points[i]) < 0.8));
+      if (!near) continue;
+      const o = createProp('lampPost', { seed: 5 });
+      o.position.set(end[0], 0, end[1]);
+      out.push(o);
+    }
+  }
+  return out;
+}
+
 /**
  * Visible barriers wherever an area's walkable rect ends with nothing drawn there (no palisade or
  * fence): snow banks, boulders and bushes just outside the edge. Corridor rects (every rect after an
@@ -119,7 +171,7 @@ function edgeBarriers(data: GameData, a: AreaD, rand: () => number): THREE.Objec
   const inR = (r: { x0: number; x1: number; z0: number; z1: number }, x: number, z: number) => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1;
   const frost: XZ[][] = data.walls.map((w) => w.points.map((p) => [p.x, p.z] as XZ));
   const nearFrost = (x: number, z: number) => frost.some((pts) => pts.some((_, i) => i > 0 && segDist(x, z, pts[i - 1], pts[i]) < 1.6));
-  const walls: XZ[][] = data.dressing.flatMap((d) => d.walls.map((w) => w.points));
+  const walls: XZ[][] = data.dressing.flatMap((d) => [...d.walls.map((w) => w.points), ...(d.edges ?? []).map((e) => e.points)]);
   const nearWall = (x: number, z: number) => walls.some((pts) => pts.some((_, i) => i > 0 && segDist(x, z, pts[i - 1], pts[i]) < 1.4));
   const kinds = ['snowBank', 'snowyBoulderCluster', 'snowBank', 'bush', 'snowBank'];
   area.rects.forEach((r, ri) => {
@@ -140,6 +192,7 @@ function edgeBarriers(data: GameData, a: AreaD, rand: () => number): THREE.Objec
         // player). Elsewhere it is a dead end that must be visible, unless a wall is drawn there.
         const across = all.some((o) => o !== r && inR(o, px - e.nx * 0.5, pz - e.nz * 0.5) && inR(o, px + e.nx * 0.5, pz + e.nz * 0.5));
         if (across || nearWall(px, pz) || nearFrost(px, pz)) continue;
+        if (DEBUG) console.info(`[dressing] fallback barrier: ${a.area} edge at (${px.toFixed(1)}, ${pz.toFixed(1)}) has no wall/fence/edge in data`);
         const o = createProp(kinds[Math.floor(rand() * kinds.length)], { seed: Math.floor(rand() * 999) });
         o.position.set(px + e.nx * 1.0, 0, pz + e.nz * 1.0);
         o.rotation.y = Math.atan2(e.bx - e.ax, e.bz - e.az) + Math.PI / 2 + (rand() - 0.5) * 0.3;
@@ -299,7 +352,11 @@ export class DressingView {
         }
       }
 
-      // Every walkable edge with no drawn wall gets a visible barrier, and corridors get gateposts.
+      // Data-authored edges (snow banks, rocks, trees, ice shelf) as natural continuous runs.
+      for (const e of a.edges ?? []) solidRoots.push(...edgeRun(e.kind, e.points, rand));
+      // Fence <-> palisade junctions get a sturdy post so the two read as one tidy enclosure.
+      solidRoots.push(...junctionPosts(a));
+      // Safety net: any walkable edge still uncovered gets a computed barrier (logged in debug).
       solidRoots.push(...edgeBarriers(data, a, rand));
 
       const group = new THREE.Group();
