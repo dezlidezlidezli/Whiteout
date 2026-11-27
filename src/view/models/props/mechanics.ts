@@ -484,8 +484,12 @@ export function festivalLamp(seed = 0): PropSpec {
   b.add(box(0.01, 0.12, 0.01), P.rope, { p: [0.33, 1.4, 0] });
   const ly = 1.13;
   // paper lantern: pale paper (unlit) + ribs + caps
-  b.add(sphere(0.17, 8, 6), 0xf0e6d4, { p: [0.33, ly, 0], s: [1, 1.25, 1] });
-  for (let k = 0; k < 3; k++) b.add(torus(0.165 - Math.abs(k - 1) * 0.04, 0.008, 3, 10), P.woodDark, { p: [0.33, ly - 0.12 + k * 0.12, 0], r: [Math.PI / 2, 0, 0] });
+  // unlit: pale paper tinted with the lamp colour, a cool sheen on top and a little candle inside the slit
+  const paper = new THREE.Color(c).lerp(new THREE.Color(0xfbf6ee), 0.72).getHex();
+  b.add(sphere(0.17, 8, 6), paper, { p: [0.33, ly, 0], s: [1, 1.25, 1], top: 0xeef4ff, topY: 0.55, shade: 0.04, seed });
+  b.add(cyl(0.03, 0.03, 0.08, 6), P.cream, { p: [0.33, ly - 0.17, 0] });
+  b.add(box(0.006, 0.03, 0.006), 0x3a3030, { p: [0.33, ly - 0.12, 0] });
+  for (let k = 0; k < 3; k++) b.add(torus(0.177 - Math.abs(k - 1) * 0.03, 0.012, 3, 10), P.woodDark, { p: [0.33, ly - 0.12 + k * 0.12, 0], r: [Math.PI / 2, 0, 0] });
   for (const y of [ly + 0.21, ly - 0.21]) b.add(cyl(0.07, 0.07, 0.04, 8), P.woodDark, { p: [0.33, y, 0] });
   b.add(box(0.015, 0.14, 0.015), c, { p: [0.33, ly - 0.32, 0] });
   // lit paper glow (slightly larger shell) + candle tongue
@@ -497,5 +501,27 @@ export function festivalLamp(seed = 0): PropSpec {
     layers: [{ name: 'body', b }, { name: 'flame', b: fl, mat: 'glow', pos: lp, shadow: false }],
     markers: { light: lp },
     userData: { radius: 0.3, decor: true, lightPos: lp, lightColor: c, lightIntensity: 0.6, lightDistance: 4 },
+  };
+}
+
+/** Warm lantern post for the rink edge (with a stub of rope rail). */
+export function rinkLantern(seed = 0): PropSpec {
+  const b = new Builder(), g = new Builder();
+  const H = 2.0;
+  b.add(cyl(0.07, 0.09, H, 7), P.woodDark, { p: [0, H / 2, 0], shade: 0.05, seed });
+  for (const y of [0.35, 0.7]) b.add(cyl(0.095, 0.095, 0.12, 7), y < 0.5 ? P.coatRust : P.cream, { p: [0, y, 0] }); // painted bands
+  b.add(bevel(0.36, 0.14, 0.36, 0.04), P.stone, { p: [0, 0.07, 0] });
+  b.add(cone(0.24, 0.18, 4), P.copper, { p: [0, H + 0.38, 0], r: [0, Math.PI / 4, 0], top: P.copperLight, topY: 0.4 });
+  b.add(bevel(0.26, 0.05, 0.26, 0.02), P.iron, { p: [0, H + 0.02, 0] });
+  for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) b.add(box(0.03, 0.3, 0.03), P.iron, { p: [x * 0.11, H + 0.18, z * 0.11] });
+  g.add(box(0.19, 0.27, 0.19), P.windowGlow, { p: [0, H + 0.18, 0] });
+  b.add(box(0.2, 0.06, 0.2), P.snow, { p: [0, H + 0.49, 0], s: [0.8, 1, 0.8] });
+  // rope rail stubs either side (so a row of posts reads as the rink fence)
+  for (const sx of [-1, 1]) b.add(cyl(0.025, 0.025, 0.9, 5), P.rope, { p: [sx * 0.45, 0.85, 0], r: [0, 0, Math.PI / 2 + sx * 0.12] });
+  const lp: [number, number, number] = [0, H + 0.18, 0];
+  return {
+    layers: [{ name: 'body', b }, { name: 'glow', b: g, mat: 'glow', shadow: false }],
+    markers: { light: lp },
+    userData: { radius: 0.25, lightPos: lp, lightColor: P.windowGlow, lightIntensity: 1.1, lightDistance: 7, railSpacing: 3.0 },
   };
 }

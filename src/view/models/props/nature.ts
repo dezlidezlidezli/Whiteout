@@ -152,25 +152,27 @@ export function frostWall(seed = 0): PropSpec {
 export function iceHole(seed = 0): PropSpec {
   const b = new Builder(), ice = new Builder();
   const r = rng(seed + 2);
-  ice.add(cyl(1.25, 1.3, 0.06, 12), P.ice, { p: [0, 0.03, 0], jitter: 0.04, seed });
-  b.add(cyl(0.48, 0.5, 0.07, 10), P.water, { p: [0, 0.035, 0], jitter: 0.02, seed: seed + 1 });
-  // crushed ice chunks around the hole
-  for (let i = 0; i < 9; i++) {
-    const a = (i / 9) * Math.PI * 2 + r() * 0.3;
-    b.add(ico(0.08 + r() * 0.06), i % 2 ? P.frost : P.snow, { p: [Math.cos(a) * 0.6, 0.06, Math.sin(a) * 0.6], s: [1, 0.6, 1], r: [r(), r(), r()] });
+  // a thin frosted collar of ice so it also sits nicely on snow; on the ice sheet it blends in
+  ice.add(cyl(1.15, 1.2, 0.05, 12), 0xcfeef8, { p: [0, 0.035, 0], jitter: 0.04, seed });
+  // obvious dark water: deep centre, slushy lighter ring
+  b.add(cyl(0.62, 0.64, 0.06, 12), 0x2a5874, { p: [0, 0.05, 0], jitter: 0.02, seed: seed + 1 });
+  b.add(cyl(0.48, 0.5, 0.065, 12), P.water, { p: [0, 0.052, 0], jitter: 0.02, seed: seed + 2 });
+  b.add(cyl(0.3, 0.32, 0.07, 10), 0x0c1c2a, { p: [0, 0.053, 0] });
+  for (let i = 0; i < 5; i++) b.add(box(0.12 + r() * 0.1, 0.01, 0.04), 0x9fd0e6, { p: [(r() - 0.5) * 0.6, 0.09, (r() - 0.5) * 0.6], r: [0, r() * 3, 0] }); // slush floes
+  // chunky rim of broken ice blocks
+  for (let i = 0; i < 11; i++) {
+    const a = (i / 11) * Math.PI * 2 + r() * 0.25;
+    const s = 0.12 + r() * 0.08;
+    b.add(ico(s, 0), i % 3 === 0 ? 0xbfe6f4 : i % 3 === 1 ? P.frost : P.snow, { p: [Math.cos(a) * 0.72, s * 0.5, Math.sin(a) * 0.72], s: [1.2, 0.7, 1], r: [r(), r(), r()], jitter: 0.02, seed: i });
   }
   // little flag (a tip-up) to show it's a fishing spot
-  b.add(box(0.5, 0.03, 0.04), P.woodLight, { p: [0.75, 0.07, 0.3], r: [0, 0.5, 0] });
-  b.add(cyl(0.015, 0.015, 0.6, 4), P.woodDark, { p: [0.75, 0.37, 0.3] });
-  b.add(box(0.2, 0.14, 0.01), P.coatRust, { p: [0.85, 0.58, 0.3] });
-  for (let i = 0; i < 4; i++) {
-    const a = r() * 6.28;
-    b.add(box(0.12, 0.012, 0.03), P.snowShade, { p: [Math.cos(a) * 1.0, 0.065, Math.sin(a) * 1.0], r: [0, a, 0] });
-  }
+  b.add(box(0.5, 0.03, 0.04), P.woodLight, { p: [0.95, 0.07, 0.35], r: [0, 0.5, 0] });
+  b.add(cyl(0.018, 0.018, 0.7, 4), P.woodDark, { p: [0.95, 0.4, 0.35] });
+  b.add(box(0.26, 0.18, 0.01), P.coatRust, { p: [1.08, 0.66, 0.35] });
   return {
     layers: [{ name: 'ice', b: ice, mat: 'ice', shadow: false }, { name: 'body', b }],
-    markers: { water: [0, 0.07, 0] },
-    userData: { radius: 1.3, walkable: true },
+    markers: { water: [0, 0.09, 0] },
+    userData: { radius: 1.1, walkable: true },
   };
 }
 

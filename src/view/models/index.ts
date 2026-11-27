@@ -32,7 +32,7 @@ export type PropName =
   | 'plough' // opts.level 1 | 2 (2.4 m iron-edged blade)
   | 'emberCache' | 'buriedCrate' | 'buriedVillager' | 'lanternHeld' | 'foundBoard' | 'monument'
   | 'gripMat' | 'fishLeap' | 'capstan' | 'bellows' | 'mineLift' | 'shaftPile'
-  | 'flameHeld' | 'trailBrazier' | 'windGap' | 'festivalLamp';
+  | 'flameHeld' | 'trailBrazier' | 'windGap' | 'festivalLamp' | 'rinkLantern';
 
 export interface ModelOpts {
   level?: number;
@@ -44,6 +44,9 @@ export interface ModelOpts {
   skates?: boolean;
   /** Props with a lit/unlit state (brazier, trailBrazier, festivalLamp): start unlit. */
   unlit?: boolean;
+  /** Characters: hand tool override ('none' hides it) and its upgrade tier (1 wood, 2 iron, 3 steel binding). */
+  tool?: 'none' | 'axe' | 'pick' | 'rod' | 'spoon';
+  toolTier?: 1 | 2 | 3;
 }
 
 /** Static prop. Unknown names return a placeholder box, never throw. */
@@ -115,6 +118,8 @@ export { mats as getSharedMaterials } from './materials';
 export { PROP_NAMES } from './props/registry';
 /** Central character style table (colours/hat/tool per role). */
 export { CHARACTER_STYLES } from './characters';
+/** Swap a humanoid rig's hand tool / tier at runtime (tool mesh lives under the `tool` node). */
+export { setTool as setCharacterTool } from './characters';
 
 // ---------------------------------------------------------------- paths, floors, scatter (additive API)
 export type { XZ, PathSample, GroundPath, Station, SweepOpts } from './paths';

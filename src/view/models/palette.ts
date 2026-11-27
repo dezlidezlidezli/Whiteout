@@ -38,6 +38,8 @@ export const PALETTE = {
   copperDark: 0x8a3f1c,
   iron: 0x4a4f5a,
   steel: 0xb0bccb,
+  kettleSteel: 0xa7abb0,
+  kettleSteelLight: 0xdcdfe2,
   pine: 0x2f6b55,
   pineDark: 0x1f4d40,
   pineLight: 0x46906b,

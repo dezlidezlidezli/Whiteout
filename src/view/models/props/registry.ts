@@ -14,7 +14,7 @@ import * as mech from './mechanics';
 type Factory = (level: number, seed: number) => PropSpec;
 /** Which option each prop varies by (for cache keys). */
 const F: Record<string, { f: Factory; by?: 'level' | 'seed'; seeds?: number }> = {
-  kettle: { f: () => camp.kettle() },
+  kettle: { f: (l) => camp.kettle(l), by: 'level' },
   counter: { f: () => camp.counter() },
   fishCrate: { f: () => camp.fishCrate() },
   storageTable: { f: () => camp.storageTable() },
@@ -76,6 +76,7 @@ const F: Record<string, { f: Factory; by?: 'level' | 'seed'; seeds?: number }> =
   trailBrazier: { f: () => mech.trailBrazier() },
   windGap: { f: (_l, s) => mech.windGap(s), by: 'seed', seeds: 3 },
   festivalLamp: { f: (_l, s) => mech.festivalLamp(s), by: 'seed', seeds: 4 },
+  rinkLantern: { f: (_l, s) => mech.rinkLantern(s), by: 'seed', seeds: 2 },
   crateStack: { f: (_l, s) => clutter.crateStack(s), by: 'seed', seeds: 3 },
   barrelCluster: { f: (_l, s) => clutter.barrelCluster(s), by: 'seed', seeds: 3 },
   sackPile: { f: (_l, s) => clutter.sackPile(s), by: 'seed', seeds: 3 },
@@ -102,7 +103,7 @@ const F: Record<string, { f: Factory; by?: 'level' | 'seed'; seeds?: number }> =
 };
 
 export const PROP_NAMES = Object.keys(F);
-const NO_RANDOM_YAW = new Set(['windGap', 'gripMat', 'festivalLamp', 'buriedVillager', 'frostWall', 'fence', 'tent', 'cabin', 'flagPole', 'marketStall', 'snowBank', 'bannerLine', 'woodenArch', 'watchTower', 'firewoodRack', 'dryingRack', 'toolRack', 'potShelf', 'signBoard', 'lampPost', 'rugMat']);
+const NO_RANDOM_YAW = new Set(['rinkLantern', 'windGap', 'gripMat', 'festivalLamp', 'buriedVillager', 'frostWall', 'fence', 'tent', 'cabin', 'flagPole', 'marketStall', 'snowBank', 'bannerLine', 'woodenArch', 'watchTower', 'firewoodRack', 'dryingRack', 'toolRack', 'potShelf', 'signBoard', 'lampPost', 'rugMat']);
 /** Purely decorative props: no collision expected. */
 const DECOR = new Set(['rugMat', 'snowBank', 'bush', 'sapling', 'iceShards', 'footpathStones', 'bannerLine', 'basketPile', 'signBoard', 'snowDrift', 'aurora', 'lanternString', 'flagPole']);
 

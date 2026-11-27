@@ -18,7 +18,7 @@ import { triCount } from '../view/models/geo';
 import { RENDER_FLAGS } from '../view/models/materials';
 import { buildYard } from './yard';
 import { runAnimTest } from './animtest';
-import { mechanicsEntries } from './mechanics';
+import { mechanicsEntries, props4Entries } from './mechanics';
 
 const q = new URLSearchParams(location.search);
 const sheet = q.get('sheet') ?? 'characters';
@@ -191,6 +191,8 @@ function buildEntries(): Entry[] {
       const o = new THREE.Mesh(d.geometry, d.material);
       E.push({ label: '', obj: o, radius: 0.36, center: new THREE.Vector3(0, 0.08, 0) });
     }
+  } else if (sheet === 'props4') {
+    E.push(...props4Entries());
   } else if (sheet === 'mechanics') {
     E.push(...mechanicsEntries());
   } else if (sheet === 'kit') {

@@ -235,36 +235,47 @@ function legGeo(role: string, st: Style): THREE.BufferGeometry {
   });
 }
 
-function toolGeo(t: Tool): THREE.BufferGeometry | null {
+/** Tool tier colours: binding (wood -> iron -> steel) and head metal. */
+const TIER = {
+  1: { bind: 0xb08850, head: 0x8a929e, edge: 0xc8d0da, handle: P.woodLight },
+  2: { bind: 0x4e545e, head: 0xaeb9c6, edge: 0xe6edf4, handle: P.wood },
+  3: { bind: 0xd8e2ec, head: 0xd6e0ea, edge: 0xffffff, handle: 0x7a4a2c },
+} as const;
+/** Chunky, toy-proportioned tools that read at ~65 px from the 50° camera. Grip at the origin, tool extends along -Y. */
+function toolGeo(t: Tool, tier: 1 | 2 | 3 = 1): THREE.BufferGeometry | null {
   if (t === 'none') return null;
-  return cached(`tool:${t}`, () => {
+  return cached(`tool:${t}:${tier}`, () => {
     const b = new Builder();
+    const c = TIER[tier];
     if (t === 'axe') {
-      b.add(cyl(0.022, 0.026, 0.62, 5), P.woodLight, { p: [0, -0.22, 0] });
-      b.add(prismAxe(), P.steel, { p: [0, -0.48, 0.0] });
-      b.add(box(0.05, 0.12, 0.06), P.iron, { p: [0, -0.48, -0.03] });
+      b.add(cyl(0.035, 0.04, 0.7, 6), c.handle, { p: [0, -0.26, 0] });
+      b.add(cyl(0.045, 0.045, 0.1, 6), c.bind, { p: [0, -0.5, 0] });
+      b.add(prismAxe(1.7), c.head, { p: [0, -0.58, 0.0], top: c.edge, topY: 0.5 });
+      b.add(box(0.08, 0.18, 0.1), c.bind, { p: [0, -0.58, -0.03] });
+      b.add(box(0.03, 0.26, 0.05), c.edge, { p: [0, -0.58, 0.3] }); // bright edge
     } else if (t === 'pick') {
-      b.add(cyl(0.022, 0.026, 0.6, 5), P.woodLight, { p: [0, -0.22, 0] });
-      b.add(cone(0.035, 0.3, 4), P.steel, { p: [0, -0.5, 0.15], r: [Math.PI / 2 + 0.2, 0, 0] });
-      b.add(cone(0.035, 0.3, 4), P.steel, { p: [0, -0.5, -0.15], r: [-Math.PI / 2 - 0.2, 0, 0] });
-      b.add(box(0.06, 0.07, 0.08), P.iron, { p: [0, -0.5, 0] });
+      b.add(cyl(0.035, 0.04, 0.68, 6), c.handle, { p: [0, -0.26, 0] });
+      b.add(cone(0.06, 0.42, 5), c.head, { p: [0, -0.6, 0.22], r: [Math.PI / 2 + 0.25, 0, 0], top: c.edge, topY: 0.3 });
+      b.add(cone(0.06, 0.42, 5), c.head, { p: [0, -0.6, -0.22], r: [-Math.PI / 2 - 0.25, 0, 0], top: c.edge, topY: 0.3 });
+      b.add(bevel(0.11, 0.12, 0.14, 0.02), c.bind, { p: [0, -0.6, 0] });
     } else if (t === 'rod') {
-      b.add(cyl(0.012, 0.025, 1.3, 4), P.woodDark, { p: [0, -0.55, 0] });
-      b.add(cyl(0.03, 0.03, 0.06, 6), P.steel, { p: [0.03, -0.08, 0], r: [0, 0, Math.PI / 2] });
-      b.add(box(0.006, 0.5, 0.006), 0xf0f0f0, { p: [0, -1.2 + 0.0, -0.22], r: [1.1, 0, 0] });
-      b.add(sphere(0.04, 5, 4), P.berry, { p: [0, -1.33, -0.44] });
+      b.add(cyl(0.018, 0.035, 1.4, 5), P.woodDark, { p: [0, -0.6, 0] });
+      for (const y of [-0.3, -0.75, -1.15]) b.add(cyl(0.03, 0.03, 0.04, 6), c.bind, { p: [0, y, 0] });
+      b.add(cyl(0.06, 0.06, 0.08, 8), c.head, { p: [0.05, -0.12, 0], r: [0, 0, Math.PI / 2], top: c.edge }); // reel
+      b.add(box(0.008, 0.55, 0.008), 0xf0f0f0, { p: [0, -1.28, -0.22], r: [1.1, 0, 0] });
+      b.add(sphere(0.06, 6, 4), P.berry, { p: [0, -1.42, -0.46], top: 0xffffff, topY: 0.6 });
     } else if (t === 'spoon') {
-      b.add(cyl(0.018, 0.022, 0.38, 5), P.woodLight, { p: [0, -0.15, 0] });
-      b.add(sphere(0.055, 6, 4), P.woodLight, { p: [0, -0.36, 0], s: [1, 1.2, 0.5] });
+      b.add(cyl(0.022, 0.026, 0.42, 5), P.woodLight, { p: [0, -0.17, 0] });
+      b.add(sphere(0.075, 6, 4), P.woodLight, { p: [0, -0.4, 0], s: [1, 1.2, 0.5] });
     }
     return b;
   });
 }
-function prismAxe(): THREE.BufferGeometry {
+function prismAxe(k = 1): THREE.BufferGeometry {
   const s = new THREE.Shape();
-  s.moveTo(0, -0.06); s.lineTo(0.16, -0.11); s.lineTo(0.18, 0.11); s.lineTo(0, 0.06); s.lineTo(0, -0.06);
-  const g = new THREE.ExtrudeGeometry(s, { depth: 0.035, bevelEnabled: false });
-  g.translate(0, 0, -0.0175);
+  s.moveTo(0, -0.06 * k); s.lineTo(0.16 * k, -0.11 * k); s.lineTo(0.18 * k, 0.11 * k); s.lineTo(0, 0.06 * k); s.lineTo(0, -0.06 * k);
+  const g = new THREE.ExtrudeGeometry(s, { depth: 0.035 * k, bevelEnabled: false });
+  g.translate(0, 0, -0.0175 * k);
   g.rotateY(-Math.PI / 2);
   g.deleteAttribute('uv');
   return g;
@@ -297,13 +308,10 @@ function buildHumanoid(role: Exclude<CharacterRole, 'dog'>, opts: ModelOpts): Ch
     armL.add(mesh(armGeo(role, st, 1), 'armLMesh'));
     armR.add(mesh(armGeo(role, st, -1), 'armRMesh'));
   }
-  const tg = toolGeo(st.tool);
-  if (tg) {
-    const tool = group('tool', 0, -ARM_LEN - 0.03, 0.02);
-    tool.rotation.x = st.tool === 'rod' ? -1.6 : st.tool === 'spoon' ? 0 : -0.9;
-    tool.add(mesh(tg, 'toolMesh'));
-    armR.add(tool);
-  }
+  // the tool node always exists; its mesh is a separate (unskinned) mesh so it can be swapped / tiered
+  const tool = group('tool', 0, -ARM_LEN - 0.03, 0.02);
+  armR.add(tool);
+  applyTool(tool, (opts.tool ?? st.tool) as Tool, (opts.toolTier ?? 1) as 1 | 2 | 3);
   const legL = group('legL', 0.13, HIP, 0);
   const legR = group('legR', -0.13, HIP, 0);
   rig.add(legL, legR);
@@ -329,7 +337,7 @@ function buildHumanoid(role: Exclude<CharacterRole, 'dog'>, opts: ModelOpts): Ch
   if (rescued) { addBlanket(body, opts.seed ?? 0); rig.scale.setScalar(0.9); }
 
   const phase = ((opts.seed ?? 0) * 0.6180339) % 1 * Math.PI * 2;
-  partsMap.set(root, { rig, body, head, armL, armR, legL, legR, quad: false, phase, tool: armR.getObjectByName('tool') });
+  partsMap.set(root, { rig, body, head, armL, armR, legL, legR, quad: false, phase, tool });
   if (opts.variant === 'rescued') root.userData.variant = 'rescued';
   root.userData.radius = 0.35;
   const height = HIP + NECK + 0.24 + 0.27 + (st.hat === 'bobble' ? 0.25 : 0.12);
@@ -363,6 +371,24 @@ function addBlanket(body: THREE.Object3D, seed: number) {
   body.add(mesh(g, 'blanket'));
 }
 
+/** Put `kind` (tier 1-3) in a character's `tool` node. */
+function applyTool(tool: THREE.Object3D, kind: Tool, tier: 1 | 2 | 3) {
+  for (const c of [...tool.children]) tool.remove(c);
+  const tg = toolGeo(kind, tier);
+  tool.userData.kind = kind;
+  tool.userData.tier = tier;
+  if (!tg) return;
+  tool.rotation.x = kind === 'rod' ? -1.6 : kind === 'spoon' ? 0 : -0.9;
+  const m = mesh(tg, `tool:${kind}`);
+  m.userData.noSkin = true;
+  tool.add(m);
+}
+/** Swap the hand tool of a humanoid rig (e.g. the player picks up an axe, or an upgrade raises the tier). */
+export function setTool(rig: CharacterRig, kind: 'none' | 'axe' | 'pick' | 'rod' | 'spoon', tier: 1 | 2 | 3 = 1): void {
+  const tool = rig.root.getObjectByName('tool');
+  if (tool) applyTool(tool, kind, tier);
+}
+
 // ---------------------------------------------------------------- skinning: one draw call per character
 const skinCache = new Map<string, { geo: THREE.BufferGeometry }>();
 /** Merge every static vertex-coloured part into ONE SkinnedMesh whose bones are the existing named nodes
@@ -371,7 +397,7 @@ function skinify(root: THREE.Object3D, key: string): void {
   if (RENDER_FLAGS.unskinnedCharacters) return;
   root.updateMatrixWorld(true);
   const meshes: THREE.Mesh[] = [];
-  root.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && m.material === mats().std && m.visible) meshes.push(m); });
+  root.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh && m.material === mats().std && m.visible && !m.userData.noSkin) meshes.push(m); });
   const bones: THREE.Object3D[] = [];
   const parts = meshes.map((m) => {
     let i = bones.indexOf(m.parent!);

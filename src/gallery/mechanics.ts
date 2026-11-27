@@ -203,3 +203,58 @@ export function mechanicsEntries(): MechEntry[] {
   }
   return E;
 }
+
+/** Art pass 8: steel kettle, tiered tools, festival lamps, the Frozen Lake rink. */
+export function props4Entries(): MechEntry[] {
+  const E: MechEntry[] = [];
+  for (const lv of [1, 2]) { const k = createProp('kettle', { level: lv }); E.push({ label: lv === 1 ? 'kettle L1 · copper' : 'kettle L2 · steel', obj: k }); }
+  // tools at game scale: a lineup per tier
+  const tools: [Parameters<typeof createCharacter>[0], 'axe' | 'pick' | 'rod', CharacterAnimState['action']][] = [['player', 'axe', 'chop'], ['player', 'pick', 'mine'], ['player', 'rod', 'fish']];
+  for (const [role, tool, action] of tools) {
+    const g = new THREE.Group();
+    const anims: ((t: number) => void)[] = [];
+    for (let tier = 1; tier <= 3; tier++) {
+      const r = rigAt(role, (tier - 2) * 1.3, 0, 0.5, { action: 'none' }, { tool, toolTier: tier as 1 | 2 | 3 });
+      g.add(r.rig.root); anims.push(r.anim);
+      void action;
+    }
+    E.push({ label: `player ${tool} · tier 1 / 2 / 3`, obj: g, update: (t) => anims.forEach((a) => a(t)), radius: 2.1, center: new THREE.Vector3(0, 0.7, 0) });
+  }
+  {
+    const g = new THREE.Group(); const anims: ((t: number) => void)[] = [];
+    ([['lumberjack', 'chop'], ['miner', 'mine'], ['fisher', 'fish']] as const).forEach(([role, action], i) => {
+      const r = rigAt(role, (i - 1) * 1.4, 0, 0.5, { action }, { toolTier: 3 }); g.add(r.rig.root); anims.push(r.anim);
+    });
+    E.push({ label: 'helpers · tier-3 tools in action', obj: g, update: (t) => anims.forEach((a) => a(t)), radius: 2.3, center: new THREE.Vector3(0, 0.8, 0) });
+  }
+  {
+    const g = new THREE.Group();
+    for (let i = 0; i < 4; i++) {
+      const u = createProp('festivalLamp', { seed: i, unlit: true }); u.position.set((i - 1.5) * 0.9, 0, -0.6); g.add(u);
+      const l = createProp('festivalLamp', { seed: i }); l.position.set((i - 1.5) * 0.9, 0, 0.6); g.add(l);
+    }
+    E.push({ label: 'festivalLamp · unlit (back) / lit (front)', obj: g });
+  }
+  // the rink at full size
+  {
+    const g = new THREE.Group();
+    g.add(createIceSheet(16, 14, { round: true, seed: 3 }));
+    const mat = createProp('gripMat', { seed: 0 }); mat.position.set(-4.0, 0.03, 3.2); g.add(mat);
+    const ct = createProp('counter'); ct.position.set(-4.0, 0.16, 2.8); g.add(ct);
+    for (const [x, z, s] of [[3.5, -2.5, 0], [-2, -4, 1]] as const) { const h = createProp('iceHole', { seed: s }); h.position.set(x, 0, z); g.add(h); }
+    const fl = createProp('fishLeap'); fl.position.set(2.2, 0.03, 2.6); g.add(fl);
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + 0.2;
+      const l = createProp('rinkLantern', { seed: i }); l.position.set(Math.cos(a) * 8.6, 0, Math.sin(a) * 7.6); l.rotation.y = -a + Math.PI / 2; g.add(l);
+    }
+    const sk = rigAt('player', 0.5, 0.5, 2.2, { speed: 6, action: 'skate' }, { skates: true });
+    g.add(sk.rig.root);
+    E.push({ label: 'Frozen Lake rink · 16×14 round ice, grip mat, ice holes, rink lanterns', obj: g, update: sk.anim, radius: 9.2, center: new THREE.Vector3(0, 0, 0) });
+  }
+  {
+    const poly: [number, number][] = [[-5, -3], [1, -4], [5, -1], [4, 3], [-2, 4], [-5, 1]];
+    E.push({ label: 'createIceSheet polygon outline', obj: createIceSheet(10, 8, { polygon: poly, seed: 5 }) });
+  }
+  for (const n of ['iceHole', 'gripMat', 'rinkLantern']) { const o = createProp(n); o.rotation.y = 0; o.scale.setScalar(1); E.push({ label: n, obj: o }); }
+  return E;
+}

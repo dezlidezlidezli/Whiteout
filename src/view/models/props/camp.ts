@@ -5,10 +5,21 @@ import { fishBody } from '../items';
 import { coals, flame, logBetween, snowMound, stoneRing, type PropSpec } from './common';
 
 // ---------------------------------------------------------------- kettle
-export function kettle(): PropSpec {
+export function kettle(level = 1): PropSpec {
+  const steel = level >= 2;
   const b = new Builder(), lid = new Builder(), fl = new Builder(), em = new Builder();
-  // fire ring + coal bed
-  stoneRing(b, 0.68, 9, 0.17, 21);
+  // metal scheme: copper (L1) or brushed steel with copper trim (L2)
+  const M = steel
+    ? { body: P.kettleSteel, light: P.kettleSteelLight, dark: P.iron, trim: P.copper }
+    : { body: P.copper, light: P.copperLight, dark: P.copperDark, trim: P.copperDark };
+  // fire ring + coal bed (L2: a sturdier ring of dressed stone blocks)
+  if (steel) {
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      b.add(bevel(0.36, 0.24, 0.22, 0.04), i % 3 === 0 ? P.stoneWarm : i % 3 === 1 ? P.stone : 0x9aa0ab, { p: [Math.cos(a) * 0.72, 0.12, Math.sin(a) * 0.72], r: [0, -a + Math.PI / 2, 0], shade: 0.05, seed: i });
+    }
+    b.add(cyl(0.86, 0.86, 0.05, 12, true), P.iron, { p: [0, 0.22, 0] });
+  } else stoneRing(b, 0.68, 9, 0.17, 21);
   b.add(cyl(0.58, 0.62, 0.05, 10), P.coal, { p: [0, 0.025, 0] });
   coals(em, 0.45, 7, 4, 0.06);
   // trivet legs
@@ -18,25 +29,41 @@ export function kettle(): PropSpec {
   }
   // copper belly
   const prof: [number, number][] = [[0, 0.3], [0.3, 0.3], [0.5, 0.38], [0.64, 0.56], [0.67, 0.72], [0.6, 0.92], [0.46, 1.04], [0.32, 1.08]];
-  b.add(lathe(prof, 11), P.copper, { top: P.copperLight, topY: 0.55, shade: 0.04, seed: 3 });
-  b.add(cyl(0.675, 0.675, 0.05, 12, true), P.copperDark, { p: [0, 0.72, 0] });
-  b.add(cyl(0.34, 0.34, 0.05, 12), P.copperDark, { p: [0, 1.08, 0] }); // rim
-  for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * Math.PI * 2 + 0.3;
-    b.add(box(0.04, 0.04, 0.04), P.copperLight, { p: [Math.cos(a) * 0.685, 0.72, Math.sin(a) * 0.685], r: [0, -a, 0] });
+  b.add(lathe(prof, 11), M.body, { top: M.light, topY: 0.55, shade: steel ? 0.07 : 0.04, seed: 3 });
+  const bands = steel ? [0.5, 0.72, 0.94] : [0.72];
+  for (const y of bands) {
+    const rr = y === 0.72 ? 0.675 : y < 0.72 ? 0.6 : 0.6;
+    b.add(cyl(rr, rr, 0.05, 12, true), M.dark, { p: [0, y, 0] });
+    const n = steel ? 10 : 6;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + 0.3;
+      b.add(steel ? sphere(0.025, 4, 3) : box(0.04, 0.04, 0.04), steel ? 0xdfe8f0 : P.copperLight, { p: [Math.cos(a) * (rr + 0.01), y, Math.sin(a) * (rr + 0.01)], r: [0, -a, 0] });
+    }
   }
+  b.add(cyl(0.34, 0.34, 0.05, 12), M.dark, { p: [0, 1.08, 0] }); // rim
   // spout (+X), curving up
-  b.add(cyl(0.07, 0.13, 0.36, 7), P.copper, { p: [0.72, 0.68, 0], r: [0, 0, -1.05] });
-  b.add(cyl(0.055, 0.075, 0.32, 7), P.copper, { p: [0.95, 0.92, 0], r: [0, 0, -0.55] });
-  b.add(cyl(0.065, 0.065, 0.04, 7), P.copperDark, { p: [1.03, 1.06, 0], r: [0, 0, -0.55] });
+  b.add(cyl(0.07, 0.13, 0.36, 7), M.body, { p: [0.72, 0.68, 0], r: [0, 0, -1.05] });
+  b.add(cyl(0.055, 0.075, 0.32, 7), M.body, { p: [0.95, 0.92, 0], r: [0, 0, -0.55] });
+  b.add(cyl(0.065, 0.065, 0.04, 7), M.trim, { p: [1.03, 1.06, 0], r: [0, 0, -0.55] });
   // handle (-X)
-  b.add(torus(0.3, 0.045, 4, 9, Math.PI * 1.1), P.copperDark, { p: [-0.62, 0.78, 0], r: [0, 0, Math.PI / 2 - 0.1] });
+  b.add(torus(0.3, 0.045, 4, 9, Math.PI * 1.1), steel ? P.copper : P.copperDark, { p: [-0.62, 0.78, 0], r: [0, 0, Math.PI / 2 - 0.1] });
   // ember emblem on the front
   b.add(prism([[0, 0.1], [0.06, 0], [0, -0.1], [-0.06, 0]], 0.03), P.ember, { p: [0, 0.68, 0.665] });
   // lid (separate node, hinge at the rim)
-  lid.add(lathe([[0.33, 0], [0.32, 0.04], [0.2, 0.11], [0, 0.13]], 12), P.copper, { top: P.copperLight, topY: 0.4 });
-  lid.add(cyl(0.035, 0.03, 0.08, 6), P.woodDark, { p: [0, 0.16, 0] });
-  lid.add(sphere(0.06, 6, 4), P.woodDark, { p: [0, 0.22, 0] });
+  if (steel) {
+    // taller chimney-style lid with a steam whistle and a copper knob
+    lid.add(lathe([[0.33, 0], [0.32, 0.05], [0.22, 0.12], [0.16, 0.2], [0.15, 0.3], [0, 0.3]], 12), M.body, { top: M.light, topY: 0.4 });
+    lid.add(cyl(0.165, 0.165, 0.04, 12, true), P.iron, { p: [0, 0.22, 0] });
+    lid.add(cyl(0.05, 0.06, 0.16, 8), P.steel, { p: [0.08, 0.38, 0], r: [0, 0, -0.25] });
+    lid.add(cone(0.06, 0.08, 8), P.copper, { p: [0.105, 0.49, 0], r: [0, 0, -0.25] });
+    lid.add(box(0.06, 0.02, 0.03), 0x30343c, { p: [0.11, 0.42, 0.05] }); // whistle slot
+    lid.add(cyl(0.035, 0.03, 0.08, 6), P.copperDark, { p: [-0.07, 0.34, 0] });
+    lid.add(sphere(0.065, 6, 4), P.copper, { p: [-0.07, 0.4, 0], top: P.copperLight });
+  } else {
+    lid.add(lathe([[0.33, 0], [0.32, 0.04], [0.2, 0.11], [0, 0.13]], 12), P.copper, { top: P.copperLight, topY: 0.4 });
+    lid.add(cyl(0.035, 0.03, 0.08, 6), P.woodDark, { p: [0, 0.16, 0] });
+    lid.add(sphere(0.06, 6, 4), P.woodDark, { p: [0, 0.22, 0] });
+  }
   // fire tongues peeking out around the belly
   for (let i = 0; i < 4; i++) {
     const a = (i / 4) * Math.PI * 2 + 0.6;
@@ -55,8 +82,8 @@ export function kettle(): PropSpec {
       { name: 'coals', b: em, mat: 'ember', shadow: false },
       { name: 'flame', b: fl, mat: 'glow', pos: [0, 0.05, 0] },
     ],
-    markers: { steamPoint: [0, 1.35, 0], spoutSteamPoint: [1.05, 1.1, 0], light: [0, 0.4, 0], itemAnchor: [0, 1.3, 0] },
-    userData: { radius: 0.9, size: [1.8, 1.6], lightPos: [0, 0.4, 0], lightColor: P.flame, lightIntensity: 1.2, lightDistance: 5 },
+    markers: { steamPoint: steel ? [0.13, 1.62, 0] : [0, 1.35, 0], spoutSteamPoint: [1.05, 1.1, 0], light: [0, 0.4, 0], itemAnchor: [0, 1.3, 0] },
+    userData: { level: steel ? 2 : 1, radius: 0.9, size: [1.8, 1.6], lightPos: [0, 0.4, 0], lightColor: P.flame, lightIntensity: 1.2, lightDistance: 5 },
   };
 }
 

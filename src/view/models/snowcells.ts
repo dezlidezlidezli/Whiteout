@@ -56,54 +56,118 @@ export function snowBankCell(seed = 0): CrowdMeshDef {
   return d;
 }
 
-export interface IceSheetOpts { seed?: number; edge?: boolean }
-/** Large lake-ice floor (one draw call): glossy pale teal, darker cracks, skate scratches, snow-dusted edges. Origin at centre, top ~0.03 m. */
+export interface IceSheetOpts {
+  seed?: number;
+  /** snow-dusted rim (default true) */
+  edge?: boolean;
+  /** organic rounded outline (wobbly ellipse inscribed in width x depth) */
+  round?: boolean;
+  /** custom outline (local XZ, centred) — overrides `round` */
+  polygon?: [number, number][];
+}
+
+function insidePoly(poly: [number, number][], x: number, z: number): boolean {
+  let c = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, zi] = poly[i], [xj, zj] = poly[j];
+    if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c;
+  }
+  return c;
+}
+function distToPoly(poly: [number, number][], x: number, z: number): number {
+  let m = 1e9;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [ax, az] = poly[j], [bx, bz] = poly[i];
+    const dx = bx - ax, dz = bz - az, L = dx * dx + dz * dz || 1;
+    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L));
+    m = Math.min(m, Math.hypot(x - ax - dx * t, z - az - dz * t));
+  }
+  return m;
+}
+
+/** Lake-ice floor (one draw call): pale teal edges deepening to dark ice in the centre, branching cracks,
+ *  skate swirls, frost dust and a snow-dusted rim. Rectangle, organic `round` outline or a custom `polygon`.
+ *  Origin at the centre, top ~0.035 m. userData.outline holds the outline for collision/zones. */
 export function iceSheet(width: number, depth: number, o: IceSheetOpts = {}): THREE.Object3D {
   const r = rng((o.seed ?? 0) + 101);
   const b = new Builder();
-  const sx = Math.max(2, Math.round(width / 1.5)), sz = Math.max(2, Math.round(depth / 1.5));
-  const pg = new THREE.PlaneGeometry(width, depth, sx, sz).rotateX(-Math.PI / 2);
-  // per-vertex teal variation (darker, deeper patches in the middle)
-  const pos = pg.attributes.position, col: number[] = [];
-  const c = new THREE.Color(), deep = new THREE.Color(0x7cc4d8), pale = new THREE.Color(0xc4ecf4);
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i), z = pos.getZ(i);
-    const e = Math.min(1, Math.min(width / 2 - Math.abs(x), depth / 2 - Math.abs(z)) / 6);
-    const n = 0.5 + 0.5 * Math.sin(x * 0.37 + z * 0.21) * Math.cos(z * 0.29 - x * 0.13);
-    c.copy(pale).lerp(deep, e * (0.4 + 0.5 * n));
-    col.push(c.r, c.g, c.b);
-  }
-  pg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  b.add(pg, 0xffffff, { p: [0, 0.03, 0], vcol: true });
-  // cracks: branching dark lines
-  const nCr = Math.round((width * depth) / 18);
-  for (let k = 0; k < nCr; k++) {
-    let x = (r() - 0.5) * width * 0.85, z = (r() - 0.5) * depth * 0.85, a = r() * Math.PI;
-    for (let s = 0; s < 4; s++) {
-      const len = 0.5 + r() * 1.3;
-      b.add(box(0.025, 0.004, len), 0x4f8aa8, { p: [x + Math.sin(a) * len / 2, 0.034, z + Math.cos(a) * len / 2], r: [0, a, 0] });
-      x += Math.sin(a) * len; z += Math.cos(a) * len; a += (r() - 0.5) * 1.2;
+  const hw = width / 2, hd = depth / 2;
+  let poly: [number, number][];
+  if (o.polygon) poly = o.polygon;
+  else if (o.round) {
+    poly = [];
+    const ph = r() * 6.28;
+    for (let k = 0; k < 40; k++) {
+      const a = (k / 40) * Math.PI * 2;
+      const w = 1 + 0.05 * Math.sin(3 * a + ph) + 0.035 * Math.sin(5 * a + ph * 2);
+      poly.push([Math.cos(a) * hw * 0.97 * w, Math.sin(a) * hd * 0.97 * w]);
+    }
+  } else poly = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]];
+  const isIn = (x: number, z: number) => insidePoly(poly, x, z);
+  // tessellated top with per-vertex colour: pale near the shore, deep teal-blue in the middle
+  const cell = 0.5;
+  const pos: number[] = [], col: number[] = [];
+  const pale = new THREE.Color(0xcdeff6), mid = new THREE.Color(0x8fd0e2), deep = new THREE.Color(0x3f8fb0), c = new THREE.Color();
+  const colAt = (x: number, z: number) => {
+    const e = Math.min(1, distToPoly(poly, x, z) / Math.max(3, Math.min(hw, hd) * 0.55));
+    const n = 0.5 + 0.5 * Math.sin(x * 0.41 + z * 0.23) * Math.cos(z * 0.31 - x * 0.17);
+    if (e < 0.5) c.copy(pale).lerp(mid, e * 2); else c.copy(mid).lerp(deep, (e - 0.5) * 2 * (0.7 + 0.3 * n));
+    return c;
+  };
+  for (let x = -hw; x < hw - 1e-6; x += cell) for (let z = -hd; z < hd - 1e-6; z += cell) {
+    if (!isIn(x + cell / 2, z + cell / 2)) continue;
+    const q = [[x, z], [x + cell, z], [x + cell, z + cell], [x, z + cell]];
+    for (const [a, b2, c2] of [[0, 2, 1], [0, 3, 2]]) for (const k of [a, b2, c2]) {
+      pos.push(q[k][0], 0.03, q[k][1]);
+      const cc = colAt(q[k][0], q[k][1]);
+      col.push(cc.r, cc.g, cc.b);
     }
   }
-  // skate scratches: faint pale arcs
-  const nSc = Math.round((width * depth) / 25);
-  for (let k = 0; k < nSc; k++) {
-    const cx = (r() - 0.5) * width * 0.8, cz = (r() - 0.5) * depth * 0.8, R = 1.5 + r() * 3, a0 = r() * 6.28;
-    for (let s = 0; s < 6; s++) {
-      const a = a0 + s * 0.22;
-      b.add(box(0.015, 0.003, R * 0.23), 0xeef9fc, { p: [cx + Math.cos(a) * R, 0.035, cz + Math.sin(a) * R], r: [0, -a, 0] });
+  const top = new THREE.BufferGeometry();
+  top.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  top.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  b.add(top, 0xffffff, { vcol: true });
+  // cracks: branching dark lines, mostly in the deep ice
+  const area = width * depth;
+  for (let k = 0; k < Math.round(area / 16); k++) {
+    let x = (r() - 0.5) * width * 0.8, z = (r() - 0.5) * depth * 0.8, a = r() * Math.PI;
+    if (!isIn(x, z)) continue;
+    for (let s = 0; s < 5; s++) {
+      const len = 0.5 + r() * 1.2;
+      const nx = x + Math.sin(a) * len, nz = z + Math.cos(a) * len;
+      if (!isIn(nx, nz)) break;
+      b.add(box(0.03, 0.004, len), 0x2f6f90, { p: [x + Math.sin(a) * len / 2, 0.034, z + Math.cos(a) * len / 2], r: [0, a, 0] });
+      if (r() < 0.3) b.add(box(0.02, 0.004, len * 0.5), 0x2f6f90, { p: [x + Math.sin(a + 0.8) * len / 4, 0.034, z + Math.cos(a + 0.8) * len / 4], r: [0, a + 0.8, 0] });
+      x = nx; z = nz; a += (r() - 0.5) * 1.2;
     }
   }
-  // frosty dust patches
-  for (let k = 0; k < Math.round((width * depth) / 30); k++) {
-    const x = (r() - 0.5) * width * 0.8, z = (r() - 0.5) * depth * 0.8;
-    b.add(new THREE.CylinderGeometry(0.4 + r() * 0.5, 0.4 + r() * 0.5, 0.006, 9), 0xcdeaf3, { p: [x, 0.033, z], s: [1.6, 1, 1], r: [0, r() * 3, 0], jitter: 0.08, seed: k });
+  // skate swirls: loops and figure-eights of pale scratches
+  for (let k = 0; k < Math.max(3, Math.round(area / 30)); k++) {
+    const cx = (r() - 0.5) * width * 0.6, cz = (r() - 0.5) * depth * 0.6, R = 1.2 + r() * 2.2, a0 = r() * 6.28;
+    const loops = r() < 0.4 ? 2 : 1;
+    for (let L = 0; L < loops; L++) {
+      const ox = L ? Math.cos(a0) * R * 2 : 0, oz = L ? Math.sin(a0) * R * 2 : 0;
+      for (let s = 0; s < 14; s++) {
+        const a = a0 + s * 0.42 + (L ? Math.PI : 0);
+        const x = cx + ox + Math.cos(a) * R, z = cz + oz + Math.sin(a) * R * 0.8;
+        if (!isIn(x, z)) continue;
+        b.add(box(0.018, 0.003, R * 0.42), 0xf2fbfe, { p: [x, 0.036, z], r: [0, -a, 0] });
+      }
+    }
+  }
+  // frost dust patches near the shore
+  for (let k = 0; k < Math.round(area / 25); k++) {
+    const x = (r() - 0.5) * width * 0.85, z = (r() - 0.5) * depth * 0.85;
+    if (!isIn(x, z) || distToPoly(poly, x, z) > 2.5) continue;
+    b.add(new THREE.CylinderGeometry(0.4 + r() * 0.5, 0.4 + r() * 0.5, 0.006, 9), 0xe4f5fa, { p: [x, 0.033, z], s: [1.6, 1, 1], r: [0, r() * 3, 0], jitter: 0.08, seed: k });
   }
   if (o.edge ?? true) {
-    const hw = width / 2, hd = depth / 2;
-    const loop = groundPath([[-hw, hd], [-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]], 1.5);
-    const cols = [P.snowShade, P.snow, P.snow];
-    b.add(sweep(loop, [[-0.4, 0.035], [0.2, 0.18], [0.9, 0.0]], { color: (k) => new THREE.Color(cols[k]) }), 0xffffff, { vcol: true, jitter: 0.04, seed: 3 });
+    const loop = groundPath([...poly, poly[0]] as [number, number][], o.round || o.polygon ? 0.6 : 1.5);
+    const cols = [P.snowShade, P.snow, P.snow, P.snowShade];
+    // the rim sweeps on the outside of the outline whichever way the polygon winds
+    const s0 = loop.sample(0.01), lat = [Math.cos(s0.yaw), -Math.sin(s0.yaw)];
+    const outward = isIn(s0.x + lat[0] * 0.5, s0.z + lat[1] * 0.5) ? -1 : 1;
+    b.add(sweep(loop, [[-0.45 * outward, 0.03], [0.1 * outward, 0.2], [0.6 * outward, 0.16], [1.1 * outward, 0.0]], { color: (k) => new THREE.Color(cols[k]) }), 0xffffff, { vcol: true, jitter: 0.04, seed: 3 });
   }
   const m = new THREE.Mesh(b.build(), mats().iceFloor);
   m.name = 'body';
@@ -111,6 +175,6 @@ export function iceSheet(width: number, depth: number, o: IceSheetOpts = {}): TH
   const g = new THREE.Group();
   g.name = 'iceSheet';
   g.add(m);
-  g.userData = { size: [width, depth], topY: 0.035, surface: 'ice', walkable: true, decor: true };
+  g.userData = { size: [width, depth], topY: 0.035, surface: 'ice', walkable: true, decor: true, outline: poly };
   return g;
 }

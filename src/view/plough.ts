@@ -64,7 +64,11 @@ export interface PloughHooks {
 }
 
 export class PloughView {
-  private deep: THREE.InstancedMesh[] = [];
+  /** Per zone, one instanced mesh per pillow variant (per zone so an off-screen lot is frustum-culled). */
+  private deepZ = new Map<string, THREE.InstancedMesh[]>();
+  private get deep(): THREE.InstancedMesh[] {
+    return [...this.deepZ.values()].flat();
+  }
   private banks: THREE.InstancedMesh;
   /** Cleared swath: packed blue-grey snow with blade grooves along the direction of travel. */
   private lane: THREE.InstancedMesh;
@@ -87,18 +91,20 @@ export class PloughView {
 
   constructor(parent: THREE.Object3D, sim: Sim, private hooks: PloughHooks) {
     const total = deepSnowZones(sim).reduce((a, z) => a + z.total, 0) || 1;
-    for (let v = 0; v < VARIANTS; v++) {
-      const d = getDeepSnowMesh({ seed: v });
-      const im = new THREE.InstancedMesh(d.geometry, d.material, total);
-      im.count = 0;
-      im.castShadow = false;
-      im.receiveShadow = true;
-      parent.add(im);
-      this.deep.push(im);
-    }
-    for (const im of this.deep) {
-      // Fresh, bright pillows (instance colour may exceed 1: it multiplies the vertex colours).
-      im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(total * 3), 3);
+    for (const z of deepSnowZones(sim)) {
+      const list: THREE.InstancedMesh[] = [];
+      for (let v = 0; v < VARIANTS; v++) {
+        const d = getDeepSnowMesh({ seed: v });
+        const im = new THREE.InstancedMesh(d.geometry, d.material, z.total);
+        im.count = 0;
+        im.castShadow = false;
+        im.receiveShadow = true;
+        // Fresh, bright pillows (instance colour may exceed 1: it multiplies the vertex colours).
+        im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(z.total * 3), 3);
+        parent.add(im);
+        list.push(im);
+      }
+      this.deepZ.set(z.id, list);
     }
     const lg = new THREE.PlaneGeometry(0.52, 0.52).rotateX(-Math.PI / 2);
     const lm = new THREE.MeshLambertMaterial({ color: 0x93a6c2, map: grooveTexture(), polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
@@ -142,11 +148,15 @@ export class PloughView {
     for (const z of zones) key += `${z.id}:${z.ver}:${z.open ? 1 : 0}|`;
     if (key === this.key) return;
     this.key = key;
-    const counts = new Array(VARIANTS).fill(0);
     let nb = 0;
     let nl = 0;
     for (const z of zones) {
-      if (!z.open) continue;
+      const meshes = this.deepZ.get(z.id)!;
+      const counts = new Array(VARIANTS).fill(0);
+      if (!z.open) {
+        for (const im of meshes) im.count = 0;
+        continue;
+      }
       // Which cells are still deep (for edge banks)?
       const deep = new Uint8Array(z.nx * z.nz);
       const prev = this.prevDeep.get(z.id);
@@ -167,10 +177,17 @@ export class PloughView {
         const k = 0.98 + h01(i + 7, j) * 0.1;
         _s.set(k, 1.35 + h01(i, j + 3) * 0.3, k);
         const n = counts[v]++;
-        this.deep[v].setMatrixAt(n, _m.compose(_p, _q, _s));
+        meshes[v].setMatrixAt(n, _m.compose(_p, _q, _s));
         const c = 1.16 + h01(j + 11, i) * 0.08;
-        this.deep[v].setColorAt(n, _c.setRGB(c, c, c * 1.02));
+        meshes[v].setColorAt(n, _c.setRGB(c, c, c * 1.02));
       });
+      for (let v = 0; v < VARIANTS; v++) {
+        const im = meshes[v];
+        im.count = counts[v];
+        im.instanceMatrix.needsUpdate = true;
+        if (im.instanceColor) im.instanceColor.needsUpdate = true;
+        im.computeBoundingSphere();
+      }
       // Freshly cut cells remember the blade's heading; draw the packed lane.
       for (let j = 0; j < z.nz; j++) {
         for (let i = 0; i < z.nx; i++) {
@@ -213,12 +230,6 @@ export class PloughView {
         }
       }
     }
-    for (let v = 0; v < VARIANTS; v++) {
-      this.deep[v].count = counts[v];
-      this.deep[v].instanceMatrix.needsUpdate = true;
-      this.deep[v].computeBoundingSphere();
-    }
-    for (const im of this.deep) if (im.instanceColor) im.instanceColor.needsUpdate = true;
     this.lane.count = nl;
     this.lane.instanceMatrix.needsUpdate = true;
     this.lane.computeBoundingSphere();
