@@ -2,7 +2,7 @@
 // palisade, on a conveyor or a walk lane, or hidden behind a tall building from the fixed camera.
 // Footprints here are VISUAL radii (how big the model looks), not collision solids.
 import { beforeAll, describe, expect, it } from 'vitest';
-import { ALL_MECHANICS, FLAT_DECOR, FOOTPRINT, FROST_WALL_HALF, GAME_DATA, NATURAL_DECOR, TOLERANCE, segDist, tentLevel, wallGoneBy, wallSolids, withMechanics } from '../src/data';
+import { ALL_MECHANICS, FLAT_DECOR, FOOTPRINT, FROST_WALL_HALF, GAME_DATA, NATURAL_DECOR, PROP_SOLID, TOLERANCE, segDist, tentLevel, wallGoneBy, wallSolids, withMechanics } from '../src/data';
 import type { CounterDef, GameData, Vec2 } from '../src/data';
 
 /** The configuration under audit (both the shipped one, mechanics off, and every mechanic on). */
@@ -229,6 +229,17 @@ for (const [name, data] of CONFIGS) describe(`world layout: ${name}`, () => {
   it('the camp holds a village: every tent plot the housing needs (16) and 3 cabins', () => {
     expect(D.camp.tentSpots.length).toBe(D.camp.housing!.tentsPerLevel.at(-1));
     expect(D.decor.filter((d) => d.area === 'camp' && d.model === 'cabin').length).toBeGreaterThanOrEqual(3);
+  });
+  it('small props are never a surprise: every instance of a model is solid alike, or walk-through', () => {
+    for (const d of D.decor) {
+      const r = PROP_SOLID[d.model];
+      if (r === undefined) continue;
+      if (r === 0) expect(d.solid, `${d.id} (${d.model}) should be walk-through`).toBeUndefined();
+      else expect(d.solid && 'r' in d.solid ? d.solid.r : -1, `${d.id} (${d.model})`).toBeCloseTo(r * (d.scale ?? 1), 1);
+    }
+    // Landmarks are dressing (never solid), so only thin or wall-mounted props may be landmarks.
+    const THIN = new Set(['lampPost', 'flagPole', 'woodenArch', 'signBoard', 'bellows', 'toolRack', 'firewoodRack', 'dryingRack', 'marketStall', 'watchTower']);
+    for (const a of D.dressing) for (const l of a.landmarks) expect(THIN.has(l.prop), `landmark ${l.prop}`).toBe(true);
   });
   it('the Hearth is a short walk from the Kettle Yard kettles (≤ 4 s)', () => {
     const k = D.stations.find((s) => s.id === 'kettleA')!;
