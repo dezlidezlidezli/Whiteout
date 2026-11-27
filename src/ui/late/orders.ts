@@ -2,7 +2,7 @@
 // Pure display (pointer-events: none) so it never steals a touch from the floating joystick.
 
 import type { Sim, SimEvent } from '../../sim';
-import { ICON_EMBER_SM, ICON_TICK, itemIcon, itemName } from './icons';
+import { ICON_EMBER_SM, ICON_LAMP, ICON_TICK, itemIcon, itemName } from './icons';
 
 const RING = 2 * Math.PI * 25;
 
@@ -94,7 +94,7 @@ export class OrdersTracker {
       live.add(o.id);
       let c = this.cards.get(o.id);
       if (!c) {
-        c = this.makeCard(o.id, o.item, o.n, o.reward);
+        c = this.makeCard(o.id, o.item, o.n, o.reward, !!(o as { festival?: boolean }).festival);
         c.got = o.got;
         this.cards.set(o.id, c);
         // Keep visual order = board order; leaving cards stay where they are until gone.
@@ -122,16 +122,17 @@ export class OrdersTracker {
     }
   }
 
-  private makeCard(id: number, item: string, n: number, reward: number): Card {
+  private makeCard(id: number, item: string, n: number, reward: number, festival = false): Card {
     const el = h('div', 'fk-ord fk-ord-in');
-    el.setAttribute('aria-label', `Order: ${n} ${itemName(item, n)} for ${reward} embers`);
+    el.setAttribute('aria-label', festival ? `Lantern Festival: light ${n} lamps for ${reward} embers` : `Order: ${n} ${itemName(item, n)} for ${reward} embers`);
+    if (festival) el.classList.add('fk-ord-fest');
     el.innerHTML = `
       <div class="fk-ord-badge">
         <svg class="fk-ord-svg" viewBox="0 0 60 60" aria-hidden="true">
           <circle cx="30" cy="30" r="25" class="fk-ord-track"/>
           <circle cx="30" cy="30" r="25" class="fk-ord-fill" stroke-dasharray="${RING.toFixed(1)}" stroke-dashoffset="${RING.toFixed(1)}"/>
         </svg>
-        <div class="fk-ord-ico">${itemIcon(item)}</div>
+        <div class="fk-ord-ico">${festival ? ICON_LAMP : itemIcon(item)}</div>
         <div class="fk-ord-tick"></div>
       </div>
       <div class="fk-ord-num">0/${n}</div>

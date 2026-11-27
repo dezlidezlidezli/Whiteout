@@ -10,6 +10,8 @@ export type MechanicId = keyof MechanicFlags;
 export const MECHANIC_IDS: readonly MechanicId[] = ['plough', 'rescue', 'skate', 'crank', 'flame'];
 export const ALL_MECHANICS: Readonly<MechanicFlags> = { plough: true, rescue: true, skate: true, crank: true, flame: true };
 export const NO_MECHANICS: Readonly<MechanicFlags> = { plough: false, rescue: false, skate: false, crank: false, flame: false };
+/** The mechanics switched on in the shipped game: each is turned on here once the view draws it. */
+export const SHIPPED_MECHANICS: Readonly<MechanicFlags> = { ...NO_MECHANICS, crank: true };
 
 const GRANT_OF: Record<'plough' | 'lantern' | 'skates', MechanicId> = { plough: 'plough', lantern: 'rescue', skates: 'skate' };
 

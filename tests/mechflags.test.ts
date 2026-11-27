@@ -1,13 +1,16 @@
 // Per-mechanic switches: the shipped data has every signature mechanic off (the view does not draw them yet);
 // withMechanics() turns any of them on. Every configuration must be self-consistent and saves must move freely.
 import { describe, expect, it } from 'vitest';
-import { ALL_MECHANICS, GAME_DATA as OFF, MECHANIC_IDS, withMechanics } from '../src/data';
+import { ALL_MECHANICS, GAME_DATA, MECHANIC_IDS, NO_MECHANICS, withMechanics } from '../src/data';
+
+const OFF = withMechanics(GAME_DATA, NO_MECHANICS);
 import type { GameData } from '../src/data';
 import { Sim } from '../src/sim';
 
 const ON = withMechanics(OFF, ALL_MECHANICS);
 const configs: [string, GameData][] = [
-  ['shipped', OFF],
+  ['all off', OFF],
+  ['shipped', GAME_DATA],
   ['all on', ON],
   ...MECHANIC_IDS.map((m): [string, GameData] => [`${m} only`, withMechanics(OFF, { [m]: true })]),
   ...MECHANIC_IDS.map((m): [string, GameData] => [`all but ${m}`, withMechanics(OFF, { ...ALL_MECHANICS, [m]: false })]),

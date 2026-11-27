@@ -2,14 +2,14 @@
 // view draws them). Same pacing rules as the full-mechanics run in bot.test.ts; the areas are a little
 // shorter without the mechanic quests.
 import { describe, expect, it } from 'vitest';
-import { GAME_DATA } from '../src/data';
+import { GAME_DATA, SHIPPED_MECHANICS } from '../src/data';
 import { runBot } from './bot';
 
 const min = 60;
 
 describe('headless campaign bot, shipped data (mechanics off)', () => {
   it('plays all five areas to the finale, then 20 minutes of Open Season', () => {
-    expect(Object.values(GAME_DATA.mechanics).some(Boolean)).toBe(false);
+    expect(GAME_DATA.mechanics).toEqual(SHIPPED_MECHANICS);
     const r = runBot({ seed: 1, maxMinutes: 180, endlessMinutes: 20, data: GAME_DATA });
     (globalThis as any).process?.stdout?.write?.(r.report.split('\n').slice(-3).join('\n') + '\n');
     expect(r.finished).toBe(true);

@@ -121,7 +121,7 @@ export class Crank implements LatePart {
       tex.colorSpace = THREE.SRGBColorSpace;
       const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false, toneMapped: false }));
       label.renderOrder = 24;
-      label.scale.set(2.2, 0.66, 1);
+      label.scale.set(2.9, 0.87, 1);
       label.position.set(c.x, 2.6, c.z);
       label.visible = false;
       scene.add(label);
@@ -154,7 +154,7 @@ export class Crank implements LatePart {
           v.forgeTex = new THREE.CanvasTexture(v.forgeCanvas);
           v.forgeTex.colorSpace = THREE.SRGBColorSpace;
           v.forgeLabel = new THREE.Sprite(new THREE.SpriteMaterial({ map: v.forgeTex, transparent: true, depthWrite: false, depthTest: false, toneMapped: false }));
-          v.forgeLabel.scale.set(1.25, 0.56, 1);
+          v.forgeLabel.scale.set(1.7, 0.76, 1);
           v.forgeLabel.renderOrder = 24;
           v.forgeLabel.visible = false;
           scene.add(v.forgeLabel);
@@ -296,8 +296,8 @@ export class Crank implements LatePart {
           v.tex.needsUpdate = true;
         }
         const k = v.labelShow * (1 + v.bump * 0.25);
-        v.label.scale.set(2.2 * k, 0.66 * k, 1);
-        v.label.position.set(c.x, 2.75 + v.bump * 0.15, c.z);
+        v.label.scale.set(2.9 * k, 0.87 * k, 1);
+        v.label.position.set(c.x, 2.9 + v.bump * 0.15, c.z - 0.4);
       }
 
       // Bellows: breathe with the blast.
