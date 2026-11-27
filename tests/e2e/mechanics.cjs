@@ -50,7 +50,7 @@ async function plough(browser) {
   const wade = await page.evaluate(() => Object.values(__fk.sim.state.plough.zones).reduce((a, v) => a + v.cleared, 0));
   assert(wade === 0, 'wading without a plough clears nothing');
   // With the plough: push north along the middle of the lot.
-  await page.evaluate((z) => { __fk.sim.state.plough.tier = 1; __fk.cheat.teleport((z.x0 + z.x1) / 2, z.z1 + 0.3); }, z);
+  await page.evaluate((z) => { __fk.sim.state.plough.tier = 1; __fk.cheat.teleport((z.x0 + z.x1) / 2, z.z1 - 0.8); }, z);
   await page.keyboard.down('w');
   await page.waitForFunction(() => Object.values(__fk.sim.state.plough.zones).reduce((a, v) => a + v.cleared, 0) > 30, null, { timeout: 30000 }).catch(() => {});
   const mid = await page.evaluate(() => __fk.view.debugPlough());

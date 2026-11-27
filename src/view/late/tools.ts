@@ -140,7 +140,7 @@ export class Tools implements LatePart {
     }
     this.handS += ((kind ? 1 : 0) - this.handS) * Math.min(1, dt * 12);
     this.hand.visible = this.handS > 0.02;
-    this.hand.scale.setScalar(Math.max(0.001, this.handS * 1.35));
+    this.hand.scale.setScalar(Math.max(0.001, this.handS * 1.75));
 
     if (this.aloft) {
       const a = this.aloft;
