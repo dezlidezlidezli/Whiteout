@@ -520,6 +520,15 @@ export class View {
     return url;
   }
 
+  /** Debug/e2e: CSS-pixel positions of the middle of each side of a pad's rim in the current frame. */
+  padRimPoints(id: string): { x: number; y: number; on: boolean }[] {
+    const pv = this.pads.get(id);
+    if (!pv || !pv.root.visible) return [];
+    const o = pv.root.position;
+    const k = pv.root.scale.x;
+    return [[0, -0.96], [0.96, 0], [0, 0.96], [-0.96, 0]].map(([dx, dz]) => this.project(new THREE.Vector3(o.x + dx * k, o.y + 0.12 * k, o.z + dz * k)));
+  }
+
   /** Debug/e2e: arrow tip/tail and the current guide target. */
   arrowInfo(): { tip: { x: number; z: number }; tail: { x: number; z: number }; visible: boolean; target: { x: number; z: number } | null; next: { x: number; z: number } | null } {
     const g = this.sim.guide();

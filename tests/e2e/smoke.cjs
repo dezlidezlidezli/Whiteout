@@ -75,9 +75,37 @@ function assert(cond, msg) {
     const p = __fk.sim.padDefs.get('pad_pack1');
     __fk.cheat.teleport(p.x - 2.2, p.z - 1.2);
   });
-  await page.waitForTimeout(1500);
-  const outline = await fk(() => __fk.view.debugPadOutline('pad_pack1'));
-  assert(outline.sides.length === 4 && outline.sides.every(Boolean), 'pad outline visible on all four sides over the yard floor (' + JSON.stringify(outline) + ')');
+  // Wait until the pad has fully popped in and the camera has settled, then test the real frame.
+  await page.waitForFunction(() => { const p = __fk.view.padRimPoints('pad_pack1'); return p.length === 4; }, null, { timeout: 20000 }).catch(() => {});
+  await page.waitForTimeout(2500);
+  const rim = await fk(() => __fk.view.padRimPoints('pad_pack1'));
+  // Hide the DOM HUD for this capture (the walk hint can sit over the pad).
+  await page.evaluate(() => { const u = document.getElementById('ui'); if (u) u.style.visibility = 'hidden'; });
+  const png = (await page.screenshot({ timeout: 60000 })).toString('base64');
+  await page.evaluate(() => { const u = document.getElementById('ui'); if (u) u.style.visibility = ''; });
+  fs.writeFileSync(path.join(OUT, 'pad-probe.png'), Buffer.from(png, 'base64'));
+  fs.writeFileSync(path.join(OUT, 'pad-probe.json'), JSON.stringify(rim));
+  const outline = await page.evaluate(async ({ png, rim }) => {
+    const img = new Image();
+    img.src = 'data:image/png;base64,' + png;
+    await img.decode();
+    const c = document.createElement('canvas');
+    c.width = img.width;
+    c.height = img.height;
+    const g = c.getContext('2d');
+    g.drawImage(img, 0, 0);
+    const k = img.width / window.innerWidth;
+    return rim.map((p) => {
+      // Best of a tiny neighbourhood (the rim is a few pixels wide).
+      let best = [0, 0, 0];
+      for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+        const d = g.getImageData(Math.round(p.x * k) + dx, Math.round(p.y * k) + dy, 1, 1).data;
+        if (d[0] - d[2] > best[0] - best[2]) best = [d[0], d[1], d[2]];
+      }
+      return { ok: best[0] > 150 && best[0] > best[2] + 30, c: best };
+    });
+  }, { png, rim });
+  assert(outline.length === 4 && outline.every((o) => o.ok), 'pad outline visible on all four sides over the yard floor (' + JSON.stringify(outline) + ')');
 
   // ---- every wall the sim collides with is actually drawn (no invisible walls)
   const cover = await fk(() => __fk.view.debugWallCoverage());
