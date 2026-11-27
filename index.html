@@ -51,7 +51,6 @@
         background: var(--fk-night); color: var(--fk-cream);
         -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
       }
-      html { height: var(--app-height); }
       body {
         position: fixed; inset: 0; bottom: auto; height: var(--app-height);
         touch-action: none;
@@ -140,6 +139,9 @@
           if (h === last) return;
           last = h;
           document.documentElement.style.setProperty('--app-height', h + 'px');
+          // The document itself must stay exactly viewport-sized: if it becomes scrollable,
+          // iOS draws its scroll-edge blur under the status bar. Only the fixed body grows.
+          if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
           window.dispatchEvent(new Event('resize'));
         }
         fit();
