@@ -66,10 +66,10 @@ describe('collision', () => {
   });
   it('blocks the player at a closed frost wall', () => {
     const sim = fresh();
-    tp(sim, -7, 0);
+    tp(sim, -17, 0);
     sim.setMove(-1, 0);
     sim.advance(3);
-    expect(sim.state.player.x).toBeGreaterThan(-8.7);
+    expect(sim.state.player.x).toBeGreaterThan(-19.5); // camp edge (Pinewood still closed)
   });
 });
 

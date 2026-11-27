@@ -400,4 +400,6 @@ export interface GameData {
   finale: FinaleDef;
   /** Floors, walls, paths, streams, clutter zones and landmarks per area (view dressing; walls also collide). */
   dressing: import('./dressing').AreaDressing[];
+  /** Bumped whenever world placement changes: saves from an older layout re-seat player, helpers and walkers. */
+  layoutRev: number;
 }

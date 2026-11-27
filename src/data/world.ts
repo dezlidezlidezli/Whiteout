@@ -9,23 +9,24 @@
 //
 // Screen "up" is -Z (the camera looks from +Z).
 
-import { LATE_LANES } from './late';
 import type { AreaDef, CampDef, DecorDef, HelperDef, LinkDef, PadDef, StationDef, Vec2, WallDef } from './types';
 
 export const AREAS: AreaDef[] = [
-  { id: 'camp', name: 'Camp', rects: [{ x0: -9, x1: 9, z0: -9, z1: 7.5 }], hearth: 1, focus: { x: 0, z: 0 } },
+  // A village-sized camp (authored in world space; the other areas are placed around it by layout.ts).
+  { id: 'camp', name: 'Camp', rects: [{ x0: -19.4, x1: 19.4, z0: -18, z1: 12 }], hearth: 1, focus: { x: 0, z: 0 } },
   { id: 'kettleYard', name: 'Kettle Yard', rects: [{ x0: -6.5, x1: 6.5, z0: 5.5, z1: 16.2 }], hearth: 1, focus: { x: 0, z: 11 } },
-  { id: 'pinewood', name: 'Pinewood', rects: [{ x0: -21.5, x1: -7.6, z0: -10, z1: 10.4 }], hearth: 2, focus: { x: -14, z: 0 } },
-  { id: 'frozenLake', name: 'Frozen Lake', rects: [{ x0: 7.6, x1: 23, z0: -10, z1: 7.8 }], hearth: 3, focus: { x: 15, z: 0 } },
-  { id: 'ironridge', name: 'Ironridge', rects: [{ x0: -10, x1: 8.8, z0: -26, z1: -7.6 }], hearth: 4, focus: { x: 0, z: -16 } },
+  { id: 'pinewood', name: 'Pinewood', rects: [{ x0: -21.5, x1: -7.6, z0: -10, z1: 10.4 }, { x0: -8.4, x1: -4.6, z0: -3, z1: 3 }], hearth: 2, focus: { x: -14, z: 0 } },
+  { id: 'frozenLake', name: 'Frozen Lake', rects: [{ x0: 7.6, x1: 29, z0: -10, z1: 7.8 }, { x0: 4.6, x1: 8.4, z0: -3, z1: 3 }], hearth: 3, focus: { x: 18, z: 0 } },
+  { id: 'ironridge', name: 'Ironridge', rects: [{ x0: -10, x1: 8.8, z0: -34, z1: -7.6 }, { x0: -3, x1: 3, z0: -8.4, z1: -4.2 }], hearth: 4, focus: { x: 0, z: -16 } },
   { id: 'beaconPeak', name: 'Beacon Peak', rects: [{ x0: -6.5, x1: 6.5, z0: -38, z1: -25 }], hearth: 5, focus: { x: 0, z: -32 } },
 ];
 
 export const WALLS: WallDef[] = [
-  { id: 'wall_pinewood', area: 'pinewood', points: [{ x: -8.6, z: -9.6 }, { x: -8.6, z: 7.6 }] },
-  { id: 'wall_lake', area: 'frozenLake', points: [{ x: 8.6, z: -9.6 }, { x: 8.6, z: 7.6 }] },
-  { id: 'wall_ironridge', area: 'ironridge', points: [{ x: -9.6, z: -8.6 }, { x: 8.4, z: -8.6 }] },
-  { id: 'wall_beacon', area: 'beaconPeak', points: [{ x: -6.5, z: -25.5 }, { x: 6.5, z: -25.5 }] },
+  // World space (frost walls enclose the camp on three sides; the Kettle Yard side is open from the start).
+  { id: 'wall_pinewood', area: 'pinewood', points: [{ x: -18.6, z: -17.6 }, { x: -18.6, z: 11.6 }] },
+  { id: 'wall_lake', area: 'frozenLake', points: [{ x: 18.6, z: -17.6 }, { x: 18.6, z: 11.6 }] },
+  { id: 'wall_ironridge', area: 'ironridge', points: [{ x: -18.6, z: -17.6 }, { x: 18.6, z: -17.6 }] },
+  { id: 'wall_beacon', area: 'beaconPeak', points: [{ x: -6.5, z: -46.5 }, { x: 6.5, z: -46.5 }] },
 ];
 
 const YARD_COUNTER_Z = 15.7;
@@ -69,7 +70,7 @@ export const STATIONS: StationDef[] = [
     id: 'woodpile', type: 'pile', area: 'pinewood', name: 'Woodpile', model: 'woodPile', x: -11.4, z: -2.8,
     solid: { r: 0.9 }, reach: 1.9, item: 'log', cap: 30, start: 0, refill: 0, accepts: true, unlockedBy: 'pad_lumberjack',
   },
-  { id: 'shelfPine', type: 'shelf', area: 'pinewood', name: 'Spare shelf', model: 'storageTable', x: -10.8, z: 8.8, rot: 0,
+  { id: 'shelfPine', type: 'shelf', area: 'pinewood', name: 'Spare shelf', model: 'storageTable', x: -12.4, z: 9.6, rot: 0,
     solid: { hw: 0.6, hd: 0.4 }, reach: 1.3 },
   ...pines(),
 ];
@@ -187,12 +188,12 @@ export const PADS: PadDef[] = [
     effects: [{ type: 'capacity', add: 3 }], icon: { item: 'stew' } },
   { id: 'pad_cook', area: 'kettleYard', x: 5.2, z: 10.6, label: 'Hire a cook', cost: 360, requires: ['pad_beltA'],
     requiresPop: 25, effects: [{ type: 'hire', helper: 'cook' }], icon: { character: 'cook' } },
-  { id: 'pad_hearth2', area: 'camp', x: 0, z: 3.4, label: 'Raise the Hearth', cost: 560, requires: ['pad_pack2', 'pad_cook'],
+  { id: 'pad_hearth2', area: 'camp', x: 4.2, z: 4.2, label: 'Raise the Hearth', cost: 560, requires: ['pad_pack2', 'pad_cook'],
     effects: [{ type: 'hearth', level: 2 }], icon: { prop: 'hearth', level: 2 } },
   // ---- Pinewood ----
   { id: 'pad_sawmill', area: 'pinewood', x: -11.4, z: 3.6, label: 'Sawmill', cost: 300, requires: ['pad_hearth2'],
     effects: [{ type: 'unlock', id: 'sawmill' }], icon: { prop: 'sawmill' } },
-  { id: 'pad_cabin1', area: 'camp', x: -6.3, z: -5.2, label: 'Cabin', cost: 240, materials: { plank: 8 }, requires: ['pad_sawmill'],
+  { id: 'pad_cabin1', area: 'camp', x: -12.4, z: -11.4, label: 'Cabin', cost: 240, materials: { plank: 8 }, requires: ['pad_sawmill'],
     effects: [{ type: 'unlock', id: 'cabin1' }, { type: 'mod', key: 'spawnRate', add: 0.25 }], icon: { prop: 'cabin' } },
   { id: 'pad_pack3', area: 'pinewood', x: -17.0, z: 8.6, label: 'Sturdy pack', cost: 440, materials: { plank: 6 }, requires: ['pad_sawmill'],
     effects: [{ type: 'capacity', add: 4 }], icon: { item: 'log' } },
@@ -202,18 +203,18 @@ export const PADS: PadDef[] = [
     effects: [{ type: 'mod', key: 'cookSpeed', mul: 1.6 }, { type: 'mod', key: 'pricePlus', add: 1 }, { type: 'tool', tool: 'kettle' }], icon: { prop: 'kettle', level: 2 } },
   { id: 'pad_lumberjack', area: 'pinewood', x: -11.4, z: -2.8, label: 'Hire a lumberjack', cost: 640, requires: ['pad_cabin1', 'pad_pack3'],
     requiresPop: 45, effects: [{ type: 'unlock', id: 'woodpile' }, { type: 'hire', helper: 'lumberjack' }], icon: { character: 'lumberjack' } },
-  { id: 'pad_boots', area: 'camp', x: 2.6, z: -1.8, label: 'Warm boots', cost: 500, requires: ['pad_pots'],
+  { id: 'pad_boots', area: 'camp', x: -4.2, z: 4.2, label: 'Warm boots', cost: 500, requires: ['pad_pots'],
     effects: [{ type: 'mod', key: 'moveSpeed', mul: 1.15 }], icon: { prop: 'sled' } },
-  { id: 'pad_cabin2', area: 'camp', x: 6.3, z: -5.2, label: 'Cabin', cost: 620, materials: { plank: 14 }, requires: ['pad_lumberjack'],
+  { id: 'pad_cabin2', area: 'camp', x: 12.4, z: -11.4, label: 'Cabin', cost: 620, materials: { plank: 14 }, requires: ['pad_lumberjack'],
     effects: [{ type: 'unlock', id: 'cabin2' }, { type: 'mod', key: 'spawnRate', add: 0.25 }], icon: { prop: 'cabin' } },
-  { id: 'pad_woodbelt', area: 'pinewood', x: -9.9, z: 0.4, label: 'Log conveyor', cost: 760, requires: ['pad_lumberjack'],
+  { id: 'pad_woodbelt', area: 'pinewood', x: -9.4, z: 8.0, label: 'Log conveyor', cost: 760, requires: ['pad_lumberjack'],
     effects: [{ type: 'unlock', id: 'woodbelt' }], icon: { prop: 'conveyor' } },
-  { id: 'pad_stoker', area: 'camp', x: -6.0, z: 1.2, label: 'Hire a stoker', cost: 800, requires: ['pad_woodbelt'],
+  { id: 'pad_stoker', area: 'camp', x: -4.2, z: -4.2, label: 'Hire a stoker', cost: 800, requires: ['pad_woodbelt'],
     requiresPop: 70, effects: [{ type: 'hire', helper: 'stoker' }], icon: { character: 'porter' } },
-  { id: 'pad_cabin3', area: 'camp', x: 6.3, z: 3.8, label: 'Cabin', cost: 1150, materials: { plank: 20 }, requires: ['pad_cabin2', 'pad_boots'],
+  { id: 'pad_cabin3', area: 'camp', x: 12.4, z: 8.0, label: 'Cabin', cost: 1150, materials: { plank: 20 }, requires: ['pad_cabin2', 'pad_boots'],
     effects: [{ type: 'unlock', id: 'cabin3' }, { type: 'mod', key: 'spawnRate', add: 0.25 }, { type: 'mod', key: 'helperSpeed', mul: 1.2 }],
     icon: { prop: 'cabin' } },
-  { id: 'pad_hearth3', area: 'camp', x: 0, z: 3.4, label: 'Raise the Hearth', cost: 2050, materials: { plank: 30 },
+  { id: 'pad_hearth3', area: 'camp', x: 4.2, z: 4.2, label: 'Raise the Hearth', cost: 2050, materials: { plank: 30 },
     requires: ['pad_stoker', 'pad_cabin3'], effects: [{ type: 'hearth', level: 3 }], icon: { prop: 'hearth', level: 3 } },
 ];
 
@@ -231,71 +232,25 @@ export const CAMP: CampDef = {
     const a = (deg * Math.PI) / 180;
     return { x: Math.cos(a) * r, z: Math.sin(a) * r };
   }).concat(TENT_EXTRA).map(({ x, z }) => ({ x, z, rot: Math.atan2(-x, -z) })),
-  settleMin: 2.4,
-  settleMax: 6.2,
+  settleMin: 3.6,
+  settleMax: 9.0,
 };
 
 export const DECOR: DecorDef[] = [
-  { id: 'cabin1', area: 'camp', model: 'cabin', x: -6.3, z: -5.2, rot: 0.5, unlockedBy: 'pad_cabin1', solid: { hw: 1.3, hd: 1.1 } },
-  { id: 'cabin2', area: 'camp', model: 'cabin', x: 6.3, z: -5.2, rot: -0.5, unlockedBy: 'pad_cabin2', solid: { hw: 1.3, hd: 1.1 } },
-  { id: 'cabin3', area: 'camp', model: 'cabin', x: 6.3, z: 3.8, rot: -2.4, unlockedBy: 'pad_cabin3', solid: { hw: 1.3, hd: 1.1 } },
-  { id: 'sign_yard', area: 'camp', model: 'signpost', x: 4.2, z: 6.6, rot: 0.3 },
-  { id: 'lantern1', area: 'kettleYard', model: 'lantern', x: -6.2, z: 8.4 },
+  { id: 'cabin1', area: 'camp', model: 'cabin', x: -12.4, z: -11.4, rot: 0.5, scale: 0.72, unlockedBy: 'pad_cabin1', solid: { hw: 0.94, hd: 0.8 } },
+  { id: 'cabin2', area: 'camp', model: 'cabin', x: 12.4, z: -11.4, rot: -0.5, scale: 0.72, unlockedBy: 'pad_cabin2', solid: { hw: 0.94, hd: 0.8 } },
+  { id: 'cabin3', area: 'camp', model: 'cabin', x: 12.4, z: 8.0, rot: -2.4, scale: 0.72, unlockedBy: 'pad_cabin3', solid: { hw: 0.94, hd: 0.8 } },
+  { id: 'sign_yard', area: 'camp', model: 'signpost', x: 3.6, z: 10.6, rot: 0.3 },
   { id: 'lantern2', area: 'kettleYard', model: 'lantern', x: 6.2, z: 8.4 },
   { id: 'lantern3', area: 'kettleYard', model: 'lantern', x: -6.2, z: 15.9 },
-  { id: 'lantern4', area: 'kettleYard', model: 'lantern', x: 6.2, z: 15.9 },
   { id: 'bench1', area: 'camp', model: 'bench', x: -2.6, z: 2.3, rot: 2.3 },
   { id: 'bench2', area: 'camp', model: 'bench', x: 2.6, z: 2.3, rot: -2.3 },
   { id: 'barrel1', area: 'kettleYard', model: 'barrel', x: -5.0, z: 6.2, solid: { r: 0.4 } },
-  { id: 'crate1', area: 'kettleYard', model: 'crate', x: -5.9, z: 15.5, solid: { r: 0.4 } },
-  { id: 'snowman1', area: 'camp', model: 'snowman', x: 7.8, z: 6.4 }, // no collision: it stands in the yard–lake passage
+  { id: 'snowman1', area: 'camp', model: 'snowman', x: -12.8, z: 10.0, solid: { r: 0.45 } },
   { id: 'brazier1', area: 'pinewood', model: 'brazier', x: -9.4, z: 9.6 },
-  { id: 'sled1', area: 'pinewood', model: 'sled', x: -13.6, z: -9.2, rot: 0.6, solid: { r: 0.6 } },
-  { id: 'sign_lake', area: 'frozenLake', model: 'signpost', x: 9.0, z: 6.6, rot: -0.4 },
-  { id: 'sign_ridge', area: 'ironridge', model: 'signpost', x: -3.4, z: -8.2, rot: 0.2 },
-  ...forest(),
+  { id: 'sled1', area: 'pinewood', model: 'sled', x: -12.0, z: -9.4, rot: 0.6, solid: { r: 0.6 } },
+  { id: 'sign_lake', area: 'frozenLake', model: 'signpost', x: 9.4, z: 4.0, rot: -0.4 },
+  { id: 'sign_ridge', area: 'ironridge', model: 'signpost', x: -4.0, z: -9.6, rot: 0.2 },
 ];
-
-/** True if a point lies inside any walkable rect (expanded by m) or a reserved corridor. */
-function nearPlay(x: number, z: number, m: number): boolean {
-  for (const a of AREAS) {
-    for (const rc of a.rects) {
-      if (x > rc.x0 - m && x < rc.x1 + m && z > rc.z0 - m && z < rc.z1 + m) return true;
-    }
-  }
-  // Icebound walk-in lanes south of the yard.
-  if (z > 16 && z < 44 && (Math.abs(x + 2.2) < 2.2 || Math.abs(x - 3) < 2.2)) return true;
-  // Queues and walk-in lanes of the late counters.
-  for (const rc of LATE_LANES) if (x > rc.x0 - m && x < rc.x1 + m && z > rc.z0 - m && z < rc.z1 + m) return true;
-  return false;
-}
-
-function forest(): DecorDef[] {
-  const out: DecorDef[] = [];
-  const r = lrng(99);
-  let i = 0;
-  for (let z = -56; z <= 46; z += 2.6) {
-    for (let x = -40; x <= 40; x += 2.6) {
-      const px = x + (r() - 0.5) * 2;
-      const pz = z + (r() - 0.5) * 2;
-      if (nearPlay(px, pz, 1.2)) continue;
-      // Keep the camera side (south of the play space) clear so trees never hide the action.
-      if ((nearPlay(px, pz - 9, 0) || nearPlay(px, pz - 15, 0)) && pz > -8) continue;
-      // Thin out far away to save triangles, keep a dense belt near the play space.
-      const near = nearPlay(px, pz, 7);
-      if (!near && r() < 0.55) continue;
-      const roll = r();
-      const model = roll < 0.12 ? 'rock' : roll < 0.2 ? 'snowDrift' : 'pineSnowy';
-      out.push({ id: `tree${i++}`, area: 'camp', model, x: px, z: pz, rot: r() * 6.28, scale: 0.8 + r() * 0.6, seed: i });
-    }
-  }
-  // Pinewood interior decoration (non-harvestable, beyond the chopping grove).
-  for (let k = 0; k < 10; k++) {
-    const px = -25 + r() * 1.5;
-    const pz = -9 + k * 2.4;
-    out.push({ id: `tree${i++}`, area: 'pinewood', model: 'pineSnowy', x: px, z: pz, rot: r() * 6, scale: 1 + r() * 0.4, seed: i, solid: { r: 0.5 } });
-  }
-  return out;
-}
 
 export const PLAYER_START: Vec2 = { x: -1.6, z: 13.6 };

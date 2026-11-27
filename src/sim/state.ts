@@ -170,6 +170,8 @@ export interface SimState {
   /** Open Season level: grows as orders are filled; gently scales order size and reward. */
   season: number;
   totals: Totals;
+  /** World layout revision this state was laid out for (GameData.layoutRev). */
+  layoutRev?: number;
 }
 
 export const DEFAULT_MODS: Record<ModKey, number> = {
@@ -185,6 +187,59 @@ export const DEFAULT_MODS: Record<ModKey, number> = {
   mineSpeed: 1,
   priceMul: 1,
 };
+
+/**
+ * The world layout changed under this save: put the player at the start, send helpers home (they keep what
+ * they carry), let villagers already walking home arrive at once, and move counter ember piles to their
+ * counters. Queued Icebound snap back into their crowds on the next step. Nothing is lost.
+ */
+function reseat(s: SimState, data: GameData): void {
+  s.player.x = s.player.px = data.playerStart.x;
+  s.player.z = s.player.pz = data.playerStart.z;
+  s.player.vx = s.player.vz = 0;
+  s.player.onPad = null;
+  s.player.returning = null;
+  s.player.pickedFrom = null;
+  s.player.shelf = null;
+  for (const id in s.helpers) {
+    const def = data.helpers.find((h) => h.id === id);
+    const h = s.helpers[id];
+    if (!def) continue;
+    h.x = h.px = h.lastX = def.home.x;
+    h.z = h.pz = h.lastZ = def.home.z;
+    h.phase = 'idle';
+    h.target = null;
+    h.t = 0;
+    h.wp = 0;
+  }
+  const counters = new Map(data.stations.filter((d) => d.type === 'counter').map((d) => [d.id, d] as const));
+  const keep: SimState['customers'] = [];
+  for (const c of s.customers) {
+    if (c.phase !== 'queue') {
+      s.population += 1;
+      s.stats.thawed = (s.stats.thawed ?? 0) + 1;
+      continue;
+    }
+    const def = counters.get(c.counter);
+    if (def && def.type === 'counter') {
+      c.x = c.px = def.spawn.x;
+      c.z = c.pz = def.spawn.z;
+    }
+    keep.push(c);
+  }
+  s.customers = keep;
+  for (const e of s.emberPiles) {
+    const def = counters.get(e.id.replace(/^embers_/, ''));
+    if (def && def.type === 'counter') {
+      e.x = def.emberSpot.x;
+      e.z = def.emberSpot.z;
+    } else {
+      e.x = data.playerStart.x;
+      e.z = data.playerStart.z;
+    }
+  }
+  s.layoutRev = data.layoutRev;
+}
 
 export function createStationState(def: GameData['stations'][number]): StationState {
   switch (def.type) {
@@ -245,6 +300,7 @@ export function createState(data: GameData, seed: number): SimState {
     nextOrderId: 1,
     season: 1,
     totals: createTotals(),
+    layoutRev: data.layoutRev,
   };
   normalizeState(s, data);
   return s;
@@ -265,6 +321,7 @@ export function normalizeState(s: SimState, data: GameData): void {
     s.player.vx = s.player.vz = 0;
     delete (s as { relocatePlayer?: boolean }).relocatePlayer;
   }
+  if ((s.layoutRev ?? 1) !== data.layoutRev) reseat(s, data);
   s.stats = s.stats ?? {};
   s.guideUnload = !!s.guideUnload;
   s.player.returning = s.player.returning ?? null;

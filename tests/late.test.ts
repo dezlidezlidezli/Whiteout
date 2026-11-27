@@ -2,7 +2,7 @@
 // sled-dog couriers, spare shelves, the soft-cap (never soft-lock) rule, dressing data and save migration.
 
 import { describe, expect, it } from 'vitest';
-import { DRESSING, GAME_DATA, ITEM_KINDS, wallSolids } from '../src/data';
+import { GAME_DATA, ITEM_KINDS, wallSolids } from '../src/data';
 import type { CounterDef, ItemKind, Vec2 } from '../src/data';
 import { Sim } from '../src/sim';
 import type { CounterState, NodeState, PileState, ProcState } from '../src/sim';
@@ -329,7 +329,7 @@ describe('world layout + dressing', () => {
     expect(d('forge', 'oreBin')).toBeLessThan(6);
   });
   it('counters sit in palisade gaps; walls never overlap a station', () => {
-    const solids = wallSolids(DRESSING);
+    const solids = wallSolids(GAME_DATA.dressing);
     for (const s of GAME_DATA.stations) {
       for (const w of solids) {
         const inside = Math.abs(s.x - w.x) < w.hw && Math.abs(s.z - w.z) < w.hd;
@@ -356,7 +356,7 @@ describe('world layout + dressing', () => {
     for (const l of GAME_DATA.links) line(l.path, 0.6, l.id);
     for (const h of GAME_DATA.helpers) if (h.route) line(h.route, 0.6, `trail ${h.id}`);
     for (const c of GAME_DATA.stations) if (c.type === 'counter' && c.queuePath) line(c.queuePath, 0.6, `queue ${c.id}`);
-    for (const a of DRESSING) {
+    for (const a of GAME_DATA.dressing) {
       for (const z of a.clutterZones) {
         for (const b of blockers) {
           const dx = Math.max(Math.abs(b.x - z.x) - z.w / 2, 0);
