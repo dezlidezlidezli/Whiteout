@@ -233,9 +233,10 @@ if (showTitle) {
 let debug: DebugOverlay | null = null;
 function toggleDebug(): void {
   if (debug) debug.toggle();
-  else debug = new DebugOverlay(uiRoot, frameStats, () => `tier ${view.quality} dpr ${view.dpr.toFixed(2)} ${canvas.width}x${canvas.height} refresh ${(1 / refresh).toFixed(0)}Hz`);
+  else debug = new DebugOverlay(uiRoot, frameStats, () => view.toggleCollisionDebug(), () => `tier ${view.quality} dpr ${view.dpr.toFixed(2)} ${canvas.width}x${canvas.height} refresh ${(1 / refresh).toFixed(0)}Hz`);
 }
-if (params.get('debug') === '1') toggleDebug();
+if (params.get('debug') === '1' || params.get('debug') === 'collision') toggleDebug();
+if (params.get('debug') === 'collision') view.toggleCollisionDebug(true);
 hud.onSecretTap = toggleDebug;
 // Extra unlock paths (some browsers only count click/touchend as activation).
 for (const ev of ['touchend', 'click', 'keydown'] as const) {

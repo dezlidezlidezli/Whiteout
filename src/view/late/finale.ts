@@ -306,8 +306,8 @@ export class FinaleDirector implements LatePart, MoodSource {
     const L = this.L;
     const D = this.D;
     const keys: Key[] = [
-      { T: 0, pos: at(B, 23, 5.5), look: B.clone().setY(crownY * 0.7) },
-      { T: L - 0.4, pos: at(B, 18, 7.5, 3.2), look: B.clone().setY(crownY + 1.5) },
+      { T: 0, pos: at(B, 29, 4.5), look: B.clone().setY(crownY * 0.6) },
+      { T: L - 0.4, pos: at(B, 23, 6.5, 3.4), look: B.clone().setY(crownY * 0.8 + 1) },
       { T: L + 3.2, pos: at(B, 34, 21, 1), look: at(B, -18, crownY + 4) },
     ];
     // Glide over every area the player rebuilt, last-opened first, ending at the camp.
@@ -434,7 +434,7 @@ export class FinaleDirector implements LatePart, MoodSource {
     fog.near = THREE.MathUtils.lerp(NIGHT.near, MORNING.near, g) + cin * 14;
     fog.far = THREE.MathUtils.lerp(NIGHT.far, MORNING.far, g) + cin * (60 + 30 * g);
     su.uHorizon.value.copy(NIGHT.fog).lerp(MORNING.horizon, g).lerp(DAWN.horizon, peak * 0.7);
-    su.uZenith.value.copy(NIGHT.zenith).lerp(MORNING.zenith, g);
+    su.uZenith.value.copy(NIGHT.zenith).lerp(MORNING.zenith, smooth(g * 1.7));
     su.uGlow.value.copy(NIGHT.glow).lerp(MORNING.glow, g).lerp(DAWN.glow, peak * 0.6);
     su.uAurora.value = 1 - g;
     const aurora = sky['aurora'] as THREE.Object3D | null;

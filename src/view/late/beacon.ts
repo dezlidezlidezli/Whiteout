@@ -125,14 +125,14 @@ export class BeaconView implements LatePart {
     const fx = fxOf(v);
     const d = this.def;
     // Build-up: sparks spiral up the tower, then the new storey drops in.
-    this.sparkT = 0.9;
+    this.sparkT = 1.0;
     fx.puff(d.x, 0.2, d.z, 16, 2.6, 2.4);
     sfxAt(v, 'beaconStage', undefined, { volume: 1 });
     rigOf(v).startPan(d.x, d.z + 3, 3.4);
     rigOf(v).pulse(0.8);
     hooksOf(v).toast(e.stage >= 4 ? 'The Great Beacon is complete!' : `The Beacon rises: ${e.stage} / 4`, 'area');
     this.pendingLevel = e.stage;
-    this.pendingT = 0.55;
+    this.pendingT = 0.8;
   }
 
   private pendingLevel = -1;
@@ -165,7 +165,7 @@ export class BeaconView implements LatePart {
       if (this.build) {
         const b = this.build;
         b.t += dt;
-        const fall = 0.32;
+        const fall = 0.42;
         if (b.t < fall) {
           const k = b.t / fall;
           this.obj.position.y = (1 - k * k) * 1.6;

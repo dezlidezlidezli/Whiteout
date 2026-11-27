@@ -79,6 +79,10 @@ function assert(cond, msg) {
   const outline = await fk(() => __fk.view.debugPadOutline('pad_pack1'));
   assert(outline.sides.length === 4 && outline.sides.every(Boolean), 'pad outline visible on all four sides over the yard floor (' + JSON.stringify(outline) + ')');
 
+  // ---- every wall the sim collides with is actually drawn (no invisible walls)
+  const cover = await fk(() => __fk.view.debugWallCoverage());
+  assert(cover.total > 10 && cover.missing.length === 0, 'every wall solid has visible wall geometry (' + cover.total + ' samples, missing ' + JSON.stringify(cover.missing.slice(0, 8)) + ')');
+
   // ---- joystick under real touch events
   let a = await pos();
   await touch('touchStart', [[200, 600, 1]]);

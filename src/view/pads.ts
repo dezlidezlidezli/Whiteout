@@ -215,6 +215,7 @@ export class PadVisual {
   private fillShown = 0;
   private hot = 0;
   private labelT = -1;
+  private tether: THREE.Line;
 
   constructor(def: PadDef) {
     this.def = def;
@@ -236,6 +237,13 @@ export class PadVisual {
     this.labelMesh.rotation.x = -0.55;
     this.labelMesh.renderOrder = 60;
     this.root.add(this.labelMesh);
+    const tg = new THREE.BufferGeometry();
+    tg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
+    this.tether = new THREE.Line(tg, new THREE.LineBasicMaterial({ color: 0xffd9a0, transparent: true, opacity: 0.85, depthTest: false }));
+    this.tether.renderOrder = 59;
+    this.tether.frustumCulled = false;
+    this.tether.visible = false;
+    this.root.add(this.tether);
     this.icon = makeIcon(def);
     // Small and to the front corner, clear of the cost label.
     this.icon.scale.setScalar(0.75);
@@ -288,18 +296,36 @@ export class PadVisual {
     if (affordable) this.fillMat.uniforms.uHot.value = Math.max(this.fillMat.uniforms.uHot.value, 0.25 + Math.sin(time * 5) * 0.15);
     this.icon.rotation.y = time * 0.9;
     this.icon.position.y = 0.32 + Math.sin(time * 2.2) * 0.05 + this.hot * 0.15;
-    this.labelMesh.position.y = 1.55 + this.hot * 0.15;
   }
 
-  /** Nudge the label sideways so it never clips the screen edge. */
-  keepOnScreen(cam: THREE.Camera): void {
-    if (!this.root.visible) return;
-    _lp.set(this.def.x, 1.6, this.def.z).project(cam);
-    const lim = 0.62;
+  /**
+   * Labels are anchored to their pad. Only when the pad is near the screen edge does the label slide
+   * (by the minimum distance) with a tether back to the pad; fully off-screen pads hide their label.
+   * `lift` stacks a label one label-height higher when it would overlap a nearer label.
+   */
+  keepOnScreen(cam: THREE.Camera, lift = 0): { x: number; y: number; depth: number } | null {
+    if (!this.root.visible) return null;
+    _lp.set(this.def.x, this.root.position.y + 1.6, this.def.z).project(cam);
+    const off = _lp.z > 1 || Math.abs(_lp.x) > 1.12 || _lp.y > 1.2 || _lp.y < -1.15;
+    this.labelMesh.visible = !off;
+    if (off) {
+      this.tether.visible = false;
+      return null;
+    }
+    const lim = 0.8;
     const over = _lp.x > lim ? _lp.x - lim : _lp.x < -lim ? _lp.x + lim : 0;
-    // ~4.8 m of world per half-screen at the default zoom.
-    const want = -over * 4.8;
-    this.labelMesh.position.x += (want - this.labelMesh.position.x) * 0.25;
+    // ~4.8 m of world per half-screen at the default zoom; slide only by what is needed.
+    this.labelMesh.position.x = -over * 4.8;
+    this.labelMesh.position.y = 1.55 + this.hot * 0.15 + lift;
+    const shifted = Math.abs(this.labelMesh.position.x) > 0.15 || lift > 0;
+    this.tether.visible = shifted;
+    if (shifted) {
+      const a = this.tether.geometry.attributes.position as THREE.BufferAttribute;
+      a.setXYZ(0, this.labelMesh.position.x, this.labelMesh.position.y - 0.55, this.labelMesh.position.z);
+      a.setXYZ(1, 0, 0.25, 0);
+      a.needsUpdate = true;
+    }
+    return { x: _lp.x, y: _lp.y, depth: _lp.z };
   }
 }
 

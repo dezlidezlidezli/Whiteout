@@ -18,6 +18,8 @@ import { PadVisual } from './pads';
 import { WorldView } from './world';
 import { DressingView, skipCampFloor } from './dressing';
 import { SurfaceMap } from './surface';
+import { CollisionDebug } from './debugcol';
+import { wallSolids } from '../data';
 import { ConveyorView } from './conveyors';
 import { clearSeeSubject, setSeeSubject } from './occlude';
 import { Sky } from './sky';
@@ -371,6 +373,72 @@ export class View {
       out.push(px[0] > 150 && px[0] > px[2] + 30);
     }
     return { sides: out, colors };
+  }
+
+  /** Anchor pad labels; when two would overlap, lift the farther one by a label height (tethered). */
+  private placeLabels(): void {
+    const cam = this.rig.camera;
+    const placed: { x: number; y: number; depth: number; pv: PadVisual }[] = [];
+    for (const pv of this.pads.values()) {
+      const r = pv.keepOnScreen(cam, 0);
+      if (r) placed.push({ ...r, pv });
+    }
+    placed.sort((a, b) => a.depth - b.depth); // nearest first keeps its spot
+    const taken: { x: number; y: number }[] = [];
+    for (const q of placed) {
+      let lift = 0;
+      let y = q.y;
+      for (let k = 0; k < 3 && taken.some((t) => Math.abs(t.x - q.x) < 0.55 && Math.abs(t.y - y) < 0.12); k++) {
+        lift += 1.25;
+        y += 0.13;
+      }
+      if (lift > 0) q.pv.keepOnScreen(cam, lift);
+      taken.push({ x: q.x, y });
+    }
+  }
+
+  private colDebug: CollisionDebug | null = null;
+
+  /** Toggle the collision debug overlay (solids + walkable rects). */
+  toggleCollisionDebug(on = !this.colDebug): void {
+    if (on && !this.colDebug) this.colDebug = new CollisionDebug(this.scene);
+    else if (!on && this.colDebug) {
+      this.colDebug.dispose();
+      this.colDebug = null;
+    }
+  }
+
+  /**
+   * Debug/e2e: every wall solid the sim collides with must have drawn wall geometry. Samples points
+   * along each wall solid and ray-casts down onto the merged dressing; returns the misses.
+   */
+  debugWallCoverage(): { total: number; missing: { x: number; z: number }[] } {
+    const ray = new THREE.Raycaster();
+    const down = new THREE.Vector3(0, -1, 0);
+    const meshes = this.dressing.solidMeshes;
+    const missing: { x: number; z: number }[] = [];
+    let total = 0;
+    for (const w of wallSolids(this.data.dressing)) {
+      const long = w.hw > w.hd;
+      const len = (long ? w.hw : w.hd) - 0.35;
+      for (const t of [-1, 0, 1]) {
+        const x = w.x + (long ? t * Math.max(0, len) : 0);
+        const z = w.z + (long ? 0 : t * Math.max(0, len));
+        total++;
+        let hit = false;
+        // A few lateral offsets: the palisade's posts sit along the line, so check across the thickness.
+        for (const off of [0, 0.12, -0.12]) {
+          ray.set(new THREE.Vector3(x + (long ? 0 : off), 10, z + (long ? off : 0)), down);
+          const h = ray.intersectObjects(meshes, false)[0];
+          if (h && h.point.y > 0.6) {
+            hit = true;
+            break;
+          }
+        }
+        if (!hit) missing.push({ x: +x.toFixed(2), z: +z.toFixed(2) });
+      }
+    }
+    return { total, missing };
   }
 
   /** Debug/e2e: arrow tip/tail and the current guide target. */
@@ -802,11 +870,12 @@ export class View {
     this.world.update(sim, t, dt);
     this.dressing.update(sim);
     this.conveyors.update(sim, dt);
+    this.colDebug?.update(sim, dt);
     for (const pv of this.pads.values()) {
       pv.update(sim, t, dt, p.onPad === pv.def.id);
-      pv.keepOnScreen(this.rig.camera);
       if (this.title) pv.root.visible = false; // nothing in-world competes with the title buttons
     }
+    this.placeLabels();
     this.drawBuffers(t);
     this.updateFlyers(dt, t);
     this.items.end();

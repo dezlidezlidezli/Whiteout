@@ -42,19 +42,15 @@ export function seeThrough(m: THREE.Material): THREE.Material {
         '#include <clipping_planes_fragment>',
         `#include <clipping_planes_fragment>
 {
-  // 4x4 Bayer threshold for a soft, stable dissolve.
-  vec2 fp = floor(gl_FragCoord.xy);
-  vec2 p1 = mod(fp, 2.0);
-  vec2 p2 = mod(floor(fp * 0.5), 2.0);
-  float b1 = p1.x * 2.0 + p1.y * 3.0 - 4.0 * p1.x * p1.y;
-  float b2 = p2.x * 2.0 + p2.y * 3.0 - 4.0 * p2.x * p2.y;
-  float bayer = (4.0 * b1 + b2 + 0.5) / 16.0;
+  // Interleaved gradient noise: a fine, even per-pixel pattern (no visible checker blocks).
+  float bayer = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
   for (int i = 0; i < ${MAX}; i++) {
     vec4 s = uSee[i];
     if (s.z <= 0.0) continue;
     float r = length(gl_FragCoord.xy - s.xy) / s.z;
     if (r < 1.0 && gl_FragCoord.z < s.w - 0.0006 && vFkWY > 0.45) {
-      float cut = smoothstep(1.0, 0.55, r) * 0.82;
+      // Feathered circle: full fade in the middle, soft falloff to nothing at the rim.
+      float cut = smoothstep(1.0, 0.35, r) * 0.78;
       if (bayer < cut) discard;
     }
   }

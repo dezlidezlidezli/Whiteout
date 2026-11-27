@@ -17,7 +17,7 @@ export class DebugOverlay {
   private last = '';
   visible = true;
 
-  constructor(root: HTMLElement, private stats: FrameStats, private extra: () => string) {
+  constructor(root: HTMLElement, private stats: FrameStats, onCollision: () => void, private extra: () => string) {
     this.el = document.createElement('div');
     this.el.setAttribute('data-ui', '');
     this.el.style.cssText =
@@ -44,7 +44,11 @@ export class DebugOverlay {
       }
       window.setTimeout(() => (btn.textContent = 'Copy report'), 1500);
     });
-    this.el.append(this.cv, this.txt, btn);
+    const col = document.createElement('button');
+    col.textContent = 'Collision';
+    col.style.cssText = btn.style.cssText + ';margin-left:6px;background:#7fd8ff';
+    col.addEventListener('click', () => onCollision());
+    this.el.append(this.cv, this.txt, btn, col);
     root.appendChild(this.el);
   }
 

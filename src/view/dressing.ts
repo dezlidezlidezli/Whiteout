@@ -106,6 +106,59 @@ function stripRects(points: XZ[], w: number): Rect[] {
   return out;
 }
 
+/**
+ * Visible barriers wherever an area's walkable rect ends with nothing drawn there (no palisade or
+ * fence): snow banks, boulders and bushes just outside the edge. Corridor rects (every rect after an
+ * area's first) get lamp-post gateposts so openings read as inviting. Data-driven from the rects.
+ */
+function edgeBarriers(data: GameData, a: AreaD, rand: () => number): THREE.Object3D[] {
+  const out: THREE.Object3D[] = [];
+  const area = data.areas.find((x) => x.id === a.area);
+  if (!area) return out;
+  const all = data.areas.flatMap((x) => x.rects);
+  const inR = (r: { x0: number; x1: number; z0: number; z1: number }, x: number, z: number) => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1;
+  const frost: XZ[][] = data.walls.map((w) => w.points.map((p) => [p.x, p.z] as XZ));
+  const nearFrost = (x: number, z: number) => frost.some((pts) => pts.some((_, i) => i > 0 && segDist(x, z, pts[i - 1], pts[i]) < 1.6));
+  const walls: XZ[][] = data.dressing.flatMap((d) => d.walls.map((w) => w.points));
+  const nearWall = (x: number, z: number) => walls.some((pts) => pts.some((_, i) => i > 0 && segDist(x, z, pts[i - 1], pts[i]) < 1.4));
+  const kinds = ['snowBank', 'snowyBoulderCluster', 'snowBank', 'bush', 'snowBank'];
+  area.rects.forEach((r, ri) => {
+    const edges: { ax: number; az: number; bx: number; bz: number; nx: number; nz: number }[] = [
+      { ax: r.x0, az: r.z0, bx: r.x1, bz: r.z0, nx: 0, nz: -1 },
+      { ax: r.x1, az: r.z0, bx: r.x1, bz: r.z1, nx: 1, nz: 0 },
+      { ax: r.x0, az: r.z1, bx: r.x1, bz: r.z1, nx: 0, nz: 1 },
+      { ax: r.x0, az: r.z0, bx: r.x0, bz: r.z1, nx: -1, nz: 0 },
+    ];
+    for (const e of edges) {
+      const len = Math.hypot(e.bx - e.ax, e.bz - e.az);
+      const n = Math.max(1, Math.round(len / 3.2));
+      for (let k = 0; k < n; k++) {
+        const t = (k + 0.5) / n;
+        const px = e.ax + (e.bx - e.ax) * t;
+        const pz = e.az + (e.bz - e.az) * t;
+        // Passable only where another rect spans across this edge (touching rects still block the
+        // player). Elsewhere it is a dead end that must be visible, unless a wall is drawn there.
+        const across = all.some((o) => o !== r && inR(o, px - e.nx * 0.5, pz - e.nz * 0.5) && inR(o, px + e.nx * 0.5, pz + e.nz * 0.5));
+        if (across || nearWall(px, pz) || nearFrost(px, pz)) continue;
+        const o = createProp(kinds[Math.floor(rand() * kinds.length)], { seed: Math.floor(rand() * 999) });
+        o.position.set(px + e.nx * 1.0, 0, pz + e.nz * 1.0);
+        o.rotation.y = Math.atan2(e.bx - e.ax, e.bz - e.az) + Math.PI / 2 + (rand() - 0.5) * 0.3;
+        out.push(o);
+      }
+    }
+    if (ri > 0) {
+      // Corridor: lamp-post gateposts at its corners.
+      for (const [x, z] of [[r.x0, r.z0], [r.x1, r.z0], [r.x0, r.z1], [r.x1, r.z1]] as [number, number][]) {
+        if (nearWall(x, z)) continue;
+        const o = createProp('lampPost', { seed: 3 });
+        o.position.set(x + Math.sign(x - (r.x0 + r.x1) / 2) * 0.4, 0, z + Math.sign(z - (r.z0 + r.z1) / 2) * 0.4);
+        out.push(o);
+      }
+    }
+  });
+  return out;
+}
+
 /** A soft, irregular octagon (local XZ) for organic patches like the camp's hearth stones. */
 function irregular(w: number, d: number, rand: () => number): XZ[] {
   const out: XZ[] = [];
@@ -143,6 +196,8 @@ export class DressingView {
   private areas: AreaView[] = [];
   private openKey = '';
   private scatter: THREE.InstancedMesh[] = [];
+  /** Merged walls/landmarks/clutter/barriers (for debug coverage checks). */
+  readonly solidMeshes: THREE.Mesh[] = [];
 
   constructor(parent: THREE.Object3D, data: GameData, private ground: GroundUniforms, quality: number, surface: SurfaceMap) {
     // Things clutter must keep clear of: stations (reach), pads, belts, counter queues.
@@ -240,13 +295,19 @@ export class DressingView {
         }
       }
 
+      // Every walkable edge with no drawn wall gets a visible barrier, and corridors get gateposts.
+      solidRoots.push(...edgeBarriers(data, a, rand));
+
       const group = new THREE.Group();
       group.name = `dressing:${a.area}`;
       for (const m of mergeStatic(flatRoots, false, false)) {
         m.renderOrder = -1;
         group.add(m);
       }
-      for (const m of mergeStatic(solidRoots, true, quality >= 1)) group.add(m);
+      for (const m of mergeStatic(solidRoots, true, quality >= 1)) {
+        group.add(m);
+        this.solidMeshes.push(m);
+      }
       group.visible = false;
       parent.add(group);
       this.areas.push({ area: a.area, group, flats });
