@@ -11,6 +11,7 @@ describe('campaign robustness (a)', () => {
     expect(r.finished).toBe(true);
     expect(r.finaleDone).toBeLessThan(130 * 60);
     expect(r.longestNoGuide).toBeLessThan(10);
+    expect(r.longestGap).toBeLessThan(300);
     expect(r.ordersDone).toBeGreaterThan(0);
   }, 120_000);
 });
