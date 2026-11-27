@@ -43,6 +43,21 @@ export class TitleScreen {
       <div class="fk-version">${VERSION_LABEL}</div>`;
     root.appendChild(this.el);
     root.classList.add('fk-titling');
+    // A newer build that finishes downloading while the title is still up is applied straight
+    // away (nothing is in progress yet), so one launch is enough to get the latest version.
+    type Pwa = { updateReady?: boolean; applyUpdate?: () => void; checkForUpdate?: () => unknown };
+    const pwa = () => (window as unknown as { __fkPwa?: Pwa }).__fkPwa;
+    const applyIfIdle = (): void => {
+      if (this.done || !pwa()?.applyUpdate) return;
+      const v = this.el.querySelector('.fk-version');
+      if (v) v.textContent = 'Updating…';
+      pwa()!.applyUpdate!();
+    };
+    window.addEventListener('fk-update-ready', applyIfIdle);
+    window.setTimeout(() => {
+      if (pwa()?.updateReady) applyIfIdle();
+      else void pwa()?.checkForUpdate?.();
+    }, 600);
     this.el.addEventListener('pointerdown', () => opts.onFirstTouch());
     this.el.querySelector('.fk-begin')!.addEventListener('click', () => this.finish(false));
     const ng = this.el.querySelector('.fk-newgame') as HTMLButtonElement | null;

@@ -17,16 +17,23 @@ const pillarMat = () =>
     fog: false,
     uniforms: { uTime: { value: 0 }, uAlpha: { value: 0 }, uColor: { value: new THREE.Color(0xffc070) } },
     vertexShader: /* glsl */ `
-      varying vec2 vUv;
-      void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+      varying vec2 vUv; varying float vFacing;
+      void main() {
+        vUv = uv;
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vec3 n = normalize(normalMatrix * normal);
+        vFacing = abs(dot(n, normalize(-mv.xyz)));
+        gl_Position = projectionMatrix * mv;
+      }`,
     fragmentShader: /* glsl */ `
-      uniform float uTime; uniform float uAlpha; uniform vec3 uColor; varying vec2 vUv;
+      uniform float uTime; uniform float uAlpha; uniform vec3 uColor; varying vec2 vUv; varying float vFacing;
       void main() {
         float y = vUv.y;
         float side = pow(sin(vUv.x * 3.14159 * 2.0 * 3.0 + uTime * 1.3) * 0.5 + 0.5, 2.0) * 0.35 + 0.65;
         float a = (1.0 - smoothstep(0.0, 1.0, y)) * smoothstep(0.0, 0.03, y) * side;
         float streak = smoothstep(0.7, 1.0, sin(y * 40.0 - uTime * 6.0 + vUv.x * 12.0)) * 0.25 * (1.0 - y);
-        gl_FragColor = vec4(uColor * (1.0 + streak), (a + streak) * uAlpha);
+        float soft = pow(vFacing, 2.2);
+        gl_FragColor = vec4(uColor * (1.0 + streak), (a + streak) * uAlpha * soft * 0.7);
       }`,
   });
 
@@ -54,7 +61,7 @@ export class BeaconView implements LatePart {
       this.root.rotation.y = this.def.rot ?? 0;
       this.root.scale.setScalar(this.def.scale ?? 1);
     }
-    this.pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.5, 70, 18, 1, true).translate(0, 35, 0), pillarMat());
+    this.pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 1.25, 70, 20, 1, true).translate(0, 35, 0), pillarMat());
     this.pillar.renderOrder = 8;
     this.pillar.frustumCulled = false;
     this.pillar.visible = false;

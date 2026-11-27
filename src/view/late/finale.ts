@@ -33,7 +33,7 @@ const MORNING = {
   fog: C(0xcbd6e4), horizon: C(0xf6dcc0), zenith: C(0x4f86c8), glow: C(0xffc48a),
   hemiSky: C(0xfff1de), hemiGround: C(0x7c6c54), hemiI: 1.22, sun: C(0xffe4bc), sunI: 2.0, near: 34, far: 96,
 };
-const DAWN = { fog: C(0xf0b48e), horizon: C(0xffa868), glow: C(0xff9a50), sun: C(0xffb878), hemiSky: C(0xffd6b4) };
+const DAWN = { fog: C(0xf2c4a2), horizon: C(0xffc48e), glow: C(0xffb070), sun: C(0xffc490), hemiSky: C(0xffdcc0) };
 
 const _c = new THREE.Color();
 const _v = new THREE.Vector3();
@@ -72,8 +72,8 @@ export class FinaleDirector implements LatePart, MoodSource {
 
   constructor(private ctx: LateCtx, private deps: FinaleDeps) {
     const v = ctx.view;
-    this.sun = glowSprite(70, 'rgba(255,236,200,0.95)', 'rgba(255,170,90,0.35)');
-    this.sunCore = glowSprite(16, 'rgba(255,255,240,1)', 'rgba(255,220,150,0.8)');
+    this.sun = glowSprite(46, 'rgba(255,226,180,0.85)', 'rgba(255,160,90,0.25)');
+    this.sunCore = glowSprite(9, 'rgba(255,252,236,1)', 'rgba(255,214,150,0.7)');
     for (const s of [this.sun, this.sunCore]) {
       s.renderOrder = -9;
       s.visible = false;
@@ -142,7 +142,7 @@ export class FinaleDirector implements LatePart, MoodSource {
   vec3 lush = diffuseColor.rgb * vec3(0.74, 1.16, 0.58) + vec3(0.015, 0.05, 0.0);
   diffuseColor.rgb = mix(diffuseColor.rgb, lush, fm * uFkGreen * (0.55 + 0.45 * tuft));
   float pn = fkFbm(fxz * 0.16 + vec2(5.0, 2.0));
-  float patchK = smoothstep(0.66, 0.72, pn + tuft * 0.04) * uFkPatches;
+  float patchK = smoothstep(0.71, 0.75, pn + tuft * 0.05) * uFkPatches;
   diffuseColor.rgb = mix(diffuseColor.rgb, uSnow * (0.9 + 0.1 * tuft), patchK);
 }`,
         );
@@ -306,9 +306,9 @@ export class FinaleDirector implements LatePart, MoodSource {
     const L = this.L;
     const D = this.D;
     const keys: Key[] = [
-      { T: 0, pos: at(B, 17, 4.5), look: B.clone().setY(crownY * 0.75) },
-      { T: L - 0.4, pos: at(B, 12.5, 6, 2.6), look: B.clone().setY(crownY + 0.5) },
-      { T: L + 3.2, pos: at(B, 32, 24, 1), look: at(B, -14, crownY + 3) },
+      { T: 0, pos: at(B, 23, 5.5), look: B.clone().setY(crownY * 0.7) },
+      { T: L - 0.4, pos: at(B, 18, 7.5, 3.2), look: B.clone().setY(crownY + 1.5) },
+      { T: L + 3.2, pos: at(B, 34, 21, 1), look: at(B, -18, crownY + 4) },
     ];
     // Glide over every area the player rebuilt, last-opened first, ending at the camp.
     const areas = data.areas
@@ -319,9 +319,9 @@ export class FinaleDirector implements LatePart, MoodSource {
     areas.forEach((a, i) => {
       const T = t0 + ((t1 - t0) * (i + 0.5)) / Math.max(1, areas.length);
       const f = new THREE.Vector3(a.focus.x, 0, a.focus.z);
-      keys.push({ T, pos: at(f, 15, 16), look: at(f, -3, 0.5) });
+      keys.push({ T, pos: at(f, 21, 25), look: at(f, -2, 0.5) });
     });
-    keys.push({ T: L + D + 6.6, pos: at(H, 14, 10, 1.5), look: H.clone().setY(1.0) });
+    keys.push({ T: L + D + 6.6, pos: at(H, 17, 13, 1.5), look: H.clone().setY(1.0) });
     keys.push({ T: L + D + 9, pos: at(H, 10.5, 6.2, 2.5), look: H.clone().setY(1.2) });
     this.keys = keys;
     this.camp = H;

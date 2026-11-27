@@ -161,7 +161,7 @@
 .fk-cr-made { font-size: 12px; color: rgba(255, 233, 204, 0.6); letter-spacing: 0.06em; }
 
 /* Finale: everything gameplay steps aside while the dawn plays. */
-.fk-ui.fk-cinema .fk-top, .fk-ui.fk-cinema .fk-quest, .fk-ui.fk-cinema .fk-orders, .fk-ui.fk-cinema .fk-hint { opacity: 0; pointer-events: none; transition: opacity 0.8s; }
+.fk-ui.fk-cinema .fk-top, .fk-ui.fk-cinema .fk-quest, .fk-ui.fk-cinema .fk-toasts, .fk-ui.fk-cinema .fk-floaters, .fk-ui.fk-cinema .fk-orders, .fk-ui.fk-cinema .fk-hint { opacity: 0; pointer-events: none; transition: opacity 0.8s; }
 .fk-skip {
   position: absolute;
   left: 50%;
