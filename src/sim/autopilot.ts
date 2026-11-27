@@ -34,6 +34,15 @@ export class Autopilot {
       return;
     }
     const w = sim.navFromPlayer(t.x, t.z);
+    // On ice: steer straight (momentum does the rest); the unstick dance would only fight the glide.
+    if (sim.state.skate.on) {
+      const l = Math.hypot(w.x - p.x, w.z - p.z) || 1;
+      sim.setMove((w.x - p.x) / l, (w.z - p.z) / l);
+      this.stuckT = 0;
+      this.lastX = p.x;
+      this.lastZ = p.z;
+      return;
+    }
     // Give other stations a wide berth so we don't grab things we don't need on the way.
     const near = (x: number, z: number) => Math.abs(x - p.x) < 6 && Math.abs(z - p.z) < 6;
     const avoid = sim.allSolids().filter((s) => near(s.x, s.z));

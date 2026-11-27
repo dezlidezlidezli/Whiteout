@@ -1,6 +1,12 @@
 import type { AreaId, GameData, ItemCounts, ItemKind, ModKey } from '../data/types';
+import { anchorQuest } from '../data/mechflags';
+import { createCrank, type CrankState } from './crankstate';
+import { createFlame, type FlameState } from './flame';
+import { createPlough, type PloughState } from './plough';
+import { createRescue, type RescueState } from './rescue';
+import { createSkate, type SkateState } from './skate';
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 export interface PlayerState {
   x: number;
@@ -25,6 +31,7 @@ export interface PlayerState {
   shelf?: { id: string; mode: 'drop' | 'pick' } | null;
   /** Seconds the player has stood still in the bin's zone (discarding starts at Balance-free 0.8 s). */
   binT?: number;
+
 }
 
 export interface PileState { kind: 'pile'; count: number; acc: number }
@@ -111,6 +118,8 @@ export interface OrderState {
   n: number;
   got: number;
   reward: number;
+  /** Lantern Festival order: light `n` festival lamps with a carried flame (item unused). */
+  festival?: boolean;
 }
 
 /** Lifetime stats for the stats page. */
@@ -174,6 +183,12 @@ export interface SimState {
   totals: Totals;
   /** World layout revision this state was laid out for (GameData.layoutRev). */
   layoutRev?: number;
+  // ---- v3: signature mechanics ----
+  plough: PloughState;
+  rescue: RescueState;
+  skate: SkateState;
+  crank: CrankState;
+  flame: FlameState;
 }
 
 export const DEFAULT_MODS: Record<ModKey, number> = {
@@ -303,6 +318,11 @@ export function createState(data: GameData, seed: number): SimState {
     season: 1,
     totals: createTotals(),
     layoutRev: data.layoutRev,
+    plough: createPlough(),
+    rescue: createRescue(),
+    skate: createSkate(),
+    crank: createCrank(),
+    flame: createFlame(),
   };
   normalizeState(s, data);
   return s;
@@ -323,6 +343,31 @@ export function normalizeState(s: SimState, data: GameData): void {
     s.player.vx = s.player.vz = 0;
     delete (s as { relocatePlayer?: boolean }).relocatePlayer;
   }
+  s.plough = { ...createPlough(), ...(s.plough ?? {}) };
+  s.rescue = { ...createRescue(), ...(s.rescue ?? {}) };
+  s.skate = { ...createSkate(), ...(s.skate ?? {}) };
+  s.crank = s.crank ?? createCrank();
+  s.flame = { ...createFlame(), ...(s.flame ?? {}) };
+  // A save that already lit the Beacon (or started the finale) keeps the whole Trail of Light lit.
+  if (s.finale && s.finale.phase !== 'none') {
+    s.flame.beaconLit = true;
+    for (const b of data.mech.braziers) if (b.kind === 'trail') s.flame.lit[b.id] = true;
+  }
+  // v2 -> v3: population becomes housed villagers (capped by the homes built); the rest passed through.
+  if ((s as { rehouse?: boolean }).rehouse) {
+    delete (s as { rehouse?: boolean }).rehouse;
+    const h = data.camp.housing;
+    if (h) {
+      const lv = Math.max(1, Math.min(h.tentsPerLevel.length, s.hearth.level));
+      s.tents = Math.min(s.tents, h.tentsPerLevel[lv - 1], data.camp.tentSpots.length);
+      const cabins = h.cabins.filter((c) => s.unlocked[c]).length;
+      const cap = h.base + h.perTent * s.tents + h.perCabin * cabins;
+      if (s.population > cap) {
+        s.stats.passedThrough = (s.stats.passedThrough ?? 0) + (s.population - cap);
+        s.population = cap;
+      }
+    }
+  }
   if ((s.layoutRev ?? 1) !== data.layoutRev) reseat(s, data);
   s.stats = s.stats ?? {};
   s.guideUnload = !!s.guideUnload;
@@ -337,9 +382,21 @@ export function normalizeState(s: SimState, data: GameData): void {
   s.season = s.season ?? 1;
   s.totals = { ...createTotals(), ...(s.totals ?? {}) };
   // Quest chain re-anchoring: keep the player on the same quest even if quests were inserted before it.
+  // A quest of a mechanic switched off here moves on to the next quest that exists.
   if (s.quest.id) {
-    const i = data.quests.findIndex((q) => q.id === s.quest.id);
+    const i = anchorQuest(data, s.quest.id);
     if (i >= 0) s.quest.index = i;
   }
+  // Switched-off mechanics let go of anything in hand (saves move freely between configurations).
+  if (!data.mechanics.flame) {
+    s.flame.held = false;
+    s.orders = s.orders.filter((o) => !o.festival);
+  }
+  if (!data.mechanics.skate) {
+    s.skate.on = false;
+    s.skate.leaps = [];
+  }
+  if (!data.mechanics.plough) s.plough.pushing = false;
+  if (!data.mechanics.crank) for (const id in s.crank) s.crank[id].blast = 0;
   s.quest.id = data.quests[s.quest.index]?.id;
 }

@@ -2,8 +2,10 @@ import { BALANCE } from './balance';
 import { ITEMS, RECIPES } from './items';
 import { QUESTS } from './quests';
 import { DRESSING } from './dressing';
+import { MECH, mechDecor, mechStations } from './mechanics';
 import { ENDLESS, FINALE, LATE_DECOR, LATE_HELPERS, LATE_LANES, LATE_LINKS, LATE_PADS, LATE_STATIONS } from './late';
 import { growForest, LAYOUT_REV, packTents, placeAreas } from './layout';
+import { ALL_MECHANICS, NO_MECHANICS, withMechanics } from './mechflags';
 import type { GameData } from './types';
 import { AREAS, CAMP, DECOR, HELPERS, LINKS, PADS, PLAYER_START, STATIONS, WALLS } from './world';
 
@@ -11,7 +13,11 @@ export * from './types';
 export { declutter, FLAT_DECOR, FOOTPRINT, FROST_WALL_HALF, NATURAL_DECOR, TOLERANCE, segDist } from './declutter';
 export { ITEM_KINDS, ITEMS, RECIPES } from './items';
 export { ORDER_BOARD } from './late';
+export { MECH } from './mechanics';
+export type { MechDef } from './mechanics';
 export { DRESSING, wallSolids } from './dressing';
+export { ALL_MECHANICS, anchorQuest, fullDataOf, MECHANIC_IDS, NO_MECHANICS, withMechanics } from './mechflags';
+export type { MechanicId } from './mechflags';
 export type { AreaDressing, FloorType, XZ } from './dressing';
 
 /** The full campaign content bundle. Areas 3–5 and Open Season (./late.ts) are appended to the base arrays. */
@@ -23,8 +29,8 @@ const AUTHORED: GameData = {
   balance: BALANCE,
   areas: AREAS,
   walls: WALLS,
-  stations: [...STATIONS, ...LATE_STATIONS],
-  decor: [...DECOR, ...LATE_DECOR],
+  stations: [...STATIONS, ...LATE_STATIONS, ...mechStations()],
+  decor: [...DECOR, ...LATE_DECOR, ...mechDecor()],
   pads: [...PADS, ...LATE_PADS],
   helpers: [...HELPERS, ...LATE_HELPERS],
   links: [...LINKS, ...LATE_LINKS],
@@ -35,13 +41,23 @@ const AUTHORED: GameData = {
   finale: FINALE,
   dressing: DRESSING,
   layoutRev: LAYOUT_REV,
+  mech: MECH,
+  mechanics: { ...ALL_MECHANICS },
 };
 
-/** Every area placed at its world offset, tent plots packed into the camp, the forest grown around it all. */
-export const GAME_DATA: GameData = (() => {
+/** Every area placed at its world offset, tent plots packed into the camp, the forest grown around it all
+ * (with every mechanic switched on; placement is shared by all configurations). */
+const FULL_DATA: GameData = (() => {
   const { data, lanes } = placeAreas(AUTHORED, LATE_LANES);
   const tentSpots = packTents(data, data.camp.tentAt.length);
   const camp = { ...data.camp, tentSpots, tentAt: data.camp.tentAt.slice(0, tentSpots.length) };
   const placed = { ...data, camp };
   return { ...placed, decor: [...placed.decor, ...growForest(placed, lanes)] };
 })();
+
+/**
+ * The shipped game data. The five signature mechanics (plough, rescue, skate, crank, flame) are all
+ * switched OFF until the view draws them; turn any of them on with
+ * `withMechanics(GAME_DATA, { plough: true, ... })` (works from any configuration).
+ */
+export const GAME_DATA: GameData = withMechanics(FULL_DATA, NO_MECHANICS);

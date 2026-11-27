@@ -2,13 +2,16 @@
 // sled-dog couriers, spare shelves, the soft-cap (never soft-lock) rule, dressing data and save migration.
 
 import { describe, expect, it } from 'vitest';
-import { GAME_DATA, ITEM_KINDS, wallSolids } from '../src/data';
+import { ALL_MECHANICS, GAME_DATA as SHIPPED_DATA, withMechanics, ITEM_KINDS, wallSolids } from '../src/data';
 import type { CounterDef, ItemKind, Vec2 } from '../src/data';
 import { Sim } from '../src/sim';
 import type { CounterState, NodeState, PileState, ProcState } from '../src/sim';
 import { queueSlotPos } from '../src/sim/agents';
 import { inRects } from '../src/sim/collision';
 import { buildReach } from './reach';
+
+/** Every signature mechanic on (the shipped data has them off until the view draws them). */
+const GAME_DATA = withMechanics(SHIPPED_DATA, ALL_MECHANICS);
 
 const fresh = (seed = 1) => new Sim(GAME_DATA, { seed });
 function tp(sim: Sim, x: number, z: number): void {
@@ -28,6 +31,17 @@ function unlockTo(sim: Sim, lastPad: string): void {
     sim.completePad(p.id);
     if (p.id === lastPad) break;
   }
+}
+
+/** Trail of Light lit, then carry a flame to the finished Beacon's crown (starts the finale). */
+function lightBeacon(sim: Sim): void {
+  for (const b of GAME_DATA.mech.braziers) if (b.kind === 'trail') sim.state.flame.lit[b.id] = true;
+  sim.state.player.stack = [];
+  sim.state.flame.held = true;
+  sim.state.flame.level = 1;
+  const m = GAME_DATA.mech.beacon;
+  tp(sim, m.x, m.z + 2.8);
+  sim.step();
 }
 
 describe('Kettle Yard stream fishing', () => {
@@ -142,6 +156,8 @@ describe('Great Beacon + finale', () => {
     sim.drainEvents();
     sim.completePad('pad_beacon4');
     expect(sim.state.beacon).toBe(4);
+    expect(sim.state.finale.phase).toBe('none'); // the finished Beacon stands dark until the flame arrives
+    lightBeacon(sim);
     expect(sim.state.finale.phase).toBe('lighting');
     sim.advance(GAME_DATA.finale.lightingTime + 0.1);
     expect(sim.state.finale.phase).toBe('dawn');
@@ -164,6 +180,7 @@ describe('Open Season', () => {
   const afterFinale = () => {
     const sim = fresh(7);
     unlockTo(sim, 'pad_beacon4');
+    lightBeacon(sim);
     sim.advance(GAME_DATA.finale.lightingTime + GAME_DATA.finale.dawnTime + 0.5);
     sim.drainEvents();
     return sim;
@@ -175,7 +192,7 @@ describe('Open Season', () => {
     sim.state.player.capacity = 64;
     let done = 0;
     for (let k = 0; k < 6; k++) {
-      const o = sim.state.orders[0];
+      const o = sim.state.orders.find((x) => !x.festival)!;
       sim.state.player.stack = Array(o.n - o.got).fill(o.item);
       for (let i = 0; i < 2000 && sim.state.player.stack.length; i++) sim.step();
       expect(sim.state.orders.length).toBe(3);
@@ -392,7 +409,7 @@ describe('save v2 + migration', () => {
     delete raw.state.stations.smokehouseA;
     delete raw.state.player.shelf;
     const b = new Sim(GAME_DATA, { save: JSON.stringify(raw) });
-    expect(b.state.version).toBe(2);
+    expect(b.state.version).toBe(3);
     expect(b.questProgress().id).toBe('q_lakefish');
     expect(b.state.beacon).toBe(0);
     expect(b.state.finale.phase).toBe('none');
@@ -401,7 +418,7 @@ describe('save v2 + migration', () => {
     expect(b.state.stations.smokehouseA).toBeDefined();
     expect(b.state.pads.pad_smokehouseA.visible).toBe(true);
     b.advance(2);
-    expect(b.serialize()).toContain('"version":2');
+    expect(b.serialize()).toContain('"version":3');
   });
   it('round-trips late-game state (orders, finale, shelves, courier waypoints)', () => {
     const a = fresh(4);

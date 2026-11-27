@@ -1,9 +1,12 @@
 // Layout audit: nothing in the world may visibly stand inside something else, inside a frost wall or a
 // palisade, on a conveyor or a walk lane, or hidden behind a tall building from the fixed camera.
 // Footprints here are VISUAL radii (how big the model looks), not collision solids.
-import { describe, expect, it } from 'vitest';
-import { FLAT_DECOR, FOOTPRINT, FROST_WALL_HALF, GAME_DATA as D, NATURAL_DECOR, TOLERANCE, segDist, wallSolids } from '../src/data';
-import type { Vec2 } from '../src/data';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { ALL_MECHANICS, FLAT_DECOR, FOOTPRINT, FROST_WALL_HALF, GAME_DATA, NATURAL_DECOR, TOLERANCE, segDist, wallSolids, withMechanics } from '../src/data';
+import type { GameData, Vec2 } from '../src/data';
+
+/** The configuration under audit (both the shipped one, mechanics off, and every mechanic on). */
+let D: GameData = GAME_DATA;
 
 const R = (m: string, fallback = 0.8) => FOOTPRINT[m] ?? fallback;
 /** Buildings that need 1.5 m of clear ground to pads/counters/conveyors and hide what stands behind them. */
@@ -117,10 +120,88 @@ export function findProblems(): string[] {
       if (behind > 0 && behind < b.r + 3 && Math.abs(t.x - b.x) < b.r * 0.8) bad.push(`hidden: ${t.kind}:${t.id} behind ${b.kind}:${b.id} at ${at(t)}`);
     }
   }
+  // 7. Readable fronts (notice boards, sign boards, market stalls) face the south camera (within 60°).
+  const READABLE = new Set(['noticeBoard', 'signBoard', 'marketStall']);
+  const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
+  for (const s of D.stations) if (READABLE.has((s as { model: string }).model) && Math.abs(wrap(s.rot ?? 0)) > Math.PI / 3) bad.push(`edge-on: ${s.id} rot ${s.rot}`);
+  for (const d of D.decor) if (READABLE.has(d.model) && Math.abs(wrap(d.rot ?? 0)) > Math.PI / 3) bad.push(`edge-on: ${d.id} rot ${d.rot}`);
+  for (const a of D.dressing) for (const l of a.landmarks) if (READABLE.has(l.prop) && Math.abs(wrap(l.yaw ?? 0)) > Math.PI / 3) bad.push(`edge-on: ${l.prop}@${l.x},${l.z}`);
+  // 8. Pads that can show at the same time stand ≥ 3 m apart (their labels must not overlap).
+  const req = new Map(D.pads.map((p) => [p.id, p.requires] as const));
+  const after = (a: string, b: string, seen = new Set<string>()): boolean => {
+    if (seen.has(a)) return false;
+    seen.add(a);
+    return (req.get(a) ?? []).some((r) => r === b || after(r, b, seen));
+  };
+  for (let i = 0; i < D.pads.length; i++) {
+    for (let j = i + 1; j < D.pads.length; j++) {
+      const a = D.pads[i];
+      const b = D.pads[j];
+      const d = Math.hypot(a.x - b.x, a.z - b.z);
+      if (d < 0.05 || d >= 3.0 || after(a.id, b.id) || after(b.id, a.id)) continue;
+      bad.push(`labels: ${a.id} x ${b.id} only ${d.toFixed(2)} m apart`);
+    }
+  }
   return bad;
 }
 
-describe('world layout', () => {
+/** Every metre of the walkable world's outline is a wall/fence, a frost wall, a counter in its gap, a gate
+ * corridor (into another area) or a declared natural edge: no invisible walls. */
+export function bareEdges(): string[] {
+  const rects = D.areas.flatMap((a) => a.rects);
+  const inside = (x: number, z: number, m: number) => rects.some((r) => x > r.x0 + m && x < r.x1 - m && z > r.z0 + m && z < r.z1 - m);
+  const solids = wallSolids(D.dressing);
+  const counters = D.stations.filter((s) => s.type === 'counter');
+  const lines: { a: Vec2; b: Vec2; tol: number }[] = [];
+  for (const w of D.walls) for (let k = 0; k + 1 < w.points.length; k++) lines.push({ a: w.points[k], b: w.points[k + 1], tol: 1.0 });
+  for (const a of D.dressing) for (const e of a.edges ?? []) {
+    for (let k = 0; k + 1 < e.points.length; k++) lines.push({ a: { x: e.points[k][0], z: e.points[k][1] }, b: { x: e.points[k + 1][0], z: e.points[k + 1][1] }, tol: 0.6 });
+  }
+  const bad: string[] = [];
+  for (const r of rects) {
+    const edge: [number, number, number, number][] = [[r.x0, r.z0, r.x1, r.z0], [r.x1, r.z0, r.x1, r.z1], [r.x1, r.z1, r.x0, r.z1], [r.x0, r.z1, r.x0, r.z0]];
+    for (const [ax, az, bx, bz] of edge) {
+      const n = Math.max(1, Math.round(Math.hypot(bx - ax, bz - az) / 0.5));
+      for (let k = 0; k <= n; k++) {
+        const x = ax + ((bx - ax) * k) / n;
+        const z = az + ((bz - az) * k) / n;
+        // Interior (shared with another rect: a gate or an overlap) is not an outline.
+        const ox = (bz - az) !== 0 ? 0.3 : 0;
+        const oz = (bx - ax) !== 0 ? 0.3 : 0;
+        if (inside(x + ox, z + oz, 0) && inside(x - ox, z - oz, 0)) continue;
+        if (solids.some((s) => Math.max(Math.abs(x - s.x) - s.hw, 0) ** 2 + Math.max(Math.abs(z - s.z) - s.hd, 0) ** 2 < 0.6 * 0.6)) continue;
+        if (lines.some((l) => segDist(x, z, l.a, l.b) < l.tol)) continue;
+        if (counters.some((c) => Math.hypot(c.x - x, c.z - z) < 1.8)) continue;
+        bad.push(`bare edge at (${x.toFixed(1)}, ${z.toFixed(1)})`);
+      }
+    }
+  }
+  return bad;
+}
+
+const CONFIGS: [string, GameData][] = [
+  ['shipped (mechanics off)', GAME_DATA],
+  ['all mechanics on', withMechanics(GAME_DATA, ALL_MECHANICS)],
+];
+for (const [name, data] of CONFIGS) describe(`world layout: ${name}`, () => {
+  beforeAll(() => {
+    D = data;
+  });
+  it('every edge of the walkable world is drawn (no invisible walls); every gate has an arch and a path', () => {
+    const bare = bareEdges();
+    if (bare.length) (globalThis as any).process?.stdout?.write?.(`BARE ${bare.length}\n${bare.slice(0, 60).join('\n')}\nEND\n`);
+    expect(bare).toEqual([]);
+    for (const a of D.areas) {
+      if (a.id === 'camp' || a.id === 'beaconPeak' || a.id === 'kettleYard') continue;
+      const gate = a.rects[1];
+      expect(gate, a.id).toBeDefined();
+      const d = D.dressing.find((x) => x.area === a.id)!;
+      const inGate = (x: number, z: number) => x >= gate.x0 - 1 && x <= gate.x1 + 1 && z >= gate.z0 - 1 && z <= gate.z1 + 1;
+      expect(d.landmarks.some((l) => l.prop === 'woodenArch' && inGate(l.x, l.z)), `${a.id} arch`).toBe(true);
+      expect(d.paths.some((p) => p.points.some(([x, z]) => inGate(x, z))), `${a.id} path`).toBe(true);
+    }
+  });
+
   it('has no clipping, no wall/conveyor/lane intrusions and nothing hidden behind buildings', () => {
     const bad = findProblems();
     if (bad.length) (globalThis as any).process?.stdout?.write?.(`LAYOUT ${bad.length} problems\n${bad.join('\n')}\nEND\n`);

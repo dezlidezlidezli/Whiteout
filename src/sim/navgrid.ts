@@ -97,18 +97,22 @@ export class NavGrid {
     let tail = 0;
     const ci = Math.round((tx - this.x0) / CELL);
     const cj = Math.round((tz - this.z0) / CELL);
-    const k = Math.ceil(SEED_R / CELL);
-    for (let j = cj - k; j <= cj + k; j++) {
-      for (let i = ci - k; i <= ci + k; i++) {
-        if (i < 0 || j < 0 || i >= nx || j >= nz) continue;
-        const c = j * nx + i;
-        if (!free[c]) continue;
-        const dx = (i - ci) * CELL;
-        const dz = (j - cj) * CELL;
-        if (dx * dx + dz * dz > SEED_R * SEED_R) continue;
-        dist[c] = 0;
-        queue[tail++] = c;
+    // Seed the free cells around the target; a target inside a big solid (the Hearth) seeds its rim instead.
+    for (const seedR of [SEED_R, 2.6, 4.0]) {
+      const k = Math.ceil(seedR / CELL);
+      for (let j = cj - k; j <= cj + k; j++) {
+        for (let i = ci - k; i <= ci + k; i++) {
+          if (i < 0 || j < 0 || i >= nx || j >= nz) continue;
+          const c = j * nx + i;
+          if (!free[c] || dist[c] === 0) continue;
+          const dx = (i - ci) * CELL;
+          const dz = (j - cj) * CELL;
+          if (dx * dx + dz * dz > seedR * seedR) continue;
+          dist[c] = 0;
+          queue[tail++] = c;
+        }
       }
+      if (tail > 0) break;
     }
     while (head < tail) {
       const c = queue[head++];

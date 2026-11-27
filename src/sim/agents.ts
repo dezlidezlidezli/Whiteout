@@ -3,6 +3,7 @@
 import type { CounterDef, HelperDef, ItemKind, NodeDef } from '../data/types';
 import { pushOut, steer } from './collision';
 import { courier } from './courier';
+import { crankHelper } from './crank';
 import type { Sim } from './sim';
 import type { CounterState, CustomerState, HelperState, NodeState } from './state';
 
@@ -91,8 +92,8 @@ export function updateCustomers(sim: Sim, dt: number): void {
         if (cu.path > pts.length) {
           s.customers.splice(i, 1);
           sim.addStat('thawed', 1);
-          sim.addPopulation(1);
-          sim.emit({ type: 'arrive', customer: cu.id, x: cu.x, z: cu.z, population: s.population });
+          if (sim.welcome()) sim.emit({ type: 'arrive', customer: cu.id, x: cu.x, z: cu.z, population: s.population });
+          else sim.emit({ type: 'passThrough', customer: cu.id });
         }
       }
     }
@@ -218,6 +219,7 @@ export function updateHelpers(sim: Sim, dt: number): void {
     if (def.role === 'haul') haul(sim, def, h, dt);
     else if (def.role === 'harvest') harvest(sim, def, h, dt);
     else if (def.role === 'courier') courier(sim, def, h, dt);
+    else if (def.role === 'crank') crankHelper(sim, def, h, dt);
     else operate(sim, def, h, dt);
   }
 }

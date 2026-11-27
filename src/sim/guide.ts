@@ -2,7 +2,11 @@
 // so "the arrow always leads somewhere useful" is tested headlessly.
 
 import type { CounterDef, ItemKind, NodeDef, PadDef, ProcessorDef, StationDef } from '../data/types';
+import { crankActive } from './crank';
 import { orderRoom } from './endless';
+import { beaconReady, flameSources, nextTrail } from './flame';
+import { deepSnowZones, forEachDeepCell } from './plough';
+import { diggable, glowRadius } from './rescue';
 import type { Sim } from './sim';
 import type { CounterState, NodeState, ProcState } from './state';
 
@@ -10,7 +14,8 @@ export interface GuideTarget {
   x: number;
   z: number;
   id: string;
-  kind: 'station' | 'pad' | 'node' | 'embers';
+  /** 'spot' = a point that is not an object (a ring position, a cell to plough, a step aside). */
+  kind: 'station' | 'pad' | 'node' | 'embers' | 'spot';
   /** How close counts as "there" (metres from x/z). */
   reach: number;
 }
@@ -24,6 +29,12 @@ export function computeGuide(sim: Sim): GuideTarget | null {
   const q = sim.data.quests[s.quest.index];
   if (!q) return null;
   const g = q.guide ?? (q.goal.type === 'pad' ? undefined : { type: 'earn' as const });
+  // Holding the flame when the goal doesn't need it (both hands are busy): set it down at the nearest source.
+  const needsFlame = g?.type === 'flame' || ((g?.type === 'orders' || g?.type === 'openSeason') && s.orders.some((o) => o.festival));
+  if (s.flame.held && !needsFlame) {
+    const src = flameSources(sim).reduce((a, b) => (dist(sim, b.x, b.z) < dist(sim, a.x, a.z) ? b : a));
+    return spot(src.x, src.z, `flame:${src.id}`, src.id === 'hearth' ? 1.9 : 0.9);
+  }
   const wanted = wantedItems(sim, q.goal.type === 'pad' && !q.guide ? { pad: q.goal.pad } : g);
   // Carrying goods an Open Season order wants: hand those in first (that frees the pack) instead of unloading junk.
   const handIn = (g?.type === 'orders' || g?.type === 'openSeason') && s.player.stack.some((it) => orderRoom(sim, it) > 0);
@@ -63,6 +74,16 @@ function baseGuide(sim: Sim, g: import('../data/types').QuestGuide): GuideTarget
       return ordersGuide(sim) ?? earn(sim);
     case 'openSeason':
       return openSeasonGuide(sim);
+    case 'plough':
+      return ploughGuide(sim, g.zone);
+    case 'rescue':
+      return rescueGuide(sim);
+    case 'skate':
+      return skateGuide(sim);
+    case 'crank':
+      return crankGuide(sim, g.id);
+    case 'flame':
+      return flameGuide(sim, g.target);
     default:
       return null;
   }
@@ -74,7 +95,12 @@ function baseGuide(sim: Sim, g: import('../data/types').QuestGuide): GuideTarget
 function ordersGuide(sim: Sim): GuideTarget | null {
   const s = sim.state;
   const board = sim.stationDefs.get(sim.data.endless.board);
-  const open = s.orders.filter((o) => o.got < o.n);
+  // Lantern Festival: carry a flame round the festival lamps (when the hands are free, or already holding it).
+  if (s.orders.some((o) => o.festival) && (s.flame.held || s.player.stack.length === 0 || s.orders.every((o) => o.festival))) {
+    const f = flameGuide(sim, 'festival');
+    if (f) return f;
+  }
+  const open = s.orders.filter((o) => o.got < o.n && !o.festival);
   if (!board || open.length === 0) return null;
   const dest = stTarget(board);
   for (const o of open) if (carrying(sim, o.item) > 0) return deliver(sim, o.item, dest);
@@ -172,6 +198,12 @@ function wantedItems(sim: Sim, g: import('../data/types').QuestGuide | { pad: st
     case 'harvest':
       for (const d of sim.data.stations) if (d.type === 'node' && d.tag === g.tag) addUp(d.item, 0);
       return out;
+    case 'plough':
+    case 'rescue':
+    case 'skate':
+    case 'crank':
+    case 'flame':
+      return null;
     case 'orders':
     case 'openSeason':
       if (sim.state.orders.length === 0) return earnItems(sim, addUp, out);
@@ -288,7 +320,7 @@ function leaveZone(sim: Sim, d: StationDef): Dest {
   dx /= l;
   dz /= l;
   const r = d.reach + 1.2;
-  return { x: d.x + dx * r, z: d.z + dz * r, id: `leave:${d.id}`, kind: 'station', reach: 0.5 };
+  return { x: d.x + dx * r, z: d.z + dz * r, id: `leave:${d.id}`, kind: 'spot', reach: 0.5 };
 }
 
 function stTarget(d: StationDef): Dest {
@@ -518,4 +550,183 @@ function earn(sim: Sim): GuideTarget | null {
   const dest = nearestDest(sim, best.item, counters);
   if (!dest) return null;
   return deliver(sim, best.item, dest);
+}
+
+// ------------------------------------------------------------------ signature mechanics
+
+const spot = (x: number, z: number, id: string, reach: number): GuideTarget => ({ x, z, id, kind: 'spot', reach });
+
+/** Plough: the nearest still-deep cell of the zone (the swath clears around the player). */
+function ploughGuide(sim: Sim, zone: string): GuideTarget | null {
+  if (sim.state.plough.tier <= 0) return padGuide(sim, 'pad_plough');
+  const z = deepSnowZones(sim).find((d) => d.id === zone);
+  if (!z || !z.open || z.cleared >= z.total) return earn(sim);
+  let best: GuideTarget | null = null;
+  let bd = Infinity;
+  forEachDeepCell(sim, zone, (x, cz) => {
+    const d = dist(sim, x, cz);
+    if (d < bd) {
+      bd = d;
+      best = spot(x, cz, `snow:${zone}`, 0.3);
+    }
+  });
+  return best ?? earn(sim);
+}
+
+/** Warmth to lead followers into: the Hearth's warm radius, or a lit brazier. */
+function nearestWarmth(sim: Sim): GuideTarget {
+  const h = sim.data.camp.hearth;
+  let best = spot(h.x, h.z, 'warm:hearth', Math.max(1.5, sim.warmRadius() - 4));
+  let bd = dist(sim, h.x, h.z) - best.reach;
+  const st = sim.state.flame;
+  for (const b of sim.data.mech.braziers) {
+    if (!st.lit[b.id] || !sim.state.areasOpen[b.area]) continue;
+    const d = dist(sim, b.x, b.z) - 1.2;
+    if (d < bd) {
+      bd = d;
+      best = spot(b.x, b.z, `warm:${b.id}`, 1.2);
+    }
+  }
+  return best;
+}
+
+/** Rescue: dig out the nearest lost villager, lead the conga line into warmth, fetch anyone left waiting. */
+function rescueGuide(sim: Sim): GuideTarget | null {
+  const r = sim.state.rescue;
+  if (r.lantern <= 0) return padGuide(sim, 'pad_lantern');
+  if (r.followers.length > 0) return nearestWarmth(sim);
+  let best: GuideTarget | null = null;
+  let bd = Infinity;
+  for (const id in r.status) {
+    if (r.status[id] !== 'waiting') continue;
+    const q = r.pos[id];
+    const d = dist(sim, q.x, q.z);
+    if (d < bd) {
+      bd = d;
+      best = spot(q.x, q.z, `lost:${id}`, glowRadius(sim) * 0.5);
+    }
+  }
+  if (best) return best;
+  for (const v of sim.data.mech.villagers) {
+    if (!diggable(sim, v)) continue;
+    const d = dist(sim, v.x, v.z);
+    if (d < bd) {
+      bd = d;
+      best = spot(v.x, v.z, `lost:${v.id}`, 0.8);
+    }
+  }
+  if (best) return best;
+  // Some are still under deep snow: plough them out.
+  for (const z of deepSnowZones(sim)) if (z.open && z.cleared < z.total) return ploughGuide(sim, z.id);
+  return earn(sim);
+}
+
+/** Skate: chase a fish leap, else build speed along the open ice lane. */
+function skateGuide(sim: Sim): GuideTarget | null {
+  const st = sim.state.skate;
+  // A leaping fish needs room in the pack.
+  if (full(sim)) return emptyHands(sim) ?? earn(sim);
+  let best: GuideTarget | null = null;
+  let bd = Infinity;
+  for (const l of st.leaps) {
+    const d = dist(sim, l.x, l.z);
+    if (d < bd) {
+      bd = d;
+      best = spot(l.x, l.z, `leap:${l.id}`, 0.4);
+    }
+  }
+  if (best) return best;
+  // Glide end to end along the lane: keep heading the way we're going, turn round near an end.
+  const lane = sim.data.mech.skateLane;
+  const p = sim.state.player;
+  const a = lane[0];
+  const b = lane[1];
+  const da = dist(sim, a.x, a.z);
+  const db = dist(sim, b.x, b.z);
+  let toA = da > db;
+  if (Math.hypot(p.vx, p.vz) > 1 && da > 1.5 && db > 1.5) toA = (a.x - p.x) * p.vx + (a.z - p.z) * p.vz > 0;
+  return toA ? spot(a.x, a.z, 'ice:a', 0.8) : spot(b.x, b.z, 'ice:b', 0.8);
+}
+
+/** Crank: step onto the ring, then keep walking round it. */
+function crankGuide(sim: Sim, id: string): GuideTarget | null {
+  const c = sim.data.mech.cranks.find((k) => k.id === id);
+  if (!c) return null;
+  if (!crankActive(sim, c)) return padGuide(sim, c.use === 'bellows' ? 'pad_bellows' : 'pad_mineLift');
+  const p = sim.state.player;
+  const R = (c.inner + c.outer) / 2;
+  const a = Math.atan2(p.z - c.z, p.x - c.x);
+  const d = Math.hypot(p.x - c.x, p.z - c.z);
+  if (d < c.inner + 0.15 || d > c.outer - 0.15) return spot(c.x + Math.cos(a) * R, c.z + Math.sin(a) * R, `ring:${id}`, 0.3);
+  return spot(c.x + Math.cos(a + 0.9) * R, c.z + Math.sin(a + 0.9) * R, `ring:${id}`, 0.2);
+}
+
+/** Empty the hands (the flame needs both): put each item where it is used, on a pad that needs it, back where
+ * it came from (with a full pack), and only for things nothing wants right now, in the bin. */
+function emptyHands(sim: Sim): GuideTarget | null {
+  const p = sim.state.player;
+  for (let i = p.stack.length - 1; i >= 0; i--) {
+    const it = p.stack[i];
+    let best: StationDef | null = null;
+    let bd = Infinity;
+    for (const d of sim.data.stations) {
+      if (!sim.isUsable(d.id) || d.type === 'pile' || d.type === 'node' || d.type === 'shelf' || sim.room(d.id, it) <= 0) continue;
+      const dd = dist(sim, d.x, d.z);
+      if (dd < bd) {
+        bd = dd;
+        best = d;
+      }
+    }
+    if (best) return stTarget(best);
+    for (const def of sim.data.pads) {
+      const ps = sim.state.pads[def.id];
+      if (!ps.visible || ps.done || sim.padLocked(def.id) || (sim.padRemaining(def.id).mats[it] ?? 0) <= 0) continue;
+      return { x: def.x, z: def.z, id: def.id, kind: 'pad', reach: 0.5 };
+    }
+  }
+  if (full(sim)) {
+    const j = unloadJunk(sim, new Set(), true);
+    if (j) return j;
+  }
+  let bin: StationDef | null = null;
+  for (const d of sim.data.stations) if (d.type === 'shelf' && sim.isUsable(d.id) && (!bin || dist(sim, d.x, d.z) < dist(sim, bin.x, bin.z))) bin = d;
+  return bin ? stTarget(bin) : null;
+}
+
+/** Carry the flame: take it up at the source nearest the goal, restore it when low, light the next target. */
+function flameGuide(sim: Sim, target: 'trail' | 'beacon' | 'festival'): GuideTarget | null {
+  const st = sim.state.flame;
+  const m = sim.data.mech;
+  let goal: { x: number; z: number; id: string; reach: number } | null = null;
+  if (target === 'beacon' && beaconReady(sim)) goal = { x: m.beacon.x, z: m.beacon.z, id: 'beacon', reach: m.beacon.reach - 0.6 };
+  else if (target === 'festival') {
+    let bd = Infinity;
+    for (const l of m.festivalLamps) {
+      if (st.lamps[l.id]) continue;
+      const d = dist(sim, l.x, l.z);
+      if (d < bd) {
+        bd = d;
+        goal = { x: l.x, z: l.z, id: l.id, reach: 0.8 };
+      }
+    }
+  }
+  if (!goal) {
+    const n = nextTrail(sim);
+    if (n && sim.state.areasOpen[n.area]) goal = { x: n.x, z: n.z, id: n.id, reach: 0.9 };
+  }
+  if (!goal) return target === 'beacon' ? null : earn(sim);
+  const srcs = flameSources(sim);
+  const nearGoal = (g: { x: number; z: number }) => srcs.reduce((a, b) => (Math.hypot(b.x - g.x, b.z - g.z) < Math.hypot(a.x - g.x, a.z - g.z) ? b : a));
+  const toSource = (s: { id: string; x: number; z: number }) => spot(s.x, s.z, `flame:${s.id}`, s.id === 'hearth' ? 1.9 : 0.9);
+  if (!st.held) {
+    if (sim.state.player.stack.length > 0) return emptyHands(sim) ?? earn(sim);
+    return toSource(nearGoal(goal));
+  }
+  // Holding it: will it last to the goal? If not, restore at the nearest source first.
+  const budget = st.level * m.flameLife * sim.data.balance.playerSpeed * 0.7;
+  if (dist(sim, goal.x, goal.z) > budget) {
+    const s = srcs.reduce((a, b) => (dist(sim, b.x, b.z) < dist(sim, a.x, a.z) ? b : a));
+    if (dist(sim, s.x, s.z) > 2.0) return toSource(s);
+  }
+  return spot(goal.x, goal.z, `light:${goal.id}`, goal.reach);
 }

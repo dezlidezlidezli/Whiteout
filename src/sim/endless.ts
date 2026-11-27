@@ -28,6 +28,13 @@ export function fillOrders(sim: Sim): void {
 function drawOrder(sim: Sim): OrderState | null {
   const s = sim.state;
   const e = sim.data.endless;
+  // Lantern Festival: light the festival lamps around the camp with a carried flame (one at a time).
+  if (!s.orders.some((o) => o.festival) && sim.data.mech.festivalLamps.length && sim.rand() < 0.25) {
+    s.flame.lamps = {};
+    const lv = s.season - 1;
+    const lamps = sim.data.mech.festivalLamps.length;
+    return { id: s.nextOrderId++, item: 'fish', n: lamps, got: 0, reward: Math.round(sim.data.mech.festivalReward * (1 + e.seasonValue * lv)), festival: true };
+  }
   const open = new Set(s.orders.map((o) => o.item));
   const pool = e.orders.filter((k) => !open.has(k.item));
   if (pool.length === 0) return null;
@@ -53,19 +60,39 @@ function drawOrder(sim: Sim): OrderState | null {
 export function orderRoom(sim: Sim, item: ItemKind): number {
   if (!openSeasonActive(sim)) return 0;
   let n = 0;
-  for (const o of sim.state.orders) if (o.item === item) n += o.n - o.got;
+  for (const o of sim.state.orders) if (o.item === item && !o.festival) n += o.n - o.got;
   return n;
 }
 
 /** One item handed in at the board. */
 export function deliverOrder(sim: Sim, item: ItemKind): void {
   const s = sim.state;
-  const i = s.orders.findIndex((o) => o.item === item && o.got < o.n);
+  const i = s.orders.findIndex((o) => o.item === item && !o.festival && o.got < o.n);
   if (i < 0) return;
   const o = s.orders[i];
   o.got++;
   sim.emit({ type: 'orderProgress', order: o.id, got: o.got, n: o.n });
   if (o.got < o.n) return;
+  completeOrder(sim, i);
+}
+
+/** A festival lamp was lit with the carried flame. */
+export function festivalLampLit(sim: Sim): void {
+  const s = sim.state;
+  const i = s.orders.findIndex((o) => o.festival);
+  if (i < 0) return;
+  const o = s.orders[i];
+  o.got = Math.min(o.n, o.got + 1);
+  sim.emit({ type: 'orderProgress', order: o.id, got: o.got, n: o.n });
+  if (o.got >= o.n) {
+    s.flame.lamps = {};
+    completeOrder(sim, i);
+  }
+}
+
+function completeOrder(sim: Sim, i: number): void {
+  const s = sim.state;
+  const o = s.orders[i];
   s.orders.splice(i, 1);
   sim.addStat('ordersDone', 1);
   const board = sim.stationDefs.get(sim.data.endless.board)!;

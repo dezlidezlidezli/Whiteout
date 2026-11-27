@@ -1,7 +1,10 @@
 // Small random perturbations of the world (tent plots dropped, decor solids removed or nudged) used to prove
 // the campaign never depends on one exact layout (a stall under a tiny change means a real player can stall).
 
-import { GAME_DATA, type GameData } from '../src/data';
+import { ALL_MECHANICS, GAME_DATA as SHIPPED_DATA, withMechanics, type GameData } from '../src/data';
+
+/** Every signature mechanic on (the shipped data has them off until the view draws them). */
+const GAME_DATA = withMechanics(SHIPPED_DATA, ALL_MECHANICS);
 
 export function perturbed(seed: number): GameData {
   let r = (seed * 2654435761) >>> 0 || 1;
