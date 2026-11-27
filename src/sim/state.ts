@@ -257,6 +257,14 @@ export function normalizeState(s: SimState, data: GameData): void {
   for (const l of data.links) if (!s.links[l.id]) s.links[l.id] = { t: 0, belt: [] };
   for (const a of data.areas) if (a.hearth <= s.hearth.level) s.areasOpen[a.id as AreaId] = true;
   s.mods = { ...DEFAULT_MODS, ...s.mods };
+  // A save from an older layout may leave the player where a wall or building now stands:
+  // put them back at the start point (set by the migration that changed the layout).
+  if ((s as { relocatePlayer?: boolean }).relocatePlayer) {
+    s.player.x = s.player.px = data.playerStart.x;
+    s.player.z = s.player.pz = data.playerStart.z;
+    s.player.vx = s.player.vz = 0;
+    delete (s as { relocatePlayer?: boolean }).relocatePlayer;
+  }
   s.stats = s.stats ?? {};
   s.guideUnload = !!s.guideUnload;
   s.player.returning = s.player.returning ?? null;

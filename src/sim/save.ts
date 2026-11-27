@@ -10,6 +10,7 @@ const MIGRATIONS: Record<number, (s: any) => any> = {
   1: (s) => ({
     ...s,
     version: 2,
+    relocatePlayer: true, // the world layout changed in v2 (compact walled yards)
     quest: { ...s.quest, id: V1_QUEST_IDS[s.quest?.index] === 'q_more' ? 'q_lakefish' : V1_QUEST_IDS[s.quest?.index] },
     beacon: 0,
     finale: { phase: 'none', t: 0, progress: 0 },
