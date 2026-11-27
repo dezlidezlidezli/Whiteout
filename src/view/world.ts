@@ -7,6 +7,7 @@ import type { DecorDef, GameData, ItemKind, StationDef } from '../data/types';
 import type { NodeState, Sim } from '../sim';
 import { PropInstancer, trs } from './instancer';
 import { createProp } from './models';
+import { makeSeeThrough } from './occlude';
 
 export interface StationView {
   def: StationDef;
@@ -215,27 +216,18 @@ export class WorldView {
       this.walls.push({ id: w.id, area: w.area, inst, pieces, state: 'up', t: 0 });
     }
 
-    // ---- conveyors
-    for (const l of data.links) {
-      const segs: { x: number; z: number; rot: number }[] = [];
-      for (let i = 0; i < l.path.length - 1; i++) {
-        const a = l.path[i];
-        const b = l.path[i + 1];
-        const len = Math.hypot(b.x - a.x, b.z - a.z);
-        const n = Math.max(1, Math.round(len / 1.0));
-        const rot = Math.atan2(b.x - a.x, b.z - a.z);
-        for (let k = 0; k < n; k++) {
-          const t = (k + 0.5) / n;
-          segs.push({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, rot });
-        }
-      }
-      const inst = new PropInstancer(this.root, 'conveyor', { seed: 1 }, segs.length);
-      segs.forEach((s, i) => inst.set(i, trs(_m, s.x, 0, s.z, s.rot, 1)));
-      inst.commit();
-      inst.setVisible(false);
-      this.beltInst.set(l.id, inst);
-      (inst as unknown as { segs: typeof segs }).segs = segs;
+    // Conveyors are drawn by ConveyorView (one continuous curved belt per link).
+    // Spare shelves: a teal "put things here" mat, distinct from the warm pads.
+    for (const d of data.stations) {
+      if (d.type !== 'shelf') continue;
+      const mat = makeShelfMat();
+      mat.position.set(d.x, 0.035, d.z);
+      mat.rotation.y = d.rot ?? 0;
+      this.root.add(mat);
     }
+
+    // Everything that can stand between the camera and the player dissolves around them.
+    makeSeeThrough(this.root);
   }
 
   /** Apply the current sim state instantly (on load). */
@@ -274,6 +266,7 @@ export class WorldView {
     this.hearthObj = createProp('hearth', { level });
     this.hearthObj.position.set(hd.def.x, 0, hd.def.z);
     this.root.add(this.hearthObj);
+    makeSeeThrough(this.hearthObj);
     hd.obj = this.hearthObj;
     this.hearthParts = findParts(this.hearthObj);
     hd.top = Math.max(0.8, new THREE.Box3().setFromObject(this.hearthObj).max.y);
@@ -320,9 +313,13 @@ export class WorldView {
   private updateGhosts(sim: Sim, time: number): void {
     const pending = this.pendingBuf;
     pending.clear();
+    // Preview a pad's building only while the player is close to that pad, so the translucent
+    // ghost never sits over neighbours the rest of the time.
+    const pl = sim.state.player;
     for (const p of this.data.pads) {
       const ps = sim.state.pads[p.id];
       if (!ps.visible || ps.done) continue;
+      if (Math.hypot(p.x - pl.x, p.z - pl.z) > 4.5) continue;
       for (const e of p.effects) if (e.type === 'unlock') pending.add(e.id);
     }
     for (const v of this.stations.values()) {
@@ -562,6 +559,7 @@ export class WorldView {
       const cur = (v.obj.userData.fkLevel as number | undefined) ?? -1;
       if (cur === lvl) continue;
       const next = createProp(v.def.model, { seed: hashId(v.def.id), level: lvl });
+      makeSeeThrough(next);
       next.position.copy(v.obj.position);
       next.rotation.copy(v.obj.rotation);
       next.visible = v.obj.visible;
@@ -603,6 +601,12 @@ export class WorldView {
     if (marker) {
       marker.getWorldPosition(out);
       if (d.type === 'processor') out.y = 0;
+      if (d.type === 'counter') {
+        // Front lip of the counter (queue side), clear of the awning behind it.
+        const r = d.rot ?? 0;
+        out.x += Math.sin(r) * 0.28;
+        out.z += Math.cos(r) * 0.28;
+      }
       return out;
     }
     const l = localSpot(d, item, role, v.top);
@@ -660,6 +664,46 @@ function distToPlay(data: GameData, x: number, z: number): number {
     }
   }
   return best;
+}
+
+let shelfTex: THREE.CanvasTexture | null = null;
+function makeShelfMat(): THREE.Mesh {
+  if (!shelfTex) {
+    const c = document.createElement('canvas');
+    c.width = 256;
+    c.height = 192;
+    const g = c.getContext('2d')!;
+    g.fillStyle = 'rgba(40,120,120,0.22)';
+    g.beginPath();
+    g.roundRect(8, 8, 240, 176, 34);
+    g.fill();
+    g.setLineDash([22, 14]);
+    g.lineWidth = 9;
+    g.strokeStyle = 'rgba(120,230,215,0.9)';
+    g.stroke();
+    g.setLineDash([]);
+    // Icon: a little stack with a down arrow ("set things down here").
+    g.fillStyle = 'rgba(200,255,245,0.9)';
+    g.fillRect(28, 128, 44, 12);
+    g.fillRect(32, 114, 36, 12);
+    g.beginPath();
+    g.moveTo(50, 70);
+    g.lineTo(50, 100);
+    g.moveTo(38, 90);
+    g.lineTo(50, 104);
+    g.lineTo(62, 90);
+    g.lineWidth = 7;
+    g.strokeStyle = 'rgba(200,255,245,0.9)';
+    g.stroke();
+    shelfTex = new THREE.CanvasTexture(c);
+    shelfTex.colorSpace = THREE.SRGBColorSpace;
+  }
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.5, 1.85).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ map: shelfTex, transparent: true, depthWrite: false, toneMapped: false }),
+  );
+  m.renderOrder = 2;
+  return m;
 }
 
 export function backOut(t: number): number {

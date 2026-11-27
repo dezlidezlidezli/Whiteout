@@ -7,7 +7,8 @@ import type { GameData } from '../data/types';
 import type { CustomerState, Sim } from '../sim';
 import { FROZEN_TINTS, getCrowdMesh, PALETTE } from './models';
 
-const COATS = [0xd9534f, 0xe8a33d, 0x4f9d69, 0x3f7cc4, 0x9a5fb5, 0xe0784e, 0x2f9c9c, 0xc94f7c, 0x7a8f3a, 0xb8643a];
+// Warm, saturated coats only: a thawed villager must never read as still icy.
+const COATS = [0xd9534f, 0xe8a33d, 0x4f9d4a, 0xc9502e, 0x9a5fb5, 0xe0784e, 0xd4b13a, 0xc94f7c, 0x7a8f3a, 0xb8643a];
 const ICE = new THREE.Color(PALETTE.ice);
 
 interface Villager {

@@ -60,6 +60,16 @@ function assert(cond, msg) {
   assert(await page.evaluate(() => !document.querySelector('.fk-title:not(.fk-leave)')), 'Begin leaves the title');
   await shot('01-start');
 
+  // ---- the guide arrow points TOWARDS the target (tip nearer the next waypoint than the tail)
+  await fk(() => __fk.cheat.teleport(2.5, 9));
+  await page.waitForTimeout(1500);
+  const ar = await fk(() => __fk.view.arrowInfo());
+  if (ar.next && ar.visible) {
+    const dTip = Math.hypot(ar.tip.x - ar.next.x, ar.tip.z - ar.next.z);
+    const dTail = Math.hypot(ar.tail.x - ar.next.x, ar.tail.z - ar.next.z);
+    assert(dTip < dTail, 'guide arrow points towards its target (tip ' + dTip.toFixed(2) + ' < tail ' + dTail.toFixed(2) + ')');
+  } else assert(false, 'guide arrow visible with a target (' + JSON.stringify(ar) + ')');
+
   // ---- joystick under real touch events
   let a = await pos();
   await touch('touchStart', [[200, 600, 1]]);

@@ -222,7 +222,8 @@ export class Hud {
       const frac = q.max > 0 ? q.cur / q.max : 0;
       this.qBar.style.width = `${Math.round(frac * 100)}%`;
       this.qBar.parentElement!.style.display = q.final ? 'none' : '';
-      this.qNum.textContent = q.final || q.max <= 1 ? '' : q.max > 60 ? `${Math.round(frac * 100)}%` : `${q.cur}/${q.max}`;
+      const amt = q.final ? '' : questAmount(sim, q);
+      this.qNum.innerHTML = amt.startsWith('@') ? `<span class="fk-qe">${ICON_EMBER}</span>${amt.slice(1)}` : amt;
       this.qIco.innerHTML = frac >= 1 ? ICON_CHECK : ICON_FLAG;
       this.quest.classList.toggle('fk-done', frac >= 1);
       if (newQuest) {
@@ -264,6 +265,25 @@ export class Hud {
       f.el.style.visibility = p.on ? 'visible' : 'hidden';
     }
   }
+}
+
+/** Consistent units on the quest chip: what is still needed ("120 embers to go", "3/5"). */
+function questAmount(sim: Sim, q: { id: string; cur: number; max: number }): string {
+  const def = sim.data.quests.find((x) => x.id === q.id);
+  const g = def?.goal;
+  if (g && g.type === 'pad') {
+    const rem = sim.padRemaining(g.pad);
+    const mats = Object.entries(rem.mats).filter(([, n]) => (n ?? 0) > 0);
+    if (rem.embers > 0) return `@${fmt(rem.embers)}`;
+    if (mats.length) {
+      const [k, n] = mats[0];
+      const name = sim.data.items[k as keyof typeof sim.data.items]?.name.toLowerCase() ?? k;
+      return `${n} ${name}${(n ?? 0) > 1 && !name.endsWith('s') ? 's' : ''}`;
+    }
+    return '';
+  }
+  if (q.max <= 1) return '';
+  return `${fmt(Math.min(q.cur, q.max))}/${fmt(q.max)}`;
 }
 
 function fmt(n: number): string {

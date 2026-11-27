@@ -79,6 +79,7 @@ interface HelperView {
   top: THREE.Vector3;
   appear: number;
   speed: number;
+  line: FishLine;
 }
 
 export class Actors {
@@ -88,6 +89,7 @@ export class Actors {
   private playerYaw = Math.PI;
   private animSpeed = 0;
   private helpers = new Map<string, HelperView>();
+  private fishLines: FishLine[];
   private parent: THREE.Object3D;
   private data: GameData;
   /** Items currently mid-air towards a stack (hidden from its top). */
@@ -99,6 +101,7 @@ export class Actors {
     this.data = data;
     this.player = createCharacter('player');
     parent.add(this.player.root);
+    this.fishLines = [new FishLine(parent)];
   }
 
   helperTop(id: string): THREE.Vector3 | null {
@@ -113,7 +116,7 @@ export class Actors {
       const rig = createCharacter(role, { seed: id.length });
       rig.root.position.set(h.x, 0, h.z);
       this.parent.add(rig.root);
-      v = { rig, spring: new StackSpring(), yaw: h.facing, top: new THREE.Vector3(h.x, 1.5, h.z), appear: 0, speed: 0 };
+      v = { rig, spring: new StackSpring(), yaw: h.facing, top: new THREE.Vector3(h.x, 1.5, h.z), appear: 0, speed: 0, line: new FishLine(this.parent) };
       this.helpers.set(id, v);
     }
     return v;
@@ -133,7 +136,9 @@ export class Actors {
     r.position.set(x, 0, z);
     r.rotation.y = this.playerYaw;
     this.cheerT = Math.max(0, this.cheerT - dt);
-    const action = p.working ? 'chop' : this.cheerT > 0 && speed < 0.5 ? 'cheer' : 'none';
+    const workDef = p.working ? sim.stationDefs.get(p.working) : undefined;
+    const action = workDef ? nodeAction(workDef.model) : this.cheerT > 0 && speed < 0.5 ? 'cheer' : 'none';
+    this.fishLines[0].update(action === 'fish' && workDef ? workDef : null, this.player.root, time);
     animateCharacter(this.player, { time, speed, carrying: p.stack.length > 0, action });
     r.updateMatrixWorld(true);
     this.playerSpring.update(dt, p.vx, p.vz, this.playerYaw, p.stack.length);
@@ -153,7 +158,10 @@ export class Actors {
       v.appear = Math.min(1, v.appear + dt / 0.5);
       const sc = v.appear < 1 ? 0.2 + 0.8 * (1 + 2.2 * Math.pow(v.appear - 1, 3) + 1.2 * Math.pow(v.appear - 1, 2)) : 1;
       v.rig.root.scale.setScalar(sc);
-      animateCharacter(v.rig, { time: time + id.length, speed: hs, carrying: h.stack.length > 0, action: h.action });
+      const hTarget = h.target ? sim.stationDefs.get(h.target) : undefined;
+      const hAction = h.action === 'chop' && hTarget && hTarget.type === 'node' ? nodeAction(hTarget.model) : h.action;
+      animateCharacter(v.rig, { time: time + id.length, speed: hs, carrying: h.stack.length > 0, action: hAction });
+      v.line.update(hAction === 'fish' && hTarget ? hTarget : null, v.rig.root, time);
       v.rig.root.updateMatrixWorld(true);
       v.spring.update(dt, h.moving ? Math.sin(v.yaw) * hs : 0, h.moving ? Math.cos(v.yaw) * hs : 0, v.yaw, h.stack.length);
       drawStack(items, h.stack, this.hidden.get(`helper:${id}`) ?? 0, v.rig.carryAnchor, v.yaw, v.spring, time, v.top);
@@ -162,8 +170,60 @@ export class Actors {
 
   /** Reset everything (load). */
   reset(): void {
-    for (const v of this.helpers.values()) v.rig.root.removeFromParent();
+    for (const v of this.helpers.values()) {
+      v.rig.root.removeFromParent();
+      v.line.dispose();
+    }
     this.helpers.clear();
     this.hidden.clear();
+  }
+}
+
+/** Which work animation a harvest node calls for. */
+export function nodeAction(model: string): 'chop' | 'mine' | 'fish' {
+  if (/ice|hole|lake|fish|water/i.test(model)) return 'fish';
+  if (/ore|vein|rock|stone/i.test(model)) return 'mine';
+  return 'chop';
+}
+
+const _h = new THREE.Vector3();
+
+/** A fishing line from the angler's hands to a bobbing float in the ice hole. */
+class FishLine {
+  private line: THREE.Line;
+  private bob: THREE.Mesh;
+  private pos = new Float32Array(9);
+
+  constructor(private parent: THREE.Object3D) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
+    this.line = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0xf4f0e6, transparent: true, opacity: 0.8 }));
+    this.line.frustumCulled = false;
+    this.bob = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6), new THREE.MeshLambertMaterial({ color: 0xff5a3a, emissive: 0x401008 }));
+    this.line.visible = this.bob.visible = false;
+    parent.add(this.line, this.bob);
+  }
+
+  update(node: { x: number; z: number } | null, angler: THREE.Object3D, time: number): void {
+    const on = !!node;
+    this.line.visible = this.bob.visible = on;
+    if (!node) return;
+    // Rod tip: in front of the angler at shoulder height.
+    angler.updateMatrixWorld();
+    _h.set(0.15, 1.45, 0.55).applyMatrix4(angler.matrixWorld);
+    const bx = node.x + Math.sin(time * 1.3) * 0.08;
+    const bz = node.z + Math.cos(time * 1.1) * 0.08;
+    const by = 0.12 + Math.abs(Math.sin(time * 3.1)) * 0.05 - (Math.sin(time * 0.7) > 0.93 ? 0.08 : 0);
+    this.bob.position.set(bx, by, bz);
+    const p = this.pos;
+    p[0] = _h.x; p[1] = _h.y; p[2] = _h.z;
+    p[3] = (_h.x + bx) / 2; p[4] = Math.max(by, _h.y * 0.55); p[5] = (_h.z + bz) / 2;
+    p[6] = bx; p[7] = by + 0.05; p[8] = bz;
+    (this.line.geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+  }
+
+  dispose(): void {
+    this.line.removeFromParent();
+    this.bob.removeFromParent();
   }
 }

@@ -145,7 +145,8 @@
   background: linear-gradient(90deg, #ff8a3a, #ffc04a);
   transition: width 0.25s;
 }
-.fk-quest .fk-qnum { font-size: 16px; color: #7a4a24; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fk-quest .fk-qnum { font-size: 16px; color: #7a4a24; font-variant-numeric: tabular-nums; white-space: nowrap; display: inline-flex; align-items: center; gap: 2px; }
+.fk-quest .fk-qe { width: 18px; height: 18px; display: inline-block; }
 .fk-quest.fk-pop-in { transform: translateX(-50%) scale(1.08); }
 
 /* Toasts */

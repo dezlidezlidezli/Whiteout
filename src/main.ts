@@ -13,6 +13,7 @@ import { DebugOverlay } from './ui/debug';
 import { FrameStats } from './platform/perf';
 import { View } from './view/view';
 import * as THREE from 'three';
+import { createLatePresentation } from './view/late'; // LATE-GAME HOOK
 
 const params = new URLSearchParams(location.search);
 const seedParam = params.get('seed');
@@ -27,23 +28,53 @@ const uiRoot = (document.getElementById('ui') as HTMLDivElement | null) ?? docum
 const store = new SaveStore(seedParam ? `seed${seedParam}` : 'main');
 const seed = seedParam ? Number(seedParam) || 1 : 1 + Math.floor(Math.random() * 1e6);
 
+/**
+ * Load a save and prove it actually runs: a probe copy is stepped and queried inside try/catch.
+ * Throws a friendly message (never raw JS error text) when the save cannot be used.
+ */
+function loadChecked(json: string): Sim {
+  let probe: Sim;
+  try {
+    probe = new Sim(GAME_DATA, { save: json });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : '';
+    throw new Error(/newer version/i.test(msg) ? 'that save is from a newer version of the game' : "that doesn't look like a Frostkettle save");
+  }
+  try {
+    for (let i = 0; i < 30; i++) probe.step(STEP);
+    probe.drainEvents();
+    probe.questProgress();
+    probe.guide();
+    probe.serialize();
+  } catch {
+    throw new Error('that save is damaged and cannot be played');
+  }
+  return new Sim(GAME_DATA, { save: json });
+}
+
+/** Saves that failed the boot check are kept here (never destroyed). */
+let bootNotice: string | null = null;
+
 function createSim(): Sim {
   if (!fresh) {
     const saved = store.read();
     if (saved) {
       try {
-        return new Sim(GAME_DATA, { save: saved });
+        return loadChecked(saved);
       } catch (err) {
-        console.warn('Frostkettle: save unreadable, trying backup', err);
+        console.warn('Frostkettle: save unusable, trying backup', err);
         const bak = store.readBackup();
         if (bak && bak !== saved) {
           try {
-            return new Sim(GAME_DATA, { save: bak });
+            const s = loadChecked(bak);
+            bootNotice = 'Your last save was damaged, so we loaded the one before it.';
+            return s;
           } catch {
             /* fall through */
           }
         }
         store.quarantine();
+        bootNotice = "Your save couldn't be loaded, so a new game started. The old save is kept safe.";
       }
     }
   }
@@ -89,17 +120,30 @@ const hud = new Hud(uiRoot, {
   },
   exportCode: () => encodeSaveCode(sim.serialize()),
   importCode: (code) => {
+    let json: string;
     try {
-      const json = decodeSaveCode(code);
-      const next = new Sim(GAME_DATA, { save: json });
-      save();
+      json = decodeSaveCode(code);
+    } catch {
+      return "that code isn't complete. Copy the whole thing and try again";
+    }
+    let next: Sim;
+    try {
+      next = loadChecked(json);
+    } catch (e) {
+      return e instanceof Error ? e.message : 'that save cannot be used';
+    }
+    // Switch over only once the new save renders; otherwise roll back and keep the current game.
+    const prev = sim;
+    try {
       sim = next;
       view.setSim(sim);
-      save();
-      return null;
-    } catch (e) {
-      return e instanceof Error ? e.message : 'invalid code';
+    } catch {
+      sim = prev;
+      view.setSim(sim);
+      return 'that save could not be shown. Your current game is unchanged';
     }
+    save();
+    return null;
   },
   reset: () => {
     newGame();
@@ -118,6 +162,7 @@ const hud = new Hud(uiRoot, {
   tap: () => audio.sfx('uiTap'),
 });
 
+if (bootNotice) hud.toast(bootNotice, 'info');
 view = new View(canvas, sim, startQuality, {
   float: (text, world, kind) => hud.float(text, world, kind),
   toast: (text, kind) => hud.toast(text, kind),
@@ -131,6 +176,8 @@ function newGame(): void {
   save();
 }
 
+// LATE-GAME HOOK: Areas 3–5, Beacon, finale and Open Season presentation (src/view/late).
+const late = createLatePresentation({ getView: () => view, getSim: () => sim, hudRoot: hud.root, tap: () => audio.sfx('uiTap') });
 view.setSnow(snowLevel);
 view.warmup();
 const autoQ = new AutoQuality(() => view.lowerResolution());
@@ -397,10 +444,12 @@ function loop(now: number): void {
   const events = sim.drainEvents();
   if (events.length) {
     view.handleEvents(events);
+    late.handleEvents(events); // LATE-GAME HOOK
     recent.push(...events);
     if (recent.length > 300) recent.splice(0, recent.length - 300);
   }
   const t1 = performance.now();
+  late.frame(acc / STEP, dt); // LATE-GAME HOOK
   view.frame(acc / STEP, dt);
   const t2 = performance.now();
   hud.update(sim, dt, (w) => view.project(projV.set(w.x, w.y, w.z)));

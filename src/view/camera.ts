@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 
 const PITCH = (50 * Math.PI) / 180;
+const _pp = new THREE.Vector3();
 
 export class CameraRig {
   readonly camera: THREE.PerspectiveCamera;
@@ -15,6 +16,8 @@ export class CameraRig {
   /** Extra zoom-out (0..1) e.g. for big moments. */
   private punch = 0;
   private bias = -1.2;
+  /** Correction that keeps the player inside a safe band of the screen (clear of HUD/quest chip). */
+  private safe = 0;
   private vx = 0;
   private vz = 0;
   /** 1 = title drift, 0 = gameplay; eases between. */
@@ -37,9 +40,9 @@ export class CameraRig {
   private baseDistance(): number {
     const vfov = (this.camera.fov * Math.PI) / 180;
     const hfov = 2 * Math.atan(Math.tan(vfov / 2) * this.camera.aspect);
-    const want = 11.5;
+    const want = 9.6; // world metres across a portrait screen: characters and stations read large
     const d = want / 2 / Math.tan(hfov / 2);
-    return Math.min(30, Math.max(17, d));
+    return Math.min(27, Math.max(15, d));
   }
 
   setTitle(on: boolean, instant = false): void {
@@ -80,14 +83,14 @@ export class CameraRig {
   update(dt: number, px: number, pz: number, vx: number, vz: number, stackLen: number): void {
     // Look-ahead in the direction of travel; keep the player a little below centre.
     // In the yard, lean the view towards the counters so the hungry crowd stays on screen.
-    const bias = Math.max(-1.2, Math.min(2.4, (pz - 7) * 0.45));
+    const bias = Math.max(-1.0, Math.min(1.2, (pz - 7) * 0.3));
     this.bias += (bias - this.bias) * (1 - Math.exp(-dt * 2));
     // Look-ahead from a smoothed velocity so starting/stopping never lurches the view.
     const kv = 1 - Math.exp(-dt * 3);
     this.vx += (vx - this.vx) * kv;
     this.vz += (vz - this.vz) * kv;
     const ax = px + this.vx * 0.32;
-    const az = pz + this.vz * 0.32 + this.bias;
+    const az = pz + this.vz * 0.32 + this.bias + this.safe;
     let tx = ax;
     let tz = az;
     if (this.pan) {
@@ -133,6 +136,18 @@ export class CameraRig {
       this.look.copy(this.gameLook);
     }
     c.lookAt(this.look);
+    // Safe band: nudge the view so the player stays below the quest chip and above the thumb zone.
+    if (this.titleBlend < 0.01 && !this.pan) {
+      c.updateMatrixWorld();
+      _pp.set(px, 0.9, pz).project(c);
+      const hi = 0.18;
+      const lo = -0.42;
+      const err = _pp.y > hi ? _pp.y - hi : _pp.y < lo ? _pp.y - lo : 0;
+      // Moving the target south (+z) moves the player up the screen, so push against the error.
+      this.safe -= err * 6 * (1 - Math.exp(-dt * 5));
+      if (err === 0) this.safe *= Math.exp(-dt * 0.4);
+      this.safe = Math.max(-6, Math.min(6, this.safe));
+    }
   }
 
   get focus(): THREE.Vector3 {

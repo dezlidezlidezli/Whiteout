@@ -46,6 +46,14 @@ export class GuideArrow {
     parent.add(this.root);
   }
 
+  /** Debug/e2e: world XZ of the chevron's tip and tail. */
+  tipTail(): { tip: { x: number; z: number }; tail: { x: number; z: number }; visible: boolean } {
+    this.arrow.updateMatrixWorld();
+    const tip = this.arrow.localToWorld(new THREE.Vector3(0, 0, -0.5));
+    const tail = this.arrow.localToWorld(new THREE.Vector3(0, 0, 0.42));
+    return { tip: { x: tip.x, z: tip.z }, tail: { x: tail.x, z: tail.z }, visible: this.arrow.visible };
+  }
+
   /**
    * px,pz: player; wx,wz: next waypoint; tx,tz: final target (null hides). camYaw unused (fixed camera).
    */
