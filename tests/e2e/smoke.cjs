@@ -68,14 +68,20 @@ function assert(cond, msg) {
   let b = await pos();
   assert(moved(a, b) < 0.05, 'dead zone: tiny drag does not move');
   await touch('touchMove', [[140, 560, 1]]);
-  await page.waitForTimeout(900);
+  // Slow software GL runs the sim below real time (by design: no catch-up lurch), so wait on state.
+  await page
+    .waitForFunction((a0) => Math.hypot(__fk.sim.state.player.x - a0.x, __fk.sim.state.player.z - a0.z) > 0.6, a, { timeout: 15000 })
+    .catch(() => {});
   b = await pos();
   assert(moved(a, b) > 0.5, 'drag moves the player');
   // A second finger must not steal or re-centre the stick.
+  const tk1 = await fk(() => __fk.sim.state.tick);
+  await page.waitForFunction((t) => __fk.sim.state.tick > t + 2, tk1, { timeout: 15000 }).catch(() => {});
   const m1 = await fk(() => __fk.sim.getMove());
   await touch('touchMove', [[140, 560, 1], [330, 300, 2]]);
   await touch('touchMove', [[140, 560, 1], [380, 200, 2]]);
-  await page.waitForTimeout(300);
+  const tk2 = await fk(() => __fk.sim.state.tick);
+  await page.waitForFunction((t) => __fk.sim.state.tick > t + 2, tk2, { timeout: 15000 }).catch(() => {});
   const m2 = await fk(() => __fk.sim.getMove());
   assert(Math.hypot(m1.x - m2.x, m1.z - m2.z) < 0.02 && Math.hypot(m2.x, m2.z) > 0.5,
     'second finger ignored (stick vector unchanged: ' + JSON.stringify([m1, m2]) + ')');
