@@ -108,13 +108,9 @@ export class Journal {
     root.append(this.back, this.sheet);
   }
 
-  /** Put the book button in the HUD's top-right row, before the settings gear. */
+  /** The book sits just under the settings gear (the top row itself is full on narrow phones). */
   private mountButton(): void {
-    const row = this.root.querySelector('.fk-top .fk-row');
-    const gear = row?.querySelector('button[aria-label="Settings"]');
-    if (row && gear) row.insertBefore(this.button, gear);
-    else if (row) row.appendChild(this.button);
-    else this.root.appendChild(this.button);
+    this.root.appendChild(this.button);
   }
 
   /** Relevance: the Journal appears once the Great Beacon has been started (late game) or Open Season. */
@@ -126,17 +122,8 @@ export class Journal {
       if (want && !this.button.isConnected) this.mountButton();
       this.mountSettingsEntry(want);
     }
-    // The top row is tight on narrow phones: if the book would push the gear off screen, the
-    // Journal stays reachable from Settings only.
-    if (want && ++this.fitTick % 30 === 0) {
-      const row = this.button.parentElement;
-      const gear = row?.querySelector('button[aria-label="Settings"]') as HTMLElement | null;
-      this.button.classList.remove('fk-jsqueezed');
-      if (gear && gear.getBoundingClientRect().right > window.innerWidth - 4) this.button.classList.add('fk-jsqueezed');
-    }
   }
 
-  private fitTick = 0;
   private settingsBtn: HTMLButtonElement | null = null;
 
   /** An "Open Journal" button in the Settings sheet, under "Your camp". */

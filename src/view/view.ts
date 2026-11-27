@@ -345,6 +345,34 @@ export class View {
     }
   }
 
+  /**
+   * Debug/e2e: render now and read back the pad rim at the middle of each of its four sides.
+   * Returns which sides show the warm rim colour (a buried pad shows ground instead).
+   */
+  debugPadOutline(id: string): { sides: boolean[]; colors: number[][] } {
+    const pv = this.pads.get(id);
+    if (!pv) return { sides: [], colors: [] };
+    this.renderer.render(this.scene, this.rig.camera);
+    const gl = this.renderer.getContext();
+    const w = gl.drawingBufferWidth;
+    const h = gl.drawingBufferHeight;
+    const o = pv.root.position;
+    const k = pv.root.scale.x;
+    const out: boolean[] = [];
+    const colors: number[][] = [];
+    const px = new Uint8Array(4);
+    for (const [dx, dz] of [[0, -0.92], [0.92, 0], [0, 0.92], [-0.92, 0]]) {
+      _tmp.set(o.x + dx * k, o.y + 0.12 * k, o.z + dz * k).project(this.rig.camera);
+      const sx = Math.round((_tmp.x * 0.5 + 0.5) * w);
+      const sy = Math.round((_tmp.y * 0.5 + 0.5) * h);
+      gl.readPixels(sx, sy, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      colors.push([px[0], px[1], px[2]]);
+      // Rim is a warm cream/orange: bright red channel, clearly warmer than blue.
+      out.push(px[0] > 150 && px[0] > px[2] + 30);
+    }
+    return { sides: out, colors };
+  }
+
   /** Debug/e2e: arrow tip/tail and the current guide target. */
   arrowInfo(): { tip: { x: number; z: number }; tail: { x: number; z: number }; visible: boolean; target: { x: number; z: number } | null; next: { x: number; z: number } | null } {
     const g = this.sim.guide();

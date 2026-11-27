@@ -70,6 +70,15 @@ function assert(cond, msg) {
     assert(dTip < dTail, 'guide arrow points towards its target (tip ' + dTip.toFixed(2) + ' < tail ' + dTail.toFixed(2) + ')');
   } else assert(false, 'guide arrow visible with a target (' + JSON.stringify(ar) + ')');
 
+  // ---- pads are never buried by yard floors: the rim shows on all four sides
+  await fk(() => {
+    const p = __fk.sim.padDefs.get('pad_pack1');
+    __fk.cheat.teleport(p.x - 2.2, p.z - 1.2);
+  });
+  await page.waitForTimeout(1500);
+  const outline = await fk(() => __fk.view.debugPadOutline('pad_pack1'));
+  assert(outline.sides.length === 4 && outline.sides.every(Boolean), 'pad outline visible on all four sides over the yard floor (' + JSON.stringify(outline) + ')');
+
   // ---- joystick under real touch events
   let a = await pos();
   await touch('touchStart', [[200, 600, 1]]);
