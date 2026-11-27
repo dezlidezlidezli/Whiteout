@@ -2,6 +2,7 @@
 // conveyors and the Hearth. Station props come from createProp; repeated props are instanced.
 
 import * as THREE from 'three';
+import { TENT_SCALE, visibleTents } from './camplayout';
 import type { DecorDef, GameData, ItemKind, StationDef } from '../data/types';
 import type { NodeState, Sim } from '../sim';
 import { PropInstancer, trs } from './instancer';
@@ -88,6 +89,7 @@ export class WorldView {
   private tentInst: PropInstancer;
   private tentAppear: number[] = [];
   private tentDone: boolean[] = [];
+  private tentShown: boolean[] = [];
   private walls: WallView[] = [];
   private beltInst = new Map<string, PropInstancer>();
   private hearthObj: THREE.Object3D | null = null;
@@ -259,6 +261,7 @@ export class WorldView {
     for (const [id, inst] of this.beltInst) inst.setVisible(sim.isActive(id));
     this.tentAppear = [];
     this.tentDone = [];
+    this.tentShown = [];
     for (let i = 0; i < sim.state.tents; i++) this.tentAppear[i] = 1;
     this.setHearthLevel(sim.state.hearth.level);
   }
@@ -411,14 +414,20 @@ export class WorldView {
     // Tents pop in as the population grows.
     const spots = this.data.camp.tentSpots;
     const nt = Math.min(sim.state.tents, spots.length);
+    const tentVis = visibleTents(this.data, sim.state);
     for (let i = 0; i < nt; i++) {
       if (this.tentAppear[i] === undefined) {
         this.tentAppear[i] = 0;
         this.onAppear(spots[i].x, spots[i].z, 1.3);
       }
+      const shown = tentVis[i];
+      if (this.tentShown[i] !== shown) {
+        this.tentShown[i] = shown;
+        this.tentDone[i] = false;
+      }
       if (this.tentAppear[i] >= 1 && this.tentDone[i]) continue;
       this.tentAppear[i] = Math.min(1, this.tentAppear[i] + dt / 0.7);
-      this.tentInst.set(i, trs(_m, spots[i].x, 0, spots[i].z, spots[i].rot, backOut(this.tentAppear[i])));
+      this.tentInst.set(i, trs(_m, spots[i].x, 0, spots[i].z, spots[i].rot, shown ? backOut(this.tentAppear[i]) * TENT_SCALE : 0));
       this.tentDone[i] = this.tentAppear[i] >= 1;
     }
     this.tentInst.setCount(nt);

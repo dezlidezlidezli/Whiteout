@@ -15,12 +15,15 @@ import {
   type ScatterKind, type FloorType, type XZ,
 } from '../view/models';
 import { triCount } from '../view/models/geo';
+import { RENDER_FLAGS } from '../view/models/materials';
 import { buildYard } from './yard';
 import { runAnimTest } from './animtest';
 import { mechanicsEntries } from './mechanics';
 
 const q = new URLSearchParams(location.search);
 const sheet = q.get('sheet') ?? 'characters';
+// before/after comparison: ?legacy=1 = MeshStandardMaterial + one mesh per body part (pre pass 7)
+if (q.has('legacy')) { RENDER_FLAGS.standardMaterials = true; RENDER_FLAGS.unskinnedCharacters = true; }
 const focus = (q.get('focus') ?? '').toLowerCase();
 const fixedT = q.has('t') ? Number(q.get('t')) : null;
 const yaw = THREE.MathUtils.degToRad(Number(q.get('yaw') ?? 35));

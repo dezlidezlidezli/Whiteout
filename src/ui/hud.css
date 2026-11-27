@@ -264,9 +264,9 @@
 .fk-sheet.fk-open { transform: none; }
 .fk-sheet h2 { margin: 0 0 12px; font-size: 26px; display: flex; justify-content: space-between; align-items: center; }
 .fk-sheet h3 { margin: 18px 0 8px; font-size: 16px; color: #ffd9a8; text-transform: uppercase; letter-spacing: 0.08em; }
-.fk-sheet label { display: flex; align-items: center; justify-content: space-between; gap: 14px; font-size: 18px; margin: 10px 0; }
+.fk-sheet label { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; font-size: 18px; margin: 10px 0; }
 .fk-sheet input[type='range'] { flex: 1; max-width: 220px; accent-color: #ffb347; height: 30px; }
-.fk-seg { display: flex; gap: 6px; }
+.fk-seg { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px 6px; margin-left: auto; }
 .fk-seg button, .fk-sheet .fk-act {
   pointer-events: auto;
   border: 0;

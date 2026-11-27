@@ -61,7 +61,8 @@ export class GuideArrow {
     this.yaw += d * Math.min(1, dt * 10);
     const r = 1.35 + Math.sin(time * 6) * 0.1;
     this.arrow.position.set(px + Math.sin(this.yaw) * r, 0.18, pz + Math.cos(this.yaw) * r);
-    this.arrow.rotation.y = this.yaw;
+    // The chevron tip is on local -Z (shape +Y after rotateX(-PI/2)): turn it to face the target.
+    this.arrow.rotation.y = this.yaw + Math.PI;
     this.arrow.scale.setScalar(Math.max(0.001, this.shown) * 0.9);
     this.arrow.visible = this.shown > 0.02;
     const mWant = has ? 1 : 0;

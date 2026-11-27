@@ -910,11 +910,13 @@ export class Sim {
     const s = this.state;
     const st = s.stations['hearth'] as DepositState | undefined;
     if (!st) return;
+    if (s.hearth.fuel > 0) s.hearth.fuel = Math.max(0, s.hearth.fuel - dt);
+    // Take the next log in the same step the last one burns out, so Cosy does not flicker
+    // off and on (and re-announce itself) every time a log is used up.
     if (s.hearth.fuel <= 0 && st.count > 0) {
       st.count--;
       s.hearth.fuel += this.data.balance.fuelPerLog;
     }
-    if (s.hearth.fuel > 0) s.hearth.fuel = Math.max(0, s.hearth.fuel - dt);
     const cosy = s.hearth.fuel > 0;
     if (cosy !== s.hearth.cosy) {
       s.hearth.cosy = cosy;

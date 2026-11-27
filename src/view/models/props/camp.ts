@@ -411,7 +411,7 @@ export function cabin(seed = 0): PropSpec {
   for (const sx of [-1, 1]) b.add(bevel(0.32, 0.85, 0.06, 0.02), shutter, { p: [0.85 + sx * 0.68, 1.4, D / 2 + 0.06] });
   b.add(bevel(1.1, 0.1, 0.25, 0.03), P.snow, { p: [0.85, 0.94, D / 2 + 0.12] }); // snowy sill
   // side window glow
-  glow.add(box(0.04, 0.55, 0.7), P.windowGlow, { p: [W / 2 + 0.03, 1.45, 0] });
+  glow.add(box(0.04, 0.55, 0.7), P.windowGlow, { p: [W / 2 + 0.05, 1.45, 0] }); // proud of the frame face (was coplanar: flicker)
   b.add(bevel(0.1, 0.72, 0.88, 0.03), P.woodDark, { p: [W / 2 + 0.0, 1.45, 0] });
   // chimney
   b.add(bevel(0.6, 2.2, 0.6, 0.06), P.stone, { p: [-W / 2 + 0.75, roofY + 0.6, -0.6], shade: 0.06, seed: 11 });
