@@ -6,7 +6,8 @@
 import * as THREE from 'three';
 import type { NodeDef, ToolKind } from '../../data/types';
 import type { SimEvent } from '../../sim';
-import { animateCharacter, type CharacterRig } from '../models';
+import { animateCharacter, createProp, setCharacterTool, type CharacterRig } from '../models';
+import { hashId } from '../world';
 import { backOut, fxOf, hooksOf, sfxAt, worldOf, type LateCtx, type LatePart } from './ctx';
 
 type HandTool = 'axe' | 'pick' | 'auger';
@@ -56,11 +57,14 @@ function buildTool(kind: HandTool, tier: number): THREE.Group {
 
 const TOOL_LABEL: Record<ToolKind, string> = { axe: 'Steel axe!', pick: 'Steel pick!', auger: 'Ice auger!', kettle: 'Steel kettles!' };
 
-function toolFor(def: NodeDef): HandTool | null {
+type CharTool = 'axe' | 'pick' | 'rod';
+
+/** The character tool for a harvest node, and the upgrade (state.tools key) that sets its tier. */
+function toolFor(def: NodeDef): { kind: CharTool; upgrade: ToolKind } | null {
   const tag = `${def.tag ?? ''} ${def.model}`;
-  if (/pine|tree/i.test(tag)) return 'axe';
-  if (/ore|vein|rock/i.test(tag)) return 'pick';
-  if (/iceHole/.test(tag)) return 'auger';
+  if (/pine|tree/i.test(tag)) return { kind: 'axe', upgrade: 'axe' };
+  if (/ore|vein|rock/i.test(tag)) return { kind: 'pick', upgrade: 'pick' };
+  if (/ice|hole|fish|stream/i.test(tag)) return { kind: 'rod', upgrade: 'auger' };
   return null;
 }
 
@@ -72,23 +76,20 @@ function actionFor(def: NodeDef): 'mine' | 'fish' | null {
 }
 
 export class Tools implements LatePart {
-  private hand = new THREE.Group();
-  private handKey = '';
-  private handArm: THREE.Object3D | null = null;
-  private handS = 0;
+  /** Tool last given to the player rig (re-applied if the rig is rebuilt). */
+  private toolKey = '';
+  private toolRig: CharacterRig | null = null;
   private aloft: { obj: THREE.Object3D; t: number } | null = null;
 
-  constructor(private ctx: LateCtx) {
-    this.hand.position.set(0, -0.39, 0.02);
-    this.hand.rotation.x = -0.9;
-  }
+  constructor(private ctx: LateCtx) {}
 
   private get player(): CharacterRig {
     return this.ctx.view['actors'].player;
   }
 
-  private tier(kind: HandTool): number {
-    return this.ctx.sim.state.tools[kind] ?? 0;
+  /** Character tool tier 1..3 from the upgrade level (0 = the starting tool). */
+  private tier(upgrade: ToolKind): 1 | 2 | 3 {
+    return Math.max(1, Math.min(3, 1 + (this.ctx.sim.state.tools[upgrade] ?? 0))) as 1 | 2 | 3;
   }
 
   handle(e: SimEvent): void {
@@ -99,14 +100,16 @@ export class Tools implements LatePart {
     hooksOf(v).float(TOOL_LABEL[e.tool] ?? 'Upgrade!', new THREE.Vector3(p.x, 3.1, p.z), 'big');
     v['actors'].cheerT = 1.6;
     if (e.tool === 'kettle') {
+      this.steelKettles(true);
       for (const d of this.ctx.sim.data.stations) {
-        if (d.type !== 'processor' || !/kettle/i.test(d.model) || !this.ctx.sim.isActive(d.id)) continue;
-        fxOf(v).glint(d.x, 1.2, d.z, 12, 2);
+        if (d.type !== 'processor' || d.model !== 'kettle' || !this.ctx.sim.isActive(d.id)) continue;
         fxOf(v).ring(d.x, d.z, 1.6, 0xcfe4ff, 0.7);
       }
       sfxAt(v, 'craft', undefined, { pitch: 1.4 });
       return;
     }
+    // The player's own tool steps up a tier right away.
+    this.toolKey = '';
     // Held aloft over the head, spinning, with a sparkle.
     if (this.aloft) this.aloft.obj.removeFromParent();
     const obj = buildTool(e.tool as HandTool, e.level);
@@ -117,62 +120,51 @@ export class Tools implements LatePart {
     sfxAt(v, 'hammer', undefined, { pitch: 1.3, volume: 0.8 });
   }
 
-  /** Steel kettles: recolour the copper of every kettle prop to brushed steel (vertex colours, once). */
-  private steelKettles(): void {
+  /** Steel kettles: swap every kettle prop for the steel model (level 2) once the upgrade is owned. */
+  private steelKettles(pop: boolean): void {
     const sim = this.ctx.sim;
     if ((sim.state.tools.kettle ?? 0) < 1) return;
+    const world = worldOf(this.ctx.view);
     for (const d of sim.data.stations) {
-      if (d.type !== 'processor' || !/kettle/i.test(d.model)) continue;
-      const sv = worldOf(this.ctx.view).stations.get(d.id);
+      if (d.type !== 'processor' || d.model !== 'kettle') continue;
+      const sv = world.stations.get(d.id);
       if (!sv || sv.obj.userData.fkSteel) continue;
-      sv.obj.userData.fkSteel = true;
-      sv.obj.traverse((o) => {
-        const m = o as THREE.Mesh;
-        if (!m.isMesh || o.name === 'flame' || o.name === 'coals' || o.parent?.name === 'flame' || o.parent?.name === 'coals') return;
-        const col = m.geometry.getAttribute('color') as THREE.BufferAttribute | undefined;
-        if (!col) return;
-        m.geometry = m.geometry.clone();
-        const c = m.geometry.getAttribute('color') as THREE.BufferAttribute;
-        for (let i = 0; i < c.count; i++) {
-          const r = c.getX(i);
-          const g = c.getY(i);
-          const b = c.getZ(i);
-          // Copper (warm orange-brown) -> brushed steel; wood, stone and bowls are left alone.
-          if (r > 0.25 && r > g * 1.35 && g > b * 1.05 && r - b > 0.2) {
-            const l = 0.3 * r + 0.59 * g + 0.11 * b;
-            c.setXYZ(i, Math.min(1, l * 0.9 + 0.3), Math.min(1, l * 0.95 + 0.33), Math.min(1, l + 0.38));
-          }
-        }
-        c.needsUpdate = true;
-      });
+      const next = createProp('kettle', { level: 2, seed: hashId(d.id) });
+      next.position.copy(sv.obj.position);
+      next.rotation.copy(sv.obj.rotation);
+      next.scale.copy(sv.obj.scale);
+      next.visible = sv.obj.visible;
+      next.userData.fkSteel = true;
+      sv.obj.parent?.add(next);
+      sv.obj.removeFromParent();
+      sv.obj = next;
+      sv.parts = undefined; // lid bob, flames and the (higher) steam point are found again on the new model
+      sv.top = Math.max(0.5, new THREE.Box3().setFromObject(next).max.y);
+      if (pop && sv.shown) {
+        sv.appear = 0.3; // the world scales it back in with overshoot
+        fxOf(this.ctx.view).glint(d.x, 1.2, d.z, 14, 2);
+        fxOf(this.ctx.view).puff(d.x, 0.3, d.z, 8, 0.9, 1.4, 0.7);
+      }
     }
   }
 
   frame(dt: number): void {
-    this.steelKettles();
+    this.steelKettles(false);
     const sim = this.ctx.sim;
     const s = sim.state;
     const p = s.player;
     const rig = this.player;
-    // Re-attach after a rig rebuild.
-    const arm = rig.root.getObjectByName('armR') ?? null;
-    if (arm !== this.handArm) {
-      this.hand.removeFromParent();
-      arm?.add(this.hand);
-      this.handArm = arm;
-    }
+    // The player holds the tool for the node being worked (none otherwise), tier from the upgrades.
     const node = p.working ? (sim.stationDefs.get(p.working) as NodeDef | undefined) : undefined;
-    let kind = node && node.type === 'node' ? toolFor(node) : null;
-    if (kind === 'auger' && this.tier('auger') < 1) kind = null; // bare-handed line fishing until the auger exists
-    const key = kind ? `${kind}:${this.tier(kind)}` : this.handKey;
-    if (key !== this.handKey && kind) {
-      this.hand.clear();
-      this.hand.add(buildTool(kind, this.tier(kind)));
-      this.handKey = key;
+    const t = node && node.type === 'node' ? toolFor(node) : null;
+    const kind = t ? t.kind : 'none';
+    const tier = t ? this.tier(t.upgrade) : 1;
+    const key = `${kind}:${tier}`;
+    if (key !== this.toolKey || rig !== this.toolRig) {
+      setCharacterTool(rig, kind, tier);
+      this.toolKey = key;
+      this.toolRig = rig;
     }
-    this.handS += ((kind ? 1 : 0) - this.handS) * Math.min(1, dt * 12);
-    this.hand.visible = this.handS > 0.02;
-    this.hand.scale.setScalar(Math.max(0.001, this.handS * 1.75));
 
     if (this.aloft) {
       const a = this.aloft;
@@ -199,10 +191,10 @@ export class Tools implements LatePart {
     if (p.working) {
       const d = sim.stationDefs.get(p.working) as NodeDef | undefined;
       const act = d && d.type === 'node' ? actionFor(d) : null;
-      if (act) {
-        animateCharacter(this.player, { time, speed: 0, carrying: p.stack.length > 0, action: act });
-        this.player.root.updateMatrixWorld(true);
-      }
+      if (act) animateCharacter(this.player, { time, speed: 0, carrying: p.stack.length > 0, action: act });
+      // The rig stows its tool while carrying; while working a node it stays in hand.
+      if (d && d.type === 'node' && toolFor(d)) this.player.root.getObjectByName('tool')?.scale.setScalar(1);
+      this.player.root.updateMatrixWorld(true);
     }
     const helpers = v['actors']['helpers'] as Map<string, { rig: CharacterRig }>;
     for (const id in s.helpers) {
@@ -218,7 +210,6 @@ export class Tools implements LatePart {
   }
 
   dispose(): void {
-    this.hand.removeFromParent();
     this.aloft?.obj.removeFromParent();
   }
 }

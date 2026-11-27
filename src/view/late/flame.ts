@@ -35,7 +35,9 @@ interface LightView {
   z: number;
   obj: THREE.Object3D;
   fire: THREE.Object3D[];
-  kindling: THREE.Object3D[];
+  /** The prop's own unlit look (createProp(..., { unlit: true })): kindling, pale paper lamp… */
+  dark: THREE.Object3D;
+  scale: number;
   lit: boolean;
   pop: number;
   warm: number;
@@ -144,13 +146,24 @@ export class Flame implements LatePart {
     obj.rotation.y = rot;
     obj.scale.setScalar(scale);
     this.ctx.view.scene.add(obj);
+    const dark = createProp(model, { seed, unlit: true });
+    dark.position.copy(obj.position);
+    dark.rotation.copy(obj.rotation);
+    dark.scale.setScalar(scale);
+    dark.visible = false;
+    this.ctx.view.scene.add(dark);
     const fire: THREE.Object3D[] = [];
-    const kindling: THREE.Object3D[] = [];
     obj.traverse((o) => {
       if (FIRE_PARTS.has(o.name)) fire.push(o);
-      if (o.name === 'kindling') kindling.push(o);
     });
-    return { id, kind, order, area, x, z, obj, fire, kindling, lit: true, pop: 1, warm: 0, flicker: Math.random() * 10 };
+    return { id, kind, order, area, x, z, obj, fire, dark, scale, lit: true, pop: 1, warm: 0, flicker: Math.random() * 10 };
+  }
+
+  private showLook(l: LightView, lit: boolean): void {
+    l.obj.visible = lit;
+    l.dark.visible = !lit;
+    l.obj.scale.setScalar(l.scale);
+    l.dark.scale.setScalar(l.scale);
   }
 
   /** Hide the static instanced copies the world drew (they are always lit). */
@@ -178,8 +191,7 @@ export class Flame implements LatePart {
       l.lit = lit;
       l.pop = 1;
       l.warm = lit && l.kind !== 'lamp' ? 1 : 0;
-      for (const o of l.fire) o.visible = lit;
-      for (const o of l.kindling) o.visible = !lit;
+      this.showLook(l, lit);
     }
     void instant;
     this.dotKey = '';
@@ -230,8 +242,7 @@ export class Flame implements LatePart {
         if (!l) break;
         l.lit = true;
         l.pop = 0;
-        for (const o of l.fire) o.visible = true;
-        for (const o of l.kindling) o.visible = false;
+        this.showLook(l, true);
         sfxAt(v, 'brazierLit', l, { volume: 1 });
         fx.glint(l.x, 1.8, l.z, l.kind === 'lamp' ? 10 : 26, l.kind === 'lamp' ? 1.4 : 2.6);
         if (l.kind !== 'lamp') {
@@ -293,12 +304,22 @@ export class Flame implements LatePart {
       const lit = this.isLit(l);
       if (lit !== l.lit) {
         l.lit = lit;
-        for (const o of l.fire) o.visible = lit;
-        for (const o of l.kindling) o.visible = !lit;
+        this.showLook(l, lit);
+        if (lit) l.pop = 0;
       }
       if (lit) {
         l.pop = Math.min(1, l.pop + dt / 0.7);
         const k = l.pop < 1 ? backOut(l.pop) * (1 + (1 - l.pop) * 0.6) : 1;
+        // Pop between the two looks: the unlit one shrinks away as the lit one bounces in.
+        if (l.pop < 1) {
+          const out = Math.max(0, 1 - l.pop / 0.2);
+          l.dark.visible = out > 0.01;
+          l.dark.scale.setScalar(l.scale * Math.max(0.001, out));
+          l.obj.scale.setScalar(l.scale * Math.max(0.001, 0.75 + 0.25 * backOut(l.pop)));
+        } else if (l.dark.visible) {
+          l.dark.visible = false;
+          l.obj.scale.setScalar(l.scale);
+        }
         const fl = 1 + Math.sin(t * 11 + l.flicker) * 0.07 + Math.sin(t * 17.3 + l.flicker) * 0.05;
         for (const o of l.fire) if (o.name === 'flame') o.scale.set(k, k * fl, k);
         if (l.kind !== 'lamp') l.warm = Math.min(1, l.warm + dt / 1.4);
@@ -465,7 +486,10 @@ export class Flame implements LatePart {
   }
 
   dispose(): void {
-    for (const l of this.lights) l.obj.removeFromParent();
+    for (const l of this.lights) {
+      l.obj.removeFromParent();
+      l.dark.removeFromParent();
+    }
     for (const g of this.gaps) g.obj.removeFromParent();
     this.staticBraziers?.dispose();
     this.held.removeFromParent();
