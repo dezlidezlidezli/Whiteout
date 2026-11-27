@@ -611,6 +611,12 @@ export class WorldView {
     return this.surface ? this.surface.heightAt(x, z) : 0;
   }
 
+  /** Debug: hide every ghost preview via the given hide function (restored by the caller). */
+  hideGhosts(hide: (o: THREE.Object3D) => void): void {
+    for (const v of this.stations.values()) if (v.ghost) hide(v.ghost);
+    for (const v of this.decor.values()) if (v.ghost) hide(v.ghost);
+  }
+
   bump(id: string): void {
     const s = this.stations.get(id);
     if (s && s.appear >= 1) s.wobble = 1;

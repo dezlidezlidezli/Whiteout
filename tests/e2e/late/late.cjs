@@ -93,6 +93,8 @@ function assert(cond, msg) {
       window.__fk.cheat.lateGo(b.x + Math.sin(r) * 1.3, b.z + Math.cos(r) * 1.3);
     });
     await fk((o) => window.__fk.cheat.stack(o.item, o.n), o);
+    // Software-rendered CI browsers run the sim slowly in real time: hand the items in headlessly.
+    await fk(() => window.__fk.sim.advance(4));
     await until(() => window.__fk.sim.state.totals.ordersDone >= 1, 20000, 'an order completes at the board');
     await shot('open-season-order');
     await until(() => document.querySelectorAll('.fk-ord:not(.fk-ord-done)').length === 3, 8000, 'a fresh order replaces it');

@@ -361,7 +361,22 @@ export class View {
     const oldScale = pv.root.scale.x;
     pv.root.scale.setScalar(1);
     pv.root.updateMatrixWorld(true);
+    // Isolate: only ground/dressing and this pad's plate (no other pads, labels, ghosts or people).
+    const hidden: THREE.Object3D[] = [];
+    const hide = (o: THREE.Object3D) => {
+      if (o.visible) {
+        o.visible = false;
+        hidden.push(o);
+      }
+    };
+    for (const other of this.pads.values()) if (other !== pv) hide(other.root);
+    pv.root.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh && ((o as THREE.Mesh).material as THREE.Material).depthTest === false) hide(o);
+      if ((o as THREE.Line).isLine) hide(o);
+    });
+    this.world.hideGhosts(hide);
     this.renderer.render(this.scene, this.rig.camera);
+    for (const o of hidden) o.visible = true;
     pv.root.scale.setScalar(oldScale);
     const gl = this.renderer.getContext();
     const w = gl.drawingBufferWidth;
@@ -371,7 +386,7 @@ export class View {
     const out: boolean[] = [];
     const colors: number[][] = [];
     const px = new Uint8Array(4);
-    for (const [dx, dz] of [[0, -0.92], [0.92, 0], [0, 0.92], [-0.92, 0]]) {
+    for (const [dx, dz] of [[0, -0.96], [0.96, 0], [0, 0.96], [-0.96, 0]]) {
       _tmp.set(o.x + dx * k, o.y + 0.12 * k, o.z + dz * k).project(this.rig.camera);
       const sx = Math.round((_tmp.x * 0.5 + 0.5) * w);
       const sy = Math.round((_tmp.y * 0.5 + 0.5) * h);
@@ -434,13 +449,15 @@ export class View {
         const z = w.z + (long ? 0 : t * Math.max(0, len));
         total++;
         let hit = false;
-        // A few lateral offsets: the palisade's posts sit along the line, so check across the thickness.
-        for (const off of [0, 0.12, -0.12]) {
-          ray.set(new THREE.Vector3(x + (long ? 0 : off), 10, z + (long ? off : 0)), down);
-          const h = ray.intersectObjects(meshes, false)[0];
-          if (h && h.point.y > 0.6) {
-            hit = true;
-            break;
+        // A small cluster along and across the line: rays can slip between pointed stakes.
+        outer: for (const along of [0, 0.15, -0.15, 0.3, -0.3]) {
+          for (const off of [0, 0.12, -0.12, 0.25, -0.25]) {
+            ray.set(new THREE.Vector3(x + (long ? along : off), 10, z + (long ? off : along)), down);
+            const h = ray.intersectObjects(meshes, false)[0];
+            if (h && h.point.y > 0.35) {
+              hit = true;
+              break outer;
+            }
           }
         }
         if (!hit) missing.push({ x: +x.toFixed(2), z: +z.toFixed(2) });
@@ -467,6 +484,40 @@ export class View {
       }
     }
     return { samples, bad };
+  }
+
+  /**
+   * Debug: straight-down orthographic render of a world rect, with each floor's data rectangle
+   * outlined (cyan) for comparison. Returns a PNG data URL.
+   */
+  debugTopDown(x0: number, z0: number, x1: number, z1: number, px = 600): string {
+    const w = x1 - x0;
+    const d = z1 - z0;
+    const cam = new THREE.OrthographicCamera(-w / 2, w / 2, d / 2, -d / 2, 0.1, 100);
+    cam.position.set((x0 + x1) / 2, 50, (z0 + z1) / 2);
+    cam.up.set(0, 0, -1);
+    cam.lookAt((x0 + x1) / 2, 0, (z0 + z1) / 2);
+    const seg: number[] = [];
+    for (const a of this.data.dressing) for (const f of a.floors) {
+      if (skipCampFloor(a.area, f.type)) continue;
+      const fx0 = f.x - f.w / 2, fx1 = f.x + f.w / 2, fz0 = f.z - f.d / 2, fz1 = f.z + f.d / 2;
+      seg.push(fx0, 3, fz0, fx1, 3, fz0, fx1, 3, fz0, fx1, 3, fz1, fx1, 3, fz1, fx0, 3, fz1, fx0, 3, fz1, fx0, 3, fz0);
+    }
+    const lines = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(seg, 3)), new THREE.LineBasicMaterial({ color: 0x00ffff, depthTest: false }));
+    lines.renderOrder = 99;
+    this.scene.add(lines);
+    const size = this.renderer.getSize(new THREE.Vector2());
+    const pr = this.renderer.getPixelRatio();
+    this.renderer.setPixelRatio(1);
+    this.renderer.setSize(px, Math.round((px * d) / w), false);
+    this.renderer.render(this.scene, cam);
+    const url = this.renderer.domElement.toDataURL('image/png');
+    this.scene.remove(lines);
+    lines.geometry.dispose();
+    this.renderer.setPixelRatio(pr);
+    this.renderer.setSize(size.x, size.y, false);
+    this.lastSize = '';
+    return url;
   }
 
   /** Debug/e2e: arrow tip/tail and the current guide target. */

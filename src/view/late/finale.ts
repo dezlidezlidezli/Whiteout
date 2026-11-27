@@ -128,7 +128,7 @@ export class FinaleDirector implements LatePart, MoodSource {
       prev.call(this, sh, r);
       const fs = sh.fragmentShader;
       // Only extend the shader we know (falls back to the plain thaw if the ground shader changes).
-      if (!fs.includes('fkMelt') || !fs.includes('vFkWorld') || !fs.includes('uSnow') || !fs.includes('#include <alphamap_fragment>')) return;
+      if (!fs.includes('fkMelt') || !fs.includes('vFkWorld') || !fs.includes('uniform vec3 uSnow;') || !fs.includes('#include <alphamap_fragment>')) return;
       Object.assign(sh.uniforms, u);
       sh.fragmentShader = fs
         .replace('uniform vec3 uSnow;', 'uniform vec3 uSnow; uniform float uFkGreen; uniform float uFkPatches;')
@@ -307,7 +307,7 @@ export class FinaleDirector implements LatePart, MoodSource {
     const D = this.D;
     const keys: Key[] = [
       { T: 0, pos: at(B, 36, 8), look: B.clone().setY(crownY * 0.5) },
-      { T: L - 0.4, pos: at(B, 30, 9, 4), look: B.clone().setY(crownY * 0.62) },
+      { T: L - 0.4, pos: at(B, 30, 9, 4), look: B.clone().setY(crownY * 0.72) },
       { T: L + 3.2, pos: at(B, 34, 21, 1), look: at(B, -18, crownY + 4) },
     ];
     // Glide over every area the player rebuilt, last-opened first, ending at the camp.
@@ -321,8 +321,8 @@ export class FinaleDirector implements LatePart, MoodSource {
       const f = new THREE.Vector3(a.focus.x, 0, a.focus.z);
       keys.push({ T, pos: at(f, 21, 25), look: at(f, -2, 0.5) });
     });
-    keys.push({ T: L + D + 6.6, pos: at(H, 17, 13, 1.5), look: H.clone().setY(1.0) });
-    keys.push({ T: L + D + 9, pos: at(H, 10.5, 6.2, 2.5), look: H.clone().setY(1.2) });
+    keys.push({ T: L + D + 6.6, pos: at(H, 24, 18, 2), look: H.clone().setY(1.0) });
+    keys.push({ T: L + D + 9, pos: at(H, 15.5, 9.5, 3), look: H.clone().setY(1.4) });
     this.keys = keys;
     this.camp = H;
     this.campBack = back;

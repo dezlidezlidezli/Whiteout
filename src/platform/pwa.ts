@@ -273,8 +273,10 @@ function showInstallTip(): void {
     '<button type="button" aria-label="Dismiss" style="flex:none;width:36px;height:36px;border:0;border-radius:10px;' +
     'background:rgba(255,255,255,.08);color:inherit;font:600 18px/1 system-ui;cursor:pointer">&times;</button>';
   let watch = 0;
+  let mo: MutationObserver | null = null;
   const hide = (remember: boolean) => {
     window.clearInterval(watch);
+    mo?.disconnect();
     if (remember) storageSet(A2HS_KEY, '1');
     tip.style.opacity = '0';
     tip.style.transform = 'translate(-50%, 20px)';
@@ -283,9 +285,16 @@ function showInstallTip(): void {
   };
   tip.querySelector('button')!.addEventListener('click', () => hide(true));
   // Gone as soon as the game begins (it comes back on a later visit to the title, until dismissed).
-  watch = window.setInterval(() => {
+  const check = () => {
     if (!onTitle()) hide(false);
-  }, 200);
+  };
+  const titleEl = document.querySelector('.fk-title[data-ui]');
+  if (titleEl && 'MutationObserver' in window) {
+    mo = new MutationObserver(check);
+    mo.observe(titleEl, { attributes: true, attributeFilter: ['class'] });
+    if (titleEl.parentElement) mo.observe(titleEl.parentElement, { childList: true });
+  }
+  watch = window.setInterval(check, 250); // fallback
   document.body.appendChild(tip);
   requestAnimationFrame(() =>
     requestAnimationFrame(() => {
