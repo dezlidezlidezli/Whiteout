@@ -124,7 +124,41 @@ export class Journal {
       this.shownBtn = want;
       this.button.classList.toggle('fk-hidden', !want);
       if (want && !this.button.isConnected) this.mountButton();
+      this.mountSettingsEntry(want);
     }
+    // The top row is tight on narrow phones: if the book would push the gear off screen, the
+    // Journal stays reachable from Settings only.
+    if (want && ++this.fitTick % 30 === 0) {
+      const row = this.button.parentElement;
+      const gear = row?.querySelector('button[aria-label="Settings"]') as HTMLElement | null;
+      this.button.classList.remove('fk-jsqueezed');
+      if (gear && gear.getBoundingClientRect().right > window.innerWidth - 4) this.button.classList.add('fk-jsqueezed');
+    }
+  }
+
+  private fitTick = 0;
+  private settingsBtn: HTMLButtonElement | null = null;
+
+  /** An "Open Journal" button in the Settings sheet, under "Your camp". */
+  private mountSettingsEntry(on: boolean): void {
+    if (!on) {
+      this.settingsBtn?.remove();
+      this.settingsBtn = null;
+      return;
+    }
+    if (this.settingsBtn?.isConnected) return;
+    const sheet = Array.from(this.root.querySelectorAll('.fk-sheet')).find((e) => !e.classList.contains('fk-journal'));
+    const stats = sheet?.querySelector('.fk-stats');
+    if (!sheet || !stats) return;
+    const b = h('button', 'fk-act fk-jsettings', 'Open Journal');
+    b.type = 'button';
+    b.addEventListener('click', () => {
+      this.tap();
+      (sheet.querySelector('.fk-close') as HTMLButtonElement | null)?.click();
+      window.setTimeout(() => this.open(), 120);
+    });
+    stats.after(b);
+    this.settingsBtn = b;
   }
 
   open(): void {
