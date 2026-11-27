@@ -142,7 +142,7 @@ async function rescue(browser) {
   await page.evaluate(() => { const p = __fk.sim.state.player; __fk.cheat.teleport(p.x, p.z - 2.5); });
   await page.waitForTimeout(500);
   await shot('waiting', true);
-  await page.evaluate(() => { const p = __fk.sim.state.player; __fk.cheat.teleport(p.x, p.z - 3); });
+  await page.evaluate(() => { const q = Object.values(__fk.sim.state.rescue.pos)[0]; __fk.cheat.teleport(q.x + 1, q.z + 1); });
   await page.waitForFunction(() => Object.values(__fk.sim.state.rescue.status).every((s) => s === 'following'), null, { timeout: 10000 });
   assert(true, 'waiting followers rejoin when the glow reaches them');
   // Lead them home: bring the line into the warmth (positions put at the camp edge, as if walked in).
