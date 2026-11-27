@@ -386,7 +386,7 @@ export class View {
     const out: boolean[] = [];
     const colors: number[][] = [];
     const px = new Uint8Array(4);
-    for (const [dx, dz] of [[0, -0.96], [0.96, 0], [0, 0.96], [-0.96, 0]]) {
+    for (const [dx, dz] of [[0, -0.88], [0.88, 0], [0, 0.88], [-0.88, 0]]) { // middle of the rim (0.82..0.94 m)
       _tmp.set(o.x + dx * k, o.y + 0.12 * k, o.z + dz * k).project(this.rig.camera);
       const sx = Math.round((_tmp.x * 0.5 + 0.5) * w);
       const sy = Math.round((_tmp.y * 0.5 + 0.5) * h);
@@ -526,7 +526,7 @@ export class View {
     if (!pv || !pv.root.visible) return [];
     const o = pv.root.position;
     const k = pv.root.scale.x;
-    return [[0, -0.96], [0.96, 0], [0, 0.96], [-0.96, 0]].map(([dx, dz]) => this.project(new THREE.Vector3(o.x + dx * k, o.y + 0.12 * k, o.z + dz * k)));
+    return [[0, -0.88], [0.88, 0], [0, 0.88], [-0.88, 0]].map(([dx, dz]) => this.project(new THREE.Vector3(o.x + dx * k, o.y + 0.12 * k, o.z + dz * k)));
   }
 
   /** Debug/e2e: arrow tip/tail and the current guide target. */
