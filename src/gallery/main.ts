@@ -17,6 +17,7 @@ import {
 import { triCount } from '../view/models/geo';
 import { buildYard } from './yard';
 import { runAnimTest } from './animtest';
+import { mechanicsEntries } from './mechanics';
 
 const q = new URLSearchParams(location.search);
 const sheet = q.get('sheet') ?? 'characters';
@@ -187,6 +188,8 @@ function buildEntries(): Entry[] {
       const o = new THREE.Mesh(d.geometry, d.material);
       E.push({ label: '', obj: o, radius: 0.36, center: new THREE.Vector3(0, 0.08, 0) });
     }
+  } else if (sheet === 'mechanics') {
+    E.push(...mechanicsEntries());
   } else if (sheet === 'kit') {
     const CLUTTER = ['crateStack', 'barrelCluster', 'sackPile', 'firewoodRack', 'dryingRack', 'supplySled', 'toolRack', 'washTub', 'basketPile', 'potShelf', 'signBoard', 'rugMat', 'snowBank', 'bush', 'sapling', 'fallenLog', 'iceShards', 'footpathStones', 'lampPost', 'bannerLine', 'woodenArch', 'watchTower', 'snowyBoulderCluster'];
     for (const name of CLUTTER) {
@@ -311,7 +314,7 @@ renderer.setScissorTest(true);
 const wrap = document.getElementById('wrap')!;
 wrap.appendChild(renderer.domElement);
 const nav = document.getElementById('nav')!;
-nav.innerHTML = ['characters', 'actions', 'props', 'props2', 'props3', 'crowdgame', 'items', 'thumbs', 'crowd'].map((s) => `<a href="?sheet=${s}">${s}</a>`).join('');
+nav.innerHTML = ['characters', 'actions', 'props', 'props2', 'props3', 'kit', 'conveyor', 'mechanics', 'yard', 'crowdgame', 'items', 'thumbs', 'crowd'].map((s) => `<a href="?sheet=${s}">${s}</a>`).join('');
 if (q.has('nonav')) nav.remove();
 
 const dusk = q.get('light') === 'dusk' || sheet === 'crowdgame';

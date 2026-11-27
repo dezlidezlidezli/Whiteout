@@ -4,7 +4,7 @@ import { Builder, cone, cyl, ico, octa, rng, type V3 } from '../geo';
 import { mats } from '../materials';
 import { PALETTE as P } from '../palette';
 
-export type MatKey = 'std' | 'glow' | 'ice' | 'ember' | 'aurora';
+export type MatKey = 'std' | 'glow' | 'ice' | 'ember' | 'aurora' | 'iceFloor';
 
 export interface LayerSpec {
   name: string;

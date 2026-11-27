@@ -9,6 +9,7 @@ import * as stations from './stations';
 import * as lm from './landmarks';
 import * as decor from './decor';
 import * as clutter from './clutter';
+import * as mech from './mechanics';
 
 type Factory = (level: number, seed: number) => PropSpec;
 /** Which option each prop varies by (for cache keys). */
@@ -58,6 +59,23 @@ const F: Record<string, { f: Factory; by?: 'level' | 'seed'; seeds?: number }> =
   campfireRing: { f: () => decor.campfireRing() },
   caravan: { f: () => decor.caravan() },
   aurora: { f: () => decor.aurora() },
+  plough: { f: (l) => mech.plough(l), by: 'level' },
+  emberCache: { f: () => mech.emberCache() },
+  buriedCrate: { f: (_l, s) => mech.buriedCrate(s), by: 'seed', seeds: 3 },
+  buriedVillager: { f: (_l, s) => mech.buriedVillager(s), by: 'seed', seeds: 6 },
+  lanternHeld: { f: () => mech.lanternHeld() },
+  foundBoard: { f: () => mech.foundBoard() },
+  monument: { f: () => mech.monument() },
+  gripMat: { f: (_l, s) => mech.gripMat(s), by: 'seed', seeds: 3 },
+  fishLeap: { f: () => mech.fishLeap() },
+  capstan: { f: () => mech.capstan() },
+  bellows: { f: () => mech.bellows() },
+  mineLift: { f: () => mech.mineLift() },
+  shaftPile: { f: (_l, s) => mech.shaftPile(s), by: 'seed', seeds: 3 },
+  flameHeld: { f: () => mech.flameHeld() },
+  trailBrazier: { f: () => mech.trailBrazier() },
+  windGap: { f: (_l, s) => mech.windGap(s), by: 'seed', seeds: 3 },
+  festivalLamp: { f: (_l, s) => mech.festivalLamp(s), by: 'seed', seeds: 4 },
   crateStack: { f: (_l, s) => clutter.crateStack(s), by: 'seed', seeds: 3 },
   barrelCluster: { f: (_l, s) => clutter.barrelCluster(s), by: 'seed', seeds: 3 },
   sackPile: { f: (_l, s) => clutter.sackPile(s), by: 'seed', seeds: 3 },
@@ -84,7 +102,7 @@ const F: Record<string, { f: Factory; by?: 'level' | 'seed'; seeds?: number }> =
 };
 
 export const PROP_NAMES = Object.keys(F);
-const NO_RANDOM_YAW = new Set(['frostWall', 'fence', 'tent', 'cabin', 'flagPole', 'marketStall', 'snowBank', 'bannerLine', 'woodenArch', 'watchTower', 'firewoodRack', 'dryingRack', 'toolRack', 'potShelf', 'signBoard', 'lampPost', 'rugMat']);
+const NO_RANDOM_YAW = new Set(['windGap', 'gripMat', 'festivalLamp', 'buriedVillager', 'frostWall', 'fence', 'tent', 'cabin', 'flagPole', 'marketStall', 'snowBank', 'bannerLine', 'woodenArch', 'watchTower', 'firewoodRack', 'dryingRack', 'toolRack', 'potShelf', 'signBoard', 'lampPost', 'rugMat']);
 /** Purely decorative props: no collision expected. */
 const DECOR = new Set(['rugMat', 'snowBank', 'bush', 'sapling', 'iceShards', 'footpathStones', 'bannerLine', 'basketPile', 'signBoard', 'snowDrift', 'aurora', 'lanternString', 'flagPole']);
 
@@ -116,6 +134,12 @@ export function buildProp(name: string, opts: ModelOpts = {}): THREE.Object3D {
   const g = instantiate(name, def);
   g.userData.prop = name;
   if (DECOR.has(name)) g.userData.decor = true;
+  if (opts.unlit) {
+    // lit/unlit props: hide the fire, show the kindling
+    for (const n of ['flame', 'coals', 'glow']) { const c = g.getObjectByName(n); if (c) c.visible = false; }
+    const k = g.getObjectByName('kindling'); if (k) k.visible = true;
+    g.userData.lit = false;
+  } else if (g.getObjectByName('kindling')) g.userData.lit = true;
   if (e?.by === 'seed') {
     // extra free variation from the full seed: yaw + slight scale
     const s = opts.seed ?? 0;

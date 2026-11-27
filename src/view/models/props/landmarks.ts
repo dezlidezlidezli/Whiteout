@@ -148,7 +148,7 @@ export function gate(): PropSpec {
 
 // ---------------------------------------------------------------- fire & light
 export function brazier(): PropSpec {
-  const b = new Builder(), fl = new Builder(), em = new Builder();
+  const b = new Builder(), fl = new Builder(), em = new Builder(), kin = new Builder();
   const bowlY = 0.78;
   // sturdy splayed legs with curled feet and a ring brace
   for (let i = 0; i < 3; i++) {
@@ -174,8 +174,15 @@ export function brazier(): PropSpec {
   flame(fl, 0.5, 0.15, 11, [0.2, 0, 0.12], 3);
   flame(fl, 0.45, 0.14, 12, [-0.18, 0, -0.12], 3);
   const fy = bowlY + 0.36;
+  // unlit look: a fresh teepee of kindling and straw (named 'kindling', shown when unlit)
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2;
+    logBetween(kin, [Math.cos(a) * 0.3, bowlY + 0.3, Math.sin(a) * 0.3], [Math.cos(a) * 0.04, bowlY + 0.75, Math.sin(a) * 0.04], 0.04, P.woodLight, P.woodPale, 5);
+  }
+  kin.add(cone(0.22, 0.14, 7), 0xe8cf9a, { p: [0, bowlY + 0.36, 0] });
+  kin.add(sphere(0.3, 8, 3), 0x4a4440, { p: [0, bowlY + 0.3, 0], s: [1, 0.2, 1] });
   return {
-    layers: [{ name: 'body', b }, { name: 'coals', b: em, mat: 'ember', shadow: false }, { name: 'flame', b: fl, mat: 'glow', pos: [0, fy, 0] }],
+    layers: [{ name: 'body', b }, { name: 'coals', b: em, mat: 'ember', shadow: false }, { name: 'flame', b: fl, mat: 'glow', pos: [0, fy, 0] }, { name: 'kindling', b: kin, visible: false }],
     markers: { light: [0, fy + 0.5, 0] },
     userData: { radius: 0.55, lightPos: [0, fy + 0.5, 0], lightColor: P.flame, lightIntensity: 1, lightDistance: 5 },
   };

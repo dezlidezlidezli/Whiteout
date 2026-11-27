@@ -13,6 +13,9 @@ describe('audio module under Node', () => {
       audio.music(null);
       audio.ambience({ wind: 0.5, fire: 1, crowd: 0.3, camp: 1 });
       audio.sfx('dawn');
+      audio.sfx('crankNotch');
+      audio.music('whiteout');
+      audio.ambience({ plough: 0.5, skate: 1, forge: 0.2, flame: 1, gust: 0.4 });
       audio.suspend();
       audio.resume();
     }).not.toThrow();

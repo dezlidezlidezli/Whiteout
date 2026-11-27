@@ -538,9 +538,9 @@ const dig: SfxFn = (v) => {
   // scoop: soft low push + a short crunchy grain cluster
   noise(v, { filter: 'lowpass', f: 700, q: 0.8, a: 0.01, d: 0.08, g: 0.5 });
   for (let i = 0; i < 4; i++) {
-    noise(v, { at: 0.02 + rng() * 0.07, filter: 'bandpass', f: rand(rng, 1200, 2600) * v.p, q: 1.2, a: 0.002, d: rand(rng, 0.01, 0.03), g: rand(rng, 0.25, 0.45) });
+    noise(v, { at: 0.02 + rng() * 0.07, filter: 'bandpass', f: rand(rng, 800, 1800) * v.p, q: 1.2, a: 0.002, d: rand(rng, 0.01, 0.03), g: rand(rng, 0.25, 0.45) });
   }
-  noise(v, { at: 0.08, filter: 'highpass', f: 2500, q: 0.6, a: 0.02, d: 0.1, g: 0.06 });
+  noise(v, { at: 0.06, filter: 'bandpass', f: 1500, q: 0.8, a: 0.02, d: 0.08, g: 0.1 });
   return 0.2;
 };
 
@@ -704,8 +704,8 @@ const liftArrive: SfxFn = (v) => {
 };
 
 const bellows: SfxFn = (v) => {
-  noise(v, { filter: 'bandpass', f: 380 * v.p, f2: 900 * v.p, glide: 0.18, q: 1.1, a: 0.14, d: 0.3, g: 0.6 });
-  noise(v, { at: 0.2, filter: 'bandpass', f: 900 * v.p, f2: 300 * v.p, glide: 0.25, q: 1.1, a: 0.02, d: 0.25, g: 0.3 });
+  noise(v, { filter: 'bandpass', f: 300 * v.p, f2: 700 * v.p, glide: 0.18, q: 1.1, a: 0.14, d: 0.3, g: 0.6 });
+  noise(v, { at: 0.2, filter: 'bandpass', f: 700 * v.p, f2: 250 * v.p, glide: 0.25, q: 1.1, a: 0.02, d: 0.25, g: 0.3 });
   return 0.5;
 };
 
@@ -798,25 +798,25 @@ export const SFX: Record<SfxName, SfxSpec> = {
   upgrade: { fn: upgrade, level: 1, minGap: 0.12, poly: 2, cents: 0 },
   beaconStage: { fn: beaconStage, level: 0.55, minGap: 1.0, poly: 1, cents: 0, duck: 0.5 },
   dawn: { fn: dawn, level: 0.8, minGap: 5.0, poly: 1, cents: 0, duck: 0.7 },
-  ploughFind: { fn: ploughFind, level: 1, minGap: 0.15, poly: 2, cents: 20 },
+  ploughFind: { fn: ploughFind, level: 0.6, minGap: 0.15, poly: 2, cents: 20 },
   zoneCleared: { fn: zoneCleared, level: 1, minGap: 1.0, poly: 1, cents: 0, duck: 0.4 },
-  dig: { fn: dig, level: 1, minGap: 0.12, poly: 2, cents: 80 },
+  dig: { fn: dig, level: 3.2, minGap: 0.12, poly: 2, cents: 80 },
   rescued: { fn: rescued, level: 1, minGap: 0.5, poly: 2, cents: 0, duck: 0.3 },
   followerWait: { fn: followerWait, level: 1, minGap: 0.3, poly: 2, cents: 30 },
   followerHome: { fn: followerHome, level: 1, minGap: 0.2, poly: 2, cents: 0 },
-  lanternOn: { fn: lanternOn, level: 1, minGap: 0.3, poly: 1, cents: 10 },
-  allFound: { fn: allFound, level: 1, minGap: 3.0, poly: 1, cents: 0, duck: 0.8 },
+  lanternOn: { fn: lanternOn, level: 2.2, minGap: 0.3, poly: 1, cents: 10 },
+  allFound: { fn: allFound, level: 0.75, minGap: 3.0, poly: 1, cents: 0, duck: 0.8 },
   fishLeapSpawn: { fn: fishLeapSpawn, level: 1, minGap: 0.08, poly: 2, cents: 60 },
   fishLeapCatch: { fn: fishLeapCatch, level: 1, minGap: 0.06, poly: 3, cents: 5 },
   skateBounce: { fn: skateBounce, level: 1, minGap: 0.15, poly: 2, cents: 60 },
-  crankNotch: { fn: crankNotch, level: 1, minGap: 0.05, poly: 3, cents: 40 },
+  crankNotch: { fn: crankNotch, level: 2.0, minGap: 0.05, poly: 3, cents: 40 },
   crankTurn: { fn: crankTurn, level: 1, minGap: 0.3, poly: 2, cents: 30 },
   liftArrive: { fn: liftArrive, level: 1, minGap: 0.3, poly: 2, cents: 20 },
-  bellows: { fn: bellows, level: 1, minGap: 0.2, poly: 2, cents: 60 },
+  bellows: { fn: bellows, level: 1.6, minGap: 0.2, poly: 2, cents: 60 },
   flameTaken: { fn: flameTaken, level: 1, minGap: 0.3, poly: 1, cents: 0 },
   flameLow: { fn: flameLow, level: 1, minGap: 1.0, poly: 1, cents: 30 },
   flameOut: { fn: flameOut, level: 1, minGap: 0.5, poly: 1, cents: 0 },
-  brazierLit: { fn: brazierLit, level: 1, minGap: 0.5, poly: 1, cents: 0, duck: 0.5 },
+  brazierLit: { fn: brazierLit, level: 0.6, minGap: 0.5, poly: 1, cents: 0, duck: 0.5 },
   trailComplete: { fn: trailComplete, level: 1, minGap: 2.0, poly: 1, cents: 0, duck: 0.7 },
 };
 

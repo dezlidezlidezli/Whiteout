@@ -27,7 +27,12 @@ export type PropName =
   | 'flagPole' | 'lanternString' | 'statue' | 'well' | 'sleighBell' | 'iceSculpture' | 'marketStall'
   | 'campfireRing' | 'caravan' | 'aurora'
   // density kit / yard clutter (opts.seed picks a variant)
-  | 'crateStack' | 'barrelCluster' | 'sackPile' | 'firewoodRack' | 'dryingRack' | 'supplySled' | 'toolRack' | 'washTub' | 'basketPile' | 'potShelf' | 'signBoard' | 'rugMat' | 'snowBank' | 'bush' | 'sapling' | 'fallenLog' | 'iceShards' | 'footpathStones' | 'lampPost' | 'bannerLine' | 'woodenArch' | 'watchTower' | 'snowyBoulderCluster';
+  | 'crateStack' | 'barrelCluster' | 'sackPile' | 'firewoodRack' | 'dryingRack' | 'supplySled' | 'toolRack' | 'washTub' | 'basketPile' | 'potShelf' | 'signBoard' | 'rugMat' | 'snowBank' | 'bush' | 'sapling' | 'fallenLog' | 'iceShards' | 'footpathStones' | 'lampPost' | 'bannerLine' | 'woodenArch' | 'watchTower' | 'snowyBoulderCluster'
+  // signature mechanics (docs/MECHANICS.md)
+  | 'plough' // opts.level 1 | 2 (2.4 m iron-edged blade)
+  | 'emberCache' | 'buriedCrate' | 'buriedVillager' | 'lanternHeld' | 'foundBoard' | 'monument'
+  | 'gripMat' | 'fishLeap' | 'capstan' | 'bellows' | 'mineLift' | 'shaftPile'
+  | 'flameHeld' | 'trailBrazier' | 'windGap' | 'festivalLamp';
 
 export interface ModelOpts {
   level?: number;
@@ -141,3 +146,13 @@ export function createLanternStringPath(points: _XZ[], opts?: _LanternStringPath
 export function createFloor(type: _FloorType, width: number, depth: number, opts?: _FloorOpts): THREE.Object3D { return _floor(type, width, depth, opts); }
 /** Tiny ground scatter for InstancedMesh (same shape as getItemMesh). */
 export function getScatterMesh(kind: _ScatterKind): ItemMeshDef { return _scatterMesh(kind); }
+
+// ---------------------------------------------------------------- mechanics helpers (additive API)
+import { deepSnowCell as _deepSnowCell, snowBankCell as _snowBankCell, iceSheet as _iceSheet, type IceSheetOpts as _IceSheetOpts } from './snowcells';
+export type { IceSheetOpts } from './snowcells';
+/** Instancable deep-snow cell (0.5 m footprint, ~0.45 m tall); opts.seed % 4 picks a shape variant. */
+export function getDeepSnowMesh(opts: ModelOpts = {}): CrowdMeshDef { return _deepSnowCell(opts.seed ?? 0); }
+/** Curled-off plough bank cell (~0.55 m along Z, lip curls to +X); opts.seed % 3 picks a variant. */
+export function getSnowBankMesh(opts: ModelOpts = {}): CrowdMeshDef { return _snowBankCell(opts.seed ?? 0); }
+/** Lake-ice floor, one draw call, glossy; userData.surface = 'ice'. */
+export function createIceSheet(width: number, depth: number, opts?: _IceSheetOpts): THREE.Object3D { return _iceSheet(width, depth, opts); }

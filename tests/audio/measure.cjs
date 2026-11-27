@@ -194,7 +194,9 @@ const f3 = (x) => (Number.isFinite(x) ? x.toFixed(3) : String(x));
     { gust: 1 },
     { wind: 1, gust: 1 },
     { wind: 1, fire: 1, crowd: 1, camp: 1 },
-    { wind: 1, gust: 1, flame: 1, skate: 1, plough: 1, forge: 1 },
+    { wind: 1, gust: 1, flame: 1 }, // Trail of Light
+    { wind: 1, plough: 1 },
+    { forge: 1, fire: 1, camp: 1 },
   ];
   // [centroid lo, hi] per bed when it plays alone at level 1
   const AMB_CENT = { wind: [300, 1500], fire: [300, 2000], crowd: [120, 900], camp: [150, 1500], plough: [600, 3500], skate: [1500, 7000], forge: [100, 1500], flame: [150, 1500], gust: [400, 1800] };

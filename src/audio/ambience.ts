@@ -30,11 +30,11 @@ const BEDS: Record<BedName, [number, number, number, [number, number]?]> = {
   fire: [0.5, 1.2, 0.6],
   crowd: [0.3, 1.2, 1],
   camp: [0.3, 1.2, 1],
-  plough: [0.3, 1.0, 0.4, [900, 5000]],
+  plough: [0.24, 1.0, 0.4, [900, 5000]],
   skate: [0.26, 1.0, 0.25, [2200, 9000]],
   forge: [0.4, 0.8, 0.8, [450, 3500]],
-  flame: [0.4, 1.0, 0.4, [500, 3000]],
-  gust: [0.32, 1.2, 0.5],
+  flame: [0.32, 1.0, 0.4, [500, 3000]],
+  gust: [0.26, 1.2, 0.5],
 };
 
 interface Loop {

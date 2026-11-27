@@ -49,7 +49,10 @@ function make() {
     side: THREE.DoubleSide, toneMapped: false, fog: false,
   });
   aurora.name = 'fk-aurora';
-  return { std, glow, ember, ice, crowd, aurora };
+  /** Glossy lake-ice floor (vertex coloured, smooth). */
+  const iceFloor = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.22, metalness: 0.08, flatShading: false });
+  iceFloor.name = 'fk-ice-floor';
+  return { std, glow, ember, ice, crowd, aurora, iceFloor };
 }
 
 export function mats() {
