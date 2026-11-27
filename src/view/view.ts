@@ -210,14 +210,6 @@ export class View {
       this.rescue.attach(this.actors.player.root);
     }
     if (this.data.mechanics?.skate) {
-      // Rink beyond the dressed lake-ice floor (the east lot, skateable once ploughed).
-      let floorX1 = -Infinity;
-      for (const a of this.data.dressing) for (const f of a.floors) if (f.type === 'ice') floorX1 = Math.max(floorX1, f.x + f.w / 2);
-      const extend: { x0: number; x1: number; z0: number; z1: number }[] = [];
-      for (const r of this.data.mech.ice) {
-        const x0 = Math.max(r.x0, floorX1);
-        if (r.x1 - x0 > 0.5) extend.push({ x0, x1: r.x1, z0: r.z0, z1: r.z1 });
-      }
       this.skate = new SkateView(this.scene, sim, {
         puff: (x, y, z, n, r, sp, sc) => this.fx.puff(x, y, z, n, r, sp, sc),
         ring: (x, z, size, color, dur) => this.fx.ring(x, z, size, color, dur),
@@ -225,7 +217,7 @@ export class View {
         float: (text, x, y, z, kind) => this.hooks.float(text, new THREE.Vector3(x, y, z), kind),
         sfx: (name, opts) => this.sfx(name, opts ?? {}, 0.05),
         groundAt: (x, z) => this.surface.heightAt(x, z),
-      }, extend);
+      });
       this.skate.attach(this.actors.player.root);
     }
     this.crowd = new Crowd(this.scene, this.data);
@@ -563,7 +555,12 @@ export class View {
     const pr = this.renderer.getPixelRatio();
     this.renderer.setPixelRatio(1);
     this.renderer.setSize(px, Math.round((px * d) / w), false);
+    // Screen-space atmosphere (the rescue whiteout veil) means nothing from straight above.
+    const veils: THREE.Object3D[] = [];
+    this.scene.traverse((o) => { if (o.name.startsWith('whiteout') && o.visible) veils.push(o); });
+    for (const o of veils) o.visible = false;
     this.renderer.render(this.scene, cam);
+    for (const o of veils) o.visible = true;
     const url = this.renderer.domElement.toDataURL('image/png');
     this.scene.remove(lines);
     lines.geometry.dispose();
@@ -1044,6 +1041,7 @@ export class View {
     }
     if (this.skate) {
       this.skate.update(sim, dt, px, pz);
+      this.rig.glideWant = this.skate.action ? Math.min(1, Math.hypot(p.vx, p.vz) / 6) : 0;
       if (this.skate.action) this.actors.playerAction = this.skate.action;
       else if (!this.plough) this.actors.playerAction = null;
     }

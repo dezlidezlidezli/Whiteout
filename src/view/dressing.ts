@@ -10,7 +10,7 @@ import type { Sim } from '../sim';
 import type { GroundUniforms } from './ground';
 import { SnowMask, type MaskShape } from './snowmask';
 import {
-  createFencePath, createFloor, createPathStrip, createProp, createWallPath, getScatterMesh, type ScatterKind, type XZ,
+  createFencePath, createFloor, createIceSheet, createPathStrip, createProp, createWallPath, getScatterMesh, type ScatterKind, type XZ,
 } from './models';
 import { seeThrough } from './occlude';
 import { FLOOR_BASE, FLOOR_STEP, PATH_Y, type SurfaceMap } from './surface';
@@ -223,6 +223,73 @@ function irregular(w: number, d: number, rand: () => number): XZ[] {
   return out;
 }
 
+/** Rinks: clusters of touching 'ice' floor boxes, each outlined as one smooth loop (radial sample of the
+ *  union from its centre, then smoothed so steps between boxes become rounded corners). */
+function rinks(floors: { x: number; z: number; w: number; d: number }[]): { cx: number; cz: number; w: number; d: number; poly: [number, number][] }[] {
+  const boxes = floors.map((f) => ({ x0: f.x - f.w / 2, x1: f.x + f.w / 2, z0: f.z - f.d / 2, z1: f.z + f.d / 2 }));
+  const groups: (typeof boxes)[] = [];
+  for (const b of boxes) {
+    const hit = groups.filter((g) => g.some((o) => b.x0 <= o.x1 + 0.1 && b.x1 >= o.x0 - 0.1 && b.z0 <= o.z1 + 0.1 && b.z1 >= o.z0 - 0.1));
+    const merged = [b, ...hit.flat()];
+    for (const g of hit) groups.splice(groups.indexOf(g), 1);
+    groups.push(merged);
+  }
+  return groups.map((g) => {
+    const x0 = Math.min(...g.map((b) => b.x0));
+    const x1 = Math.max(...g.map((b) => b.x1));
+    const z0 = Math.min(...g.map((b) => b.z0));
+    const z1 = Math.max(...g.map((b) => b.z1));
+    const cx = (x0 + x1) / 2;
+    const cz = (z0 + z1) / 2;
+    const inside = (x: number, z: number) => g.some((b) => x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1);
+    const N = 120;
+    const rad: number[] = [];
+    const maxR = Math.hypot(x1 - x0, z1 - z0);
+    for (let k = 0; k < N; k++) {
+      const a = (k / N) * Math.PI * 2;
+      let r = 0;
+      for (let t = 0; t < maxR; t += 0.05) if (inside(cx + Math.cos(a) * t, cz + Math.sin(a) * t)) r = t;
+      rad.push(r);
+    }
+    // Smooth: rounds the corners and the steps between boxes (a few passes of a 5-tap average).
+    let cur = rad;
+    for (let pass = 0; pass < 4; pass++) cur = cur.map((_, k) => (cur[(k - 2 + N) % N] + cur[(k - 1 + N) % N] * 2 + cur[k] * 3 + cur[(k + 1) % N] * 2 + cur[(k + 2) % N]) / 9);
+    const poly = cur.map((r, k) => [Math.cos((k / N) * Math.PI * 2) * r, Math.sin((k / N) * Math.PI * 2) * r] as [number, number]);
+    return { cx, cz, w: x1 - x0 + 0.2, d: z1 - z0 + 0.2, poly };
+  });
+}
+
+/** Point at arc length s along a closed loop, with the outward normal (for a loop around its centroid). */
+function alongLoop(pts: XZ[], s: number): { x: number; z: number; nx: number; nz: number } {
+  let cx = 0;
+  let cz = 0;
+  for (const p of pts) {
+    cx += p[0];
+    cz += p[1];
+  }
+  cx /= pts.length;
+  cz /= pts.length;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % pts.length];
+    const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (s <= l || i === pts.length - 1) {
+      const t = l > 0 ? Math.min(1, s / l) : 0;
+      const x = a[0] + (b[0] - a[0]) * t;
+      const z = a[1] + (b[1] - a[1]) * t;
+      let nx = (b[1] - a[1]) / (l || 1);
+      let nz = -(b[0] - a[0]) / (l || 1);
+      if (nx * (x - cx) + nz * (z - cz) < 0) {
+        nx = -nx;
+        nz = -nz;
+      }
+      return { x, z, nx, nz };
+    }
+    s -= l;
+  }
+  return { x: pts[0][0], z: pts[0][1], nx: 0, nz: 1 };
+}
+
 function segDist(px: number, pz: number, a: XZ, b: XZ): number {
   const dx = b[0] - a[0];
   const dz = b[1] - a[1];
@@ -279,6 +346,11 @@ export class DressingView {
 
       a.floors.forEach((f, i) => {
         if (skipCampFloor(a.area, f.type)) return;
+        if (f.type === 'ice') {
+          // Lake ice is drawn below as one organic sheet per rink (no tile seams); still pressed flat.
+          flats.push({ x0: f.x - f.w / 2, z0: f.z - f.d / 2, x1: f.x + f.w / 2, z1: f.z + f.d / 2 });
+          return;
+        }
         // In the camp meadow the hearth square is a smaller, irregular patch of warm stones.
         const soft = a.area === 'camp';
         const w = soft ? f.w * 0.82 : f.w;
@@ -289,6 +361,35 @@ export class DressingView {
         flatRoots.push(o);
         flats.push({ x0: f.x - f.w / 2, z0: f.z - f.d / 2, x1: f.x + f.w / 2, z1: f.z + f.d / 2 });
       });
+      for (const rk of rinks(a.floors.filter((f) => f.type === 'ice'))) {
+        const sheet = createIceSheet(rk.w, rk.d, { polygon: rk.poly, seed: ai * 7 + 3, edge: true });
+        sheet.position.set(rk.cx, FLOOR_BASE + 0.03, rk.cz);
+        flatRoots.push(sheet);
+        // Warm post lanterns along the shore sides (not the open ice-shelf side, not on stations/pads).
+        const shelf = (a.edges ?? []).filter((e) => e.kind === 'iceShelf').map((e) => e.points);
+        const rects = data.areas.find((ar) => ar.id === a.area)?.rects ?? [];
+        const inArea = (x: number, z: number) => rects.some((r) => x > r.x0 + 0.6 && x < r.x1 - 0.6 && z > r.z0 + 0.6 && z < r.z1 - 0.6);
+        const nearShelf = (x: number, z: number) => shelf.some((pts) => pts.some((_, i) => i > 0 && segDist(x, z, pts[i - 1], pts[i]) < 2.6));
+        const outline = rk.poly.map(([x, z]) => [x + rk.cx, z + rk.cz] as XZ);
+        let per = 0;
+        for (let i = 0; i < outline.length; i++) per += Math.hypot(outline[(i + 1) % outline.length][0] - outline[i][0], outline[(i + 1) % outline.length][1] - outline[i][1]);
+        const n = Math.max(4, Math.round(per / 3.0));
+        let lastX = Infinity;
+        let lastZ = Infinity;
+        for (let k = 0; k < n; k++) {
+          const q = alongLoop(outline, (k / n) * per);
+          // Step 1.1 m out from the ice onto the snowy shore.
+          const x = q.x + q.nx * 1.1;
+          const z = q.z + q.nz * 1.1;
+          if (!inArea(x, z) || nearShelf(x, z) || blocked(x, z, 0.35) || Math.hypot(x - lastX, z - lastZ) < 2.2) continue;
+          const o = createProp('rinkLantern', { seed: k });
+          o.position.set(x, 0, z);
+          o.rotation.y = Math.atan2(-q.nx, -q.nz);
+          solidRoots.push(o);
+          lastX = x;
+          lastZ = z;
+        }
+      }
       a.paths.forEach((p, i) => {
         // Inside the warm camp meadow the ground itself shows the worn earth: no snowy strips.
         if (a.area === 'camp' && p.type === 'trampled') return;

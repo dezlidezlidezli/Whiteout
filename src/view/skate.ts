@@ -4,13 +4,13 @@
 // - Fish leaps: the sim's leaps are a telegraph splash, then a fish arcing out of the ice; skating
 //   through one scoops it with a glint and a rising-pitch combo callout.
 // - Gentle wall bounces spray ice; the blade hiss (skate ambience) follows speed.
-// - The lake ice is extended over the east lot (mech.ice) where the dressing floor stops.
+// - The rink itself is dressing (one organic sheet from the data's ice floors, see dressing.ts).
 
 import * as THREE from 'three';
 import { ladderPitch } from '../audio';
 import type { SimEvent } from '../sim';
 import type { Sim } from '../sim';
-import { createIceSheet, createProp } from './models';
+import { createProp } from './models';
 
 export interface SkateHooks {
   puff(x: number, y: number, z: number, n: number, radius: number, speed: number, scale?: number): void;
@@ -54,7 +54,7 @@ export class SkateView {
   /** 0..1 blade hiss for the `skate` ambience bed. */
   level = 0;
 
-  constructor(private parent: THREE.Object3D, sim: Sim, private hooks: SkateHooks, extendOver: { x0: number; x1: number; z0: number; z1: number }[]) {
+  constructor(private parent: THREE.Object3D, sim: Sim, private hooks: SkateHooks) {
     const g = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
     const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3, toneMapped: false });
     this.trail = new THREE.InstancedMesh(g, mat, TRAIL_MAX);
@@ -62,13 +62,6 @@ export class SkateView {
     this.trail.frustumCulled = false;
     this.trail.renderOrder = 3;
     parent.add(this.trail);
-    // Ice where the mechanic's rink goes beyond the dressed lake floor (the east lot once ploughed).
-    for (const r of extendOver) {
-      const ice = createIceSheet(r.x1 - r.x0, r.z1 - r.z0, { seed: 7, edge: true });
-      ice.position.set((r.x0 + r.x1) / 2, this.hooks.groundAt((r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2) + 0.005, (r.z0 + r.z1) / 2);
-      ice.traverse((o) => { o.receiveShadow = true; });
-      parent.add(ice);
-    }
     void sim;
   }
 

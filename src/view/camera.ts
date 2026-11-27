@@ -23,6 +23,9 @@ export class CameraRig {
   /** 1 = title drift, 0 = gameplay; eases between. */
   private titleBlend = 0;
   private titleWant = 0;
+  /** 0..1 how fast the player is gliding on ice (skating): more look-ahead and a little pull-back. */
+  glideWant = 0;
+  private glide = 0;
   private titleT = 0;
   private gamePos = new THREE.Vector3();
   private gameLook = new THREE.Vector3();
@@ -89,8 +92,10 @@ export class CameraRig {
     const kv = 1 - Math.exp(-dt * 3);
     this.vx += (vx - this.vx) * kv;
     this.vz += (vz - this.vz) * kv;
-    const ax = px + this.vx * 0.32;
-    const az = pz + this.vz * 0.32 + this.bias + this.safe;
+    this.glide += (this.glideWant - this.glide) * (1 - Math.exp(-dt * 1.6));
+    const ahead = 0.32 + 0.2 * this.glide;
+    const ax = px + this.vx * ahead;
+    const az = pz + this.vz * ahead + this.bias + this.safe;
     let tx = ax;
     let tz = az;
     if (this.pan) {
@@ -105,7 +110,7 @@ export class CameraRig {
     this.target.x += (tx - this.target.x) * f;
     this.target.z += (tz - this.target.z) * f;
     this.punch = Math.max(0, this.punch - dt * 0.6);
-    const want = this.baseDistance() + Math.min(9, stackLen * 0.16) + (this.pan ? 5 : 0) + this.punch * 4;
+    const want = this.baseDistance() + Math.min(9, stackLen * 0.16) + (this.pan ? 5 : 0) + this.punch * 4 + this.glide * 2.4;
     this.dist += (want - this.dist) * (1 - Math.exp(-dt * 2.2));
     const c = this.camera;
     let sx = 0;
