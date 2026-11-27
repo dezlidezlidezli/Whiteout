@@ -33,6 +33,12 @@ export interface ModelOpts {
   level?: number;
   /** Deterministic variation seed. */
   seed?: number;
+  /** Character look variant, e.g. 'rescued' (blanket-wrapped, frosty follower). */
+  variant?: 'default' | 'rescued';
+  /** Characters: show skate blades under the boots (named children skateL / skateR; the view may toggle them). */
+  skates?: boolean;
+  /** Props with a lit/unlit state (brazier, trailBrazier, festivalLamp): start unlit. */
+  unlit?: boolean;
 }
 
 /** Static prop. Unknown names return a placeholder box, never throw. */
@@ -75,7 +81,8 @@ export interface CharacterAnimState {
   /** True when holding a stack (arms forward). */
   carrying: boolean;
   /** Optional one-shot/looping action. */
-  action?: 'none' | 'chop' | 'mine' | 'fish' | 'cook' | 'cheer' | 'shiver';
+  action?: 'none' | 'chop' | 'mine' | 'fish' | 'cook' | 'cheer' | 'shiver'
+    | 'plough' | 'skate' | 'crank' | 'carryFlame' | 'dig' | 'shuffle';
 }
 /** Procedural animation: call every frame for each visible rig. */
 export function animateCharacter(rig: CharacterRig, s: CharacterAnimState): void {
