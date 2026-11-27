@@ -5,3 +5,4 @@ export { SAVE_VERSION } from './state';
 export { encodeSaveCode, decodeSaveCode, migrate } from './save';
 export { Autopilot } from './autopilot';
 export type { GuideTarget } from './guide';
+export { housingInfo, ackRehoused, tentsAllowed, HOMES_FULL_EVERY, type HousingInfo, type NextHome } from './housing';

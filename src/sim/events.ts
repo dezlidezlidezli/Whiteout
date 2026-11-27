@@ -86,6 +86,9 @@ export type SimEvent =
   | { type: 'trailComplete' }
   | { type: 'beaconLit' }
   /** A thawed villager found no free home and walked on to the valley. */
-  | { type: 'passThrough'; customer: number };
+  | { type: 'passThrough'; customer: number }
+  /** Throttled (every 30 s at most): villagers are being turned away for lack of homes. `next`: what raises
+   * capacity next ('tent' rises by itself; 'cabin'/'hearth' name the pad to build). */
+  | { type: 'homesFull'; turnedAway: number; capacity: number; next: 'tent' | 'cabin' | 'hearth' | null; pad: string | null };
 
 export type SimEventType = SimEvent['type'];

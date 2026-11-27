@@ -167,6 +167,10 @@ export interface SimState {
   stats: Record<string, number>;
   mods: Record<ModKey, number>;
   guideMemo: ItemKind | null;
+  /** Turned-away villagers since the last homesFull event (housing.ts). */
+  homesFull?: { t: number; n: number };
+  /** Set by the v2 -> v3 migration when population was capped to the homes built (HUD explains, then acks). */
+  rehoused?: { from: number; to: number } | null;
   /** Guidance is mid-way through handing in items the goal can't use. */
   guideUnload: boolean;
   // ---- v2: late campaign + Open Season ----
@@ -364,6 +368,7 @@ export function normalizeState(s: SimState, data: GameData): void {
       const cap = h.base + h.perTent * s.tents + h.perCabin * cabins;
       if (s.population > cap) {
         s.stats.passedThrough = (s.stats.passedThrough ?? 0) + (s.population - cap);
+        s.rehoused = { from: s.population, to: cap };
         s.population = cap;
       }
     }

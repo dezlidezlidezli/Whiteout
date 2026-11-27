@@ -15,6 +15,7 @@ import { finaleWarmRadius, setBeaconStage, updateFinale } from './finale';
 import { procBoost, updateCrank } from './crank';
 import { updateFlame } from './flame';
 import { ploughSpeed, updatePlough } from './plough';
+import { noteTurnedAway } from './housing';
 import { updateRescue } from './rescue';
 import { skateBounce, skateVelocity, updateSkate } from './skate';
 import { migrate } from './save';
@@ -1151,6 +1152,7 @@ export class Sim {
     }
     if (s.population >= this.housingCap()) {
       this.addStat('passedThrough', 1);
+      noteTurnedAway(this);
       return false;
     }
     s.population += 1;
