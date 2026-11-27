@@ -21,6 +21,7 @@ import type { Credits } from '../../ui/late/credits';
 import type { BeaconView } from './beacon';
 import { clamp01, fxOf, glowSprite, rigOf, sfxAt, smooth, worldOf, type LateCtx, type LatePart } from './ctx';
 import type { MoodSource } from './mood';
+import type { GroundFx } from './groundfx';
 
 interface Key { T: number; pos: THREE.Vector3; look: THREE.Vector3 }
 
@@ -44,6 +45,7 @@ const _m = new THREE.Matrix4();
 export interface FinaleDeps {
   credits: Credits;
   hudRoot: HTMLElement;
+  ground: GroundFx;
 }
 
 export class FinaleDirector implements LatePart, MoodSource {
@@ -63,7 +65,9 @@ export class FinaleDirector implements LatePart, MoodSource {
   private sun: THREE.Sprite;
   private sunCore: THREE.Sprite;
   private skipEl: HTMLDivElement;
-  private groundU = { uFkGreen: { value: 0 }, uFkPatches: { value: 0 } };
+  private get groundU() {
+    return this.deps.ground;
+  }
   private grade = 0;
   private orig: { exposure: number } | null = null;
   private onDown = (e: PointerEvent) => this.trySkip(e);
@@ -86,7 +90,6 @@ export class FinaleDirector implements LatePart, MoodSource {
     deps.hudRoot.appendChild(this.skipEl);
     window.addEventListener('pointerdown', this.onDown, { capture: true });
     deps.credits.onClose = () => this.endCredits();
-    this.patchGround();
     this.reset();
   }
 
@@ -119,38 +122,6 @@ export class FinaleDirector implements LatePart, MoodSource {
   }
 
   // ------------------------------------------------------------------ ground: greener thaw + lingering snow
-
-  private patchGround(): void {
-    const mat = this.ctx.view['ground'].mesh.material as THREE.Material;
-    const prev = mat.onBeforeCompile;
-    const u = this.groundU;
-    mat.onBeforeCompile = function (sh, r) {
-      prev.call(this, sh, r);
-      const fs = sh.fragmentShader;
-      // Only extend the shader we know (falls back to the plain thaw if the ground shader changes).
-      if (!fs.includes('fkMelt') || !fs.includes('vFkWorld') || !fs.includes('uniform vec3 uSnow;') || !fs.includes('#include <alphamap_fragment>')) return;
-      Object.assign(sh.uniforms, u);
-      sh.fragmentShader = fs
-        .replace('uniform vec3 uSnow;', 'uniform vec3 uSnow; uniform float uFkGreen; uniform float uFkPatches;')
-        .replace(
-          '#include <alphamap_fragment>',
-          `#include <alphamap_fragment>
-{
-  vec2 fxz = vFkWorld.xz;
-  float fm = fkMelt(fxz);
-  float tuft = fkNoise(fxz * 1.3);
-  vec3 lush = diffuseColor.rgb * vec3(0.74, 1.16, 0.58) + vec3(0.015, 0.05, 0.0);
-  diffuseColor.rgb = mix(diffuseColor.rgb, lush, fm * uFkGreen * (0.55 + 0.45 * tuft));
-  float pn = fkFbm(fxz * 0.16 + vec2(5.0, 2.0));
-  float patchK = smoothstep(0.71, 0.75, pn + tuft * 0.05) * uFkPatches;
-  diffuseColor.rgb = mix(diffuseColor.rgb, uSnow * (0.9 + 0.1 * tuft), patchK);
-}`,
-        );
-    };
-    const prevKey = mat.customProgramCacheKey.bind(mat);
-    mat.customProgramCacheKey = () => `${prevKey()}|fk-late-ground`;
-    mat.needsUpdate = true;
-  }
 
   // ------------------------------------------------------------------ state
 

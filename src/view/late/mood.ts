@@ -42,7 +42,10 @@ export class Mood implements LatePart {
       if (d.type !== 'processor' || d.model !== 'forge' || !sim.isActive(d.id)) continue;
       const st = s.stations[d.id];
       if (!st || st.kind !== 'processor' || !st.active) continue;
-      forge = Math.max(forge, Math.max(0, 1 - Math.hypot(p.x - d.x, p.z - d.z) / 8) * 0.8);
+      // The bellows' blast makes it roar (crank mechanic; 0 when it is switched off).
+      let blast = 0;
+      for (const c of sim.data.mech?.cranks ?? []) if (c.use === 'bellows' && c.target === d.id) blast = (s as unknown as { crank?: Record<string, { blast: number }> }).crank?.[c.id]?.blast ?? 0;
+      forge = Math.max(forge, Math.max(0, 1 - Math.hypot(p.x - d.x, p.z - d.z) / (8 + blast * 4)) * (0.55 + 0.45 * blast));
     }
     // Only touch the forge bed when we have something to say (the crank mechanic may drive it too).
     if (forge > 0.01 || this.lastForge > 0.01) amb.forge = forge;

@@ -34,3 +34,5 @@ export function itemName(item: string, n = 2): string {
   const p = ITEM_NAMES[item] ?? [item, item];
   return n === 1 ? p[0] : p[1];
 }
+
+export const ICON_LAMP = S(`<path d="M12 2v3" stroke="#3a2414" stroke-width="1.4" stroke-linecap="round"/><rect x="9" y="4.4" width="6" height="2" rx="1" fill="#6a4a2a"/><ellipse cx="12" cy="12" rx="6" ry="6.6" fill="#ffc46b" stroke="#7a3a10" stroke-width="1.2"/><path d="M8 9.5c2.6 1 5.4 1 8 0M7.6 13c2.8 1.1 6 1.1 8.8 0" fill="none" stroke="#c87a30" stroke-width="1"/><path d="M12 9.6c.9 1.3 1.6 2.1 1.6 3.2a1.6 1.6 0 0 1-3.2 0c0-1.1.7-1.9 1.6-3.2z" fill="#fff4c4"/><rect x="10" y="18.4" width="4" height="2" rx="1" fill="#6a4a2a"/>`);

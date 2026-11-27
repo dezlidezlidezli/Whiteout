@@ -177,3 +177,42 @@
   transition: opacity 0.6s;
 }
 .fk-skip.fk-on { opacity: 1; }
+
+/* ---------------------------------------------------------------- carried flame meter (follows the player) */
+.fk-flame-meter {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px 4px 5px;
+  border-radius: 14px;
+  background: rgba(20, 28, 50, 0.72);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25), inset 0 0 0 2px rgba(255, 190, 110, 0.55);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+  will-change: transform;
+}
+.fk-flame-meter.fk-on { opacity: 1; }
+.fk-ui.fk-cinema .fk-flame-meter { opacity: 0; }
+.fk-flame-meter .fk-fm-ico {
+  width: 16px;
+  height: 18px;
+  display: block;
+  background: radial-gradient(60% 60% at 50% 65%, #fff2b0 0%, #ffb347 45%, #ff6a2b 75%, transparent 78%);
+  border-radius: 50% 50% 45% 45% / 60% 60% 40% 40%;
+  animation: fk-flicker 0.8s ease-in-out infinite;
+}
+.fk-flame-meter b { display: block; width: 52px; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.15); overflow: hidden; }
+.fk-flame-meter b > i { display: block; height: 100%; width: 100%; border-radius: 4px; background: linear-gradient(90deg, #ff7a32, #ffd27a); transition: width 0.25s; }
+.fk-flame-meter.fk-fm-low b > i { background: linear-gradient(90deg, #8fb8e0, #ffb347); }
+.fk-flame-meter.fk-fm-low .fk-fm-ico { filter: saturate(0.6) brightness(0.9); }
+.fk-flame-meter.fk-fm-wind { animation: fk-fm-shiver 0.25s linear infinite; }
+.fk-flame-meter.fk-fm-warn { animation: fk-fm-warn 0.7s ease-out; }
+@keyframes fk-fm-shiver { 25% { margin-left: -1px; } 75% { margin-left: 1px; } }
+@keyframes fk-fm-warn { 30% { box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25), inset 0 0 0 2px #ffd27a, 0 0 16px rgba(255, 170, 80, 0.9); } }
+
+.fk-ord.fk-ord-fest .fk-ord-fill { stroke: #ffd27a; }
+.fk-ord.fk-ord-fest { box-shadow: 0 3px 0 rgba(0, 0, 0, 0.28), inset 0 0 0 2px rgba(255, 196, 107, 0.75); }
