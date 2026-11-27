@@ -2,7 +2,6 @@
 // conveyors and the Hearth. Station props come from createProp; repeated props are instanced.
 
 import * as THREE from 'three';
-import { TENT_SCALE, visibleTents } from './camplayout';
 import type { DecorDef, GameData, ItemKind, StationDef } from '../data/types';
 import type { NodeState, Sim } from '../sim';
 import { PropInstancer, trs } from './instancer';
@@ -90,7 +89,7 @@ export class WorldView {
   private tentInst: PropInstancer;
   private tentAppear: number[] = [];
   private tentDone: boolean[] = [];
-  private tentShown: boolean[] = [];
+  private shelfMats: { mesh: THREE.Mesh; x: number; z: number }[] = [];
   private walls: WallView[] = [];
   private beltInst = new Map<string, PropInstancer>();
   private hearthObj: THREE.Object3D | null = null;
@@ -152,6 +151,7 @@ export class WorldView {
         obj.visible = false;
         this.root.add(obj);
         const ghost = makeGhost(d.model, d.x, d.z, d.rot ?? 0);
+        ghost.scale.setScalar(d.scale ?? 1); // DecorDef.scale everywhere (cabins are 0.72)
         this.root.add(ghost);
         this.decor.set(d.id, { def: d, obj, ghost, appear: 1, shown: false });
         continue;
@@ -224,6 +224,7 @@ export class WorldView {
       mat.position.set(d.x, 0.035, d.z);
       mat.rotation.y = d.rot ?? 0;
       this.root.add(mat);
+      this.shelfMats.push({ mesh: mat, x: d.x, z: d.z });
     }
 
     // Everything that can stand between the camera and the player dissolves around them.
@@ -253,7 +254,6 @@ export class WorldView {
     for (const [id, inst] of this.beltInst) inst.setVisible(sim.isActive(id));
     this.tentAppear = [];
     this.tentDone = [];
-    this.tentShown = [];
     for (let i = 0; i < sim.state.tents; i++) this.tentAppear[i] = 1;
     this.setHearthLevel(sim.state.hearth.level);
   }
@@ -384,7 +384,7 @@ export class WorldView {
         const sh = Math.sin(time * 45) * n.shake * 0.08;
         const o = n.occ;
         _m2.makeScale(1 + o * 0.1, 1 - o * 0.55, 1 + o * 0.1);
-        trs(_m, n.def.x, 0, n.def.z, rot, Math.max(0.001, s), sh, sh * 0.6);
+        trs(_m, n.def.x, this.groundY(n.def.x, n.def.z), n.def.z, rot, Math.max(0.001, s), sh, sh * 0.6);
         inst.set(n.index, _m.multiply(_m2));
       } else if (tree) {
         n.fall = Math.min(1.6, n.fall + dt);
@@ -397,7 +397,7 @@ export class WorldView {
         this.stumpInst.set(stumps++, trs(_m, n.def.x, 0, n.def.z, rot, 1));
       } else {
         n.fall = Math.min(1, n.fall + dt * 2);
-        inst.set(n.index, trs(_m, n.def.x, -n.fall * 0.3, n.def.z, rot, Math.max(0.001, 1 - n.fall * 0.7)));
+        inst.set(n.index, trs(_m, n.def.x, this.groundY(n.def.x, n.def.z) - n.fall * 0.3, n.def.z, rot, Math.max(0.001, 1 - n.fall * 0.7)));
       }
       this.nodeCount.set(n.key, Math.max(this.nodeCount.get(n.key) ?? 0, n.index + 1));
     }
@@ -407,24 +407,19 @@ export class WorldView {
     }
     this.stumpInst.setCount(stumps);
     this.stumpInst.commit();
+    this.updateRipples(sim, time);
 
     // Tents pop in as the population grows.
     const spots = this.data.camp.tentSpots;
     const nt = Math.min(sim.state.tents, spots.length);
-    const tentVis = visibleTents(this.data, sim.state);
     for (let i = 0; i < nt; i++) {
       if (this.tentAppear[i] === undefined) {
         this.tentAppear[i] = 0;
         this.onAppear(spots[i].x, spots[i].z, 1.3);
       }
-      const shown = tentVis[i];
-      if (this.tentShown[i] !== shown) {
-        this.tentShown[i] = shown;
-        this.tentDone[i] = false;
-      }
       if (this.tentAppear[i] >= 1 && this.tentDone[i]) continue;
       this.tentAppear[i] = Math.min(1, this.tentAppear[i] + dt / 0.7);
-      this.tentInst.set(i, trs(_m, spots[i].x, 0, spots[i].z, spots[i].rot, shown ? backOut(this.tentAppear[i]) * TENT_SCALE : 0));
+      this.tentInst.set(i, trs(_m, spots[i].x, 0, spots[i].z, spots[i].rot, backOut(this.tentAppear[i])));
       this.tentDone[i] = this.tentAppear[i] >= 1;
     }
     this.tentInst.setCount(nt);
@@ -576,6 +571,46 @@ export class WorldView {
     }
   }
 
+  private ripples: THREE.InstancedMesh | null = null;
+
+  /** Gentle expanding ripples in every open fishing hole so the water reads as alive. */
+  private updateRipples(sim: Sim, time: number): void {
+    const holes = this.nodes.filter((n) => /ice|hole|water/i.test(n.def.model));
+    if (!holes.length) return;
+    if (!this.ripples) {
+      const geo = new THREE.RingGeometry(0.28, 0.33, 28).rotateX(-Math.PI / 2);
+      const mat = new THREE.MeshBasicMaterial({ color: 0xcfefff, transparent: true, opacity: 0.55, depthWrite: false, toneMapped: false });
+      this.ripples = new THREE.InstancedMesh(geo, mat, holes.length * 2);
+      this.ripples.frustumCulled = false;
+      this.ripples.renderOrder = 3;
+      this.root.add(this.ripples);
+    }
+    let k = 0;
+    for (const n of holes) {
+      if (!n.alive || !sim.isUsable(n.def.id)) continue;
+      const y = this.groundY(n.def.x, n.def.z) + 0.1;
+      for (let j = 0; j < 2; j++) {
+        const t = (time * 0.45 + j * 0.5 + (n.index % 7) * 0.13) % 1;
+        const sc = 0.6 + t * 1.6;
+        _m.makeScale(sc * (1 - t * 0.2), 1, sc * (1 - t * 0.2)).setPosition(n.def.x, y, n.def.z);
+        this.ripples.setMatrixAt(k++, _m);
+      }
+    }
+    this.ripples.count = k;
+    this.ripples.instanceMatrix.needsUpdate = true;
+  }
+
+  private surface: { heightAt(x: number, z: number): number } | null = null;
+  /** Ground surface (floors/streams) so nodes and mats sit on top of dressing. */
+  setSurface(s: { heightAt(x: number, z: number): number }): void {
+    this.surface = s;
+    for (const m of this.shelfMats) m.mesh.position.y = s.heightAt(m.x, m.z) + 0.02;
+  }
+
+  private groundY(x: number, z: number): number {
+    return this.surface ? this.surface.heightAt(x, z) : 0;
+  }
+
   bump(id: string): void {
     const s = this.stations.get(id);
     if (s && s.appear >= 1) s.wobble = 1;
@@ -632,6 +667,8 @@ export function localSpot(d: StationDef, item: ItemKind | null, role: 'in' | 'ou
       return _v.set(0, top, 0);
     case 'deposit':
       return _v.set(1.55, 0, 1.0);
+    case 'shelf':
+      return _v.set(0, top, 0); // items arc into the top of the bin
     default:
       void item;
       return _v.set(0, 0, 0);
@@ -668,33 +705,46 @@ function distToPlay(data: GameData, x: number, z: number): number {
 
 let shelfTex: THREE.CanvasTexture | null = null;
 function makeShelfMat(): THREE.Mesh {
+  // The bin's mat: muted brick red with a "toss it" icon and label, clearly not a build pad.
   if (!shelfTex) {
     const c = document.createElement('canvas');
     c.width = 256;
     c.height = 192;
     const g = c.getContext('2d')!;
-    g.fillStyle = 'rgba(40,120,120,0.22)';
+    g.fillStyle = 'rgba(120,50,40,0.30)';
     g.beginPath();
     g.roundRect(8, 8, 240, 176, 34);
     g.fill();
-    g.setLineDash([22, 14]);
-    g.lineWidth = 9;
-    g.strokeStyle = 'rgba(120,230,215,0.9)';
+    g.setLineDash([20, 12]);
+    g.lineWidth = 8;
+    g.strokeStyle = 'rgba(255,150,120,0.85)';
     g.stroke();
     g.setLineDash([]);
-    // Icon: a little stack with a down arrow ("set things down here").
-    g.fillStyle = 'rgba(200,255,245,0.9)';
-    g.fillRect(28, 128, 44, 12);
-    g.fillRect(32, 114, 36, 12);
+    // Icon: an item arcing into a bin.
+    g.strokeStyle = 'rgba(255,220,200,0.95)';
+    g.fillStyle = 'rgba(255,220,200,0.95)';
+    g.lineWidth = 6;
     g.beginPath();
-    g.moveTo(50, 70);
-    g.lineTo(50, 100);
-    g.moveTo(38, 90);
-    g.lineTo(50, 104);
-    g.lineTo(62, 90);
-    g.lineWidth = 7;
-    g.strokeStyle = 'rgba(200,255,245,0.9)';
+    g.moveTo(26, 150);
+    g.lineTo(32, 108);
+    g.lineTo(68, 108);
+    g.lineTo(74, 150);
+    g.closePath();
     g.stroke();
+    g.beginPath();
+    g.moveTo(20, 104);
+    g.lineTo(80, 104);
+    g.stroke();
+    g.beginPath();
+    g.setLineDash([8, 8]);
+    g.moveTo(96, 52);
+    g.quadraticCurveTo(70, 40, 52, 92);
+    g.stroke();
+    g.setLineDash([]);
+    g.fillRect(92, 42, 20, 20);
+    g.font = '900 34px system-ui, -apple-system, sans-serif';
+    g.textAlign = 'center';
+    g.fillText('BIN', 176, 160);
     shelfTex = new THREE.CanvasTexture(c);
     shelfTex.colorSpace = THREE.SRGBColorSpace;
   }

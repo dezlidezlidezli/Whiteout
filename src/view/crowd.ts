@@ -2,7 +2,6 @@
 // All drawn with two InstancedMeshes (frozen + thawed) and per-instance transforms/colours.
 
 import * as THREE from 'three';
-import { visibleTents } from './camplayout';
 import type { GameData } from '../data/types';
 import type { CustomerState, Sim } from '../sim';
 import { FROZEN_TINTS, getCrowdMesh, PALETTE } from './models';
@@ -43,6 +42,8 @@ export class Crowd {
   /** One instanced soft disc under every crowd member. */
   private blobs: THREE.InstancedMesh;
   private nb = 0;
+  /** Surface height (floors) so blob shadows sit on yard floors too. */
+  groundAt: (x: number, z: number) => number = () => 0;
   private thawed: THREE.InstancedMesh;
   private villagers: Villager[] = [];
   private cheerT = 0;
@@ -200,8 +201,7 @@ export class Crowd {
 
     // Homes: raised tents plus any built cabins.
     const spots = this.data.camp.tentSpots;
-    const tentVis = visibleTents(this.data, s);
-    const tents = spots.slice(0, Math.min(s.tents, spots.length)).filter((_, i) => tentVis[i]);
+    const tents = spots.slice(0, Math.min(s.tents, spots.length));
     this.homes = tents.slice();
     for (const d of this.data.decor) if (d.model === 'cabin' && s.unlocked[d.id]) this.homes.push({ x: d.x, z: d.z });
     const obstacles = this.homes;
@@ -313,7 +313,7 @@ export class Crowd {
     if (i >= im.instanceMatrix.count) return;
     if (this.nb < this.blobs.instanceMatrix.count) {
       const bs = scale * (1 - Math.min(0.5, y * 0.8));
-      _m.makeScale(bs, 1, bs).setPosition(x, 0.03, z);
+      _m.makeScale(bs, 1, bs).setPosition(x, this.groundAt(x, z) + 0.03, z);
       this.blobs.setMatrixAt(this.nb++, _m);
     }
     _e.set(0, yaw, roll, 'YXZ');

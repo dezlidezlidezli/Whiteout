@@ -16,7 +16,8 @@ import { ItemBatcher } from './items';
 import { PALETTE } from './models';
 import { PadVisual } from './pads';
 import { WorldView } from './world';
-import { DressingView } from './dressing';
+import { DressingView, skipCampFloor } from './dressing';
+import { SurfaceMap } from './surface';
 import { ConveyorView } from './conveyors';
 import { clearSeeSubject, setSeeSubject } from './occlude';
 import { Sky } from './sky';
@@ -72,6 +73,7 @@ export class View {
   private hemi: THREE.HemisphereLight;
   private world: WorldView;
   private dressing: DressingView;
+  readonly surface: SurfaceMap;
   private conveyors: ConveyorView;
   private pads = new Map<string, PadVisual>();
   private actors: Actors;
@@ -150,7 +152,9 @@ export class View {
     this.ground = createGround();
     this.scene.add(this.ground.mesh);
     this.world = new WorldView(this.scene, this.data, quality);
-    this.dressing = new DressingView(this.scene, this.data, this.ground.uniforms, quality);
+    this.surface = new SurfaceMap(this.data, skipCampFloor);
+    this.dressing = new DressingView(this.scene, this.data, this.ground.uniforms, quality, this.surface);
+    this.world.setSurface(this.surface);
     this.conveyors = new ConveyorView(this.scene, this.data);
     this.conveyors.onAppear = (x, z) => this.world.onAppear(x, z, 0.5);
     this.world.onAppear = (x, z, size) => {
@@ -162,12 +166,17 @@ export class View {
     this.scene.add(this.fuelBubble);
     for (const p of this.data.pads) {
       const pv = new PadVisual(p);
+      // Seat the pad on the highest surface under its footprint (floors, paths, streams).
+      let py = 0;
+      for (const [ox, oz] of [[0, 0], [-0.9, -0.9], [0.9, -0.9], [-0.9, 0.9], [0.9, 0.9]]) py = Math.max(py, this.surface.heightAt(p.x + ox, p.z + oz));
+      pv.root.position.y = py + 0.02;
       this.pads.set(p.id, pv);
       this.scene.add(pv.root);
     }
     this.items = new ItemBatcher(this.scene);
     this.actors = new Actors(this.scene, this.data);
     this.crowd = new Crowd(this.scene, this.data);
+    this.crowd.groundAt = (x, z) => this.surface.heightAt(x, z);
     this.crowd.residentCap = quality >= 1 ? 44 : 30;
     this.crowd.onEnterHome = (x, z) => {
       this.fx.puff(x, 0.3, z, 5, 0.5, 0.9);
@@ -302,6 +311,37 @@ export class View {
       this.renderer.render(this.scene, this.rig.camera);
     } finally {
       for (const o of hidden) o.visible = false;
+    }
+  }
+
+  private dwell = 0;
+  private dwellRing: THREE.Mesh | null = null;
+
+  /** A ring fills around the player while they stand at a bin with a full pack (it is about to take things). */
+  private updateBinDwell(dt: number, px: number, pz: number): void {
+    const p = this.sim.state.player;
+    let bin: { x: number; z: number } | null = null;
+    if (p.stack.length > 0 && Math.hypot(p.vx, p.vz) < 0.25) {
+      for (const d of this.data.stations) {
+        if (d.type === 'shelf' && this.sim.isUsable(d.id) && Math.hypot(d.x - px, d.z - pz) <= d.reach) {
+          bin = d;
+          break;
+        }
+      }
+    }
+    this.dwell = bin ? Math.min(1, this.dwell + dt / 0.8) : 0;
+    if (!this.dwellRing) {
+      const geo = new THREE.RingGeometry(0.62, 0.78, 48, 1, Math.PI / 2, -Math.PI * 2).rotateX(-Math.PI / 2);
+      this.dwellRing = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xff8a6a, transparent: true, opacity: 0.9, depthWrite: false, toneMapped: false }));
+      this.dwellRing.renderOrder = 4;
+      this.scene.add(this.dwellRing);
+    }
+    const r = this.dwellRing;
+    r.visible = this.dwell > 0.02 && !this.title;
+    if (r.visible) {
+      r.position.set(px, this.surface.heightAt(px, pz) + 0.05, pz);
+      const idx = r.geometry.index!.count;
+      r.geometry.setDrawRange(0, Math.floor((idx / 6) * this.dwell) * 6);
     }
   }
 
@@ -598,6 +638,19 @@ export class View {
           this.sfx('hammer', { volume: 0.6 }, 0.1);
           this.hooks.toast('A new tent goes up!', 'info');
           break;
+        case 'binned': {
+          // Toss-and-poof: the item vanishes into the bin with a little puff.
+          const d = this.sim.stationDefs.get(e.bin);
+          if (d) {
+            const top = this.world.stationTop(e.bin);
+            this.later(0.22, () => {
+              this.fx.puff(d.x, top, d.z, 4, 0.35, 0.8, 0.5);
+              this.fx.glint(d.x, top, d.z, 3, 1);
+            });
+            this.sfx('drop', { pitch: 0.7, volume: 0.6 }, 0.05);
+          }
+          break;
+        }
         case 'cosy':
           // Announce Cosy at most once every few minutes; the HUD pill shows the state.
           if (e.on && performance.now() - this.lastCosyToast > 240000) {
@@ -742,7 +795,8 @@ export class View {
     this.sparks.update(t, this.renderer.getPixelRatio(), 0.8 + s.hearth.level * 0.25 + (sim.cosy ? 0.5 : 0));
     this.prints.update(dt, px, pz, p.facing, distHearth > this.radius + 0.5);
 
-    this.playerRing.position.set(px, 0.05, pz);
+    this.playerRing.position.set(px, this.surface.heightAt(px, pz) + 0.03, pz);
+    this.updateBinDwell(dt, px, pz);
     this.playerRing.visible = !this.title;
     const rs = 1 + Math.sin(t * 2.4) * 0.04;
     this.playerRing.scale.set(rs, 1, rs);
@@ -869,16 +923,6 @@ export class View {
         const n = st.count - (this.hidden.get(`st:${d.id}:${k}`) ?? 0);
         this.world.itemSpot(d.id, k, _v, 'in');
         items.grid(k, Math.max(0, n), _v.x, 0.02, _v.z, yaw + 0.6, 4, 4, 0.36);
-      } else if (st.kind === 'shelf') {
-        // Spare shelf: a mix of kinds, one small stack per kind.
-        this.world.itemSpot(d.id, null, _v, 'in');
-        const kinds: ItemKind[] = [];
-        for (const it of st.items) if (!kinds.includes(it)) kinds.push(it);
-        kinds.forEach((k, i) => {
-          let n = 0;
-          for (const it of st.items) if (it === k) n++;
-          items.grid(k, n, _v.x + (i - (kinds.length - 1) / 2) * 0.45, _v.y, _v.z, yaw, 2, 2, 0.36);
-        });
       }
     }
     // Conveyor belts.

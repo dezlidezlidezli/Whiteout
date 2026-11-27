@@ -364,6 +364,8 @@ class SettingsSheet {
     this.sheet.appendChild(h('h3', '', 'Save code'));
     const ta = h('textarea');
     ta.setAttribute('spellcheck', 'false');
+    // A save code must arrive exactly as pasted: no autocorrect, capitalisation or smart punctuation.
+    for (const a of ['autocorrect', 'autocapitalize', 'autocomplete']) ta.setAttribute(a, 'off');
     ta.placeholder = 'Tap “Export” to get your save code, or paste one here and tap “Import”.';
     this.sheet.appendChild(ta);
     const acts = h('div', 'fk-acts');

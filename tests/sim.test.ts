@@ -468,3 +468,31 @@ describe('hearth fuel', () => {
     expect(toggles).toBe(2);
   });
 });
+
+describe('save code import is forgiving', () => {
+  const sim = new Sim(GAME_DATA, { seed: 5 });
+  for (let i = 0; i < 600; i++) sim.step(1 / 60);
+  const json = sim.serialize();
+  const code = encodeSaveCode(json);
+  const body = code.slice(4);
+  const cases: Record<string, string> = {
+    'as exported': code,
+    'wrapped in line breaks and spaces': code.replace(/(.{40})/g, '$1\n  '),
+    'with non-breaking and zero-width spaces': '\u00a0' + code.replace(/(.{25})/g, '$1\u200b') + '\u00a0\ufeff',
+    'without the prefix': body,
+    'without trailing padding': code.replace(/=+$/, ''),
+    'url-safe alphabet': 'FK1:' + body.replace(/\+/g, '-').replace(/\//g, '_'),
+    'with text around it': 'My save code: ' + code + '\n',
+    'with smart quotes around it': '\u201c' + code + '\u201d',
+  };
+  for (const [name, input] of Object.entries(cases)) {
+    it(name, () => {
+      expect(decodeSaveCode(input)).toBe(json);
+      expect(() => new Sim(GAME_DATA, { save: decodeSaveCode(input) })).not.toThrow();
+    });
+  }
+  it('rejects junk with a friendly message', () => {
+    expect(() => decodeSaveCode('hello')).toThrow(/save code/);
+    expect(() => decodeSaveCode('FK1:!!!!')).toThrow(/save code/);
+  });
+});

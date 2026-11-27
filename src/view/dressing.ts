@@ -13,6 +13,12 @@ import {
   createFencePath, createFloor, createPathStrip, createProp, createWallPath, getScatterMesh, type ScatterKind, type XZ,
 } from './models';
 import { seeThrough } from './occlude';
+import { FLOOR_BASE, FLOOR_STEP, PATH_Y, type SurfaceMap } from './surface';
+
+/** The camp is a green meadow around the Hearth: no big earth slab or snowy trampled strips there. */
+export function skipCampFloor(area: string, type: string): boolean {
+  return area === 'camp' && type === 'packedEarth';
+}
 
 type AreaD = GameData['dressing'][number];
 type Theme = AreaD['clutterZones'][number]['theme'];
@@ -100,6 +106,17 @@ function stripRects(points: XZ[], w: number): Rect[] {
   return out;
 }
 
+/** A soft, irregular octagon (local XZ) for organic patches like the camp's hearth stones. */
+function irregular(w: number, d: number, rand: () => number): XZ[] {
+  const out: XZ[] = [];
+  for (let k = 0; k < 10; k++) {
+    const a = (k / 10) * Math.PI * 2;
+    const r = 0.86 + rand() * 0.14;
+    out.push([(Math.cos(a) * w * r) / 2, (Math.sin(a) * d * r) / 2]);
+  }
+  return out;
+}
+
 function segDist(px: number, pz: number, a: XZ, b: XZ): number {
   const dx = b[0] - a[0];
   const dz = b[1] - a[1];
@@ -127,7 +144,7 @@ export class DressingView {
   private openKey = '';
   private scatter: THREE.InstancedMesh[] = [];
 
-  constructor(parent: THREE.Object3D, data: GameData, private ground: GroundUniforms, quality: number) {
+  constructor(parent: THREE.Object3D, data: GameData, private ground: GroundUniforms, quality: number, surface: SurfaceMap) {
     // Things clutter must keep clear of: stations (reach), pads, belts, counter queues.
     const keepOut: { x: number; z: number; r: number }[] = [];
     for (const s of data.stations) keepOut.push({ x: s.x, z: s.z, r: Math.max(1.3, (s.reach ?? 1.5) * 0.85) });
@@ -149,23 +166,29 @@ export class DressingView {
       const flats: Rect[] = [];
 
       a.floors.forEach((f, i) => {
-        // The camp is a green meadow around the Hearth: no big earth slab there (smaller floors stay).
-        if (a.area === 'camp' && f.type === 'packedEarth') return;
-        const o = createFloor(f.type, f.w, f.d, { seed: ai * 10 + i });
-        o.position.set(f.x, 0.004 + i * 0.004, f.z);
+        if (skipCampFloor(a.area, f.type)) return;
+        // In the camp meadow the hearth square is a smaller, irregular patch of warm stones.
+        const soft = a.area === 'camp';
+        const w = soft ? f.w * 0.82 : f.w;
+        const d = soft ? f.d * 0.82 : f.d;
+        const polygon = soft ? irregular(w, d, rand) : undefined;
+        const o = createFloor(f.type, w, d, { seed: ai * 10 + i, polygon, kerb: !soft });
+        o.position.set(f.x, FLOOR_BASE + i * FLOOR_STEP, f.z);
         flatRoots.push(o);
         flats.push({ x0: f.x - f.w / 2, z0: f.z - f.d / 2, x1: f.x + f.w / 2, z1: f.z + f.d / 2 });
       });
       a.paths.forEach((p, i) => {
+        // Inside the warm camp meadow the ground itself shows the worn earth: no snowy strips.
+        if (a.area === 'camp' && p.type === 'trampled') return;
         const o = createPathStrip(p.points, { width: p.width, type: p.type, seed: ai * 10 + i });
-        o.position.y = 0.02;
+        o.position.y = PATH_Y;
         flatRoots.push(o);
         flats.push(...stripRects(p.points, p.width));
       });
       a.streams.forEach((s, i) => {
         // Frozen water must read as ice whatever the Hearth's warmth: sit it above the melt ground.
         const o = createPathStrip(s.points, { width: s.width, type: 'ice', seed: ai * 10 + i + 5 });
-        o.position.y = 0.1;
+        o.position.y = surface.streamBase(s.points);
         flatRoots.push(o);
         flats.push(...stripRects(s.points, s.width + 0.4));
       });

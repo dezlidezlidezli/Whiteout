@@ -48,6 +48,8 @@ export function migrate(raw: { v?: number; state?: any }): SimState {
   return s as SimState;
 }
 
+const BAD_CODE = 'That does not look like a complete Frostkettle save code. Copy the whole code and try again.';
+
 /** Text code for export/import (base64 of the JSON, URL-safe). */
 export function encodeSaveCode(json: string): string {
   const bytes = new TextEncoder().encode(json);
@@ -57,11 +59,24 @@ export function encodeSaveCode(json: string): string {
 }
 
 export function decodeSaveCode(code: string): string {
-  const c = code.trim();
+  let c = code.trim();
   if (c.startsWith('{')) return c;
-  const body = c.startsWith('FK1:') ? c.slice(4) : c;
-  const bin = atob(body.replace(/\s+/g, ''));
+  // Be forgiving: notes apps, messengers and keyboards add spaces, line breaks, invisible marks or
+  // text around the code, swap in look-alike characters, or drop the trailing "=" padding.
+  const at = c.indexOf('FK1:');
+  if (at >= 0) c = c.slice(at + 4);
+  let body = c.replace(/-/g, '+').replace(/_/g, '/').replace(/[^A-Za-z0-9+/]/g, '');
+  if (body.length < 8 || body.length % 4 === 1) throw new Error(BAD_CODE);
+  while (body.length % 4) body += '=';
+  let bin: string;
+  try {
+    bin = atob(body);
+  } catch {
+    throw new Error(BAD_CODE);
+  }
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return new TextDecoder().decode(bytes);
+  const text = new TextDecoder().decode(bytes);
+  if (!text.trimStart().startsWith('{')) throw new Error(BAD_CODE);
+  return text;
 }
