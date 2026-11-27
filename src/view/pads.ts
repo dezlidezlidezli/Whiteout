@@ -312,7 +312,8 @@ export class PadVisual {
       this.tether.visible = false;
       return null;
     }
-    const lim = 0.8;
+    // The label is ~0.25 NDC half-wide at the default zoom: start sliding just before it would clip.
+    const lim = 0.72;
     const over = _lp.x > lim ? _lp.x - lim : _lp.x < -lim ? _lp.x + lim : 0;
     // ~4.8 m of world per half-screen at the default zoom; slide only by what is needed.
     this.labelMesh.position.x = -over * 4.8;
